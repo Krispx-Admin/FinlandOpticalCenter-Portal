@@ -226,7 +226,10 @@ function renderShell() {
   app.innerHTML = `
     <div class="shell">
       <nav class="side">
-        <div class="logo side-logo">${icons.glasses}<span>FOC<b>Portal</b></span></div>
+        <div class="side-logo">
+          <img class="side-wordmark" src="img/foc-portal-white.png" alt="FOC Portal">
+          <img class="side-mark" src="img/foc-portal-mark-white.png" alt="FOC Portal">
+        </div>
         <div class="side-nav" id="nav"></div>
         <div class="side-foot">
           <div class="live-ind"><i></i>Live · synced</div>
