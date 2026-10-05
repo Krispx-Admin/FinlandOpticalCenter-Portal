@@ -114,6 +114,34 @@ export const lensLabel = i => `${i.type} ${i.index}${i.coating && i.coating !== 
 export const lensRx = i => `SPH ${fmtPwr(i.sph)} · CYL ${fmtPwr(i.cyl)}`;
 export const lensFull = i => `${lensLabel(i)} · ${lensRx(i)}`;
 
+// ── Insurance claim receipts ────────────────────────────────────────────────
+// Oman prices carry three decimals (1 rial = 1000 baisa).
+export const CURRENCY = 'OMR';
+export const money = n => (Number(n) || 0).toFixed(3);
+
+export const PAYMENT_TYPES = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'card', label: 'Card' },
+];
+
+// A standard spectacle prescription grid: one row per eye, five columns.
+export const RX_EYES = [
+  { key: 'od', label: 'Right', abbr: 'OD' },
+  { key: 'os', label: 'Left', abbr: 'OS' },
+];
+export const RX_FIELDS = [
+  { key: 'sph', label: 'SPH' },
+  { key: 'cyl', label: 'CYL' },
+  { key: 'axis', label: 'AXIS' },
+  { key: 'add', label: 'ADD' },
+  { key: 'pd', label: 'PD' },
+];
+export const blankRx = () => ({
+  od: Object.fromEntries(RX_FIELDS.map(f => [f.key, ''])),
+  os: Object.fromEntries(RX_FIELDS.map(f => [f.key, ''])),
+});
+export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);
+
 // ── Permissions ──
 export function canSeeOrder(o, code) {
   const me = loc(code);
@@ -126,6 +154,10 @@ export function canAdvanceOrder(o, code) {
 }
 export function canSeeRequest(r, code) {
   return loc(code)?.role === 'admin' || r.branch === code;
+}
+// A branch sees the claims it raised; the warehouse oversees all of them.
+export function canSeeClaim(c, code) {
+  return loc(code)?.role === 'admin' || c.branch === code;
 }
 // Only the holding branch edits the shelf count; the warehouse may look on.
 export const isLensOwner = code => code === LENS_OWNER;
@@ -212,13 +244,42 @@ function mkLensReq(now, stock, { ref, branch, status, ageH, note, picks, reason 
            createdAt: created, updatedAt: last.at, timeline };
 }
 
+const isoDay = (now, offsetDays) => new Date(now + offsetDays * 864e5).toISOString().slice(0, 10);
+
+// Two worked examples so the receipt can be printed without typing anything.
+function mkClaim(now, { ref, date, branch, billNo, customer, items, rx, payment, ageH, by }) {
+  const at = now - ageH * H;
+  return {
+    id: nid(), ref, date, branch, billNo, customer,
+    items: items.map((it, i) => ({ id: `ci${ref}${i}`, ...it })),
+    rx, payment, createdAt: at, updatedAt: at, by: by ?? branch,
+  };
+}
+
 export function seedState() {
   const now = Date.now();
   const lensStock = mkLensStock(now);
   return {
     v: 5,
     rev: 1,
-    seq: { bill: 58241, req: 1027, lens: 2043 },
+    seq: { bill: 58241, req: 1027, lens: 2043, claim: 3042 },
+    claims: [
+      mkClaim(now, { ref: 'IC-3042', date: isoDay(now, 0), branch: 'MOUJ', billNo: 'B-58209', customer: 'Fatma Al Lawati', ageH: 3, payment: 'card',
+        items: [
+          { name: 'Tom Ford FT5401 optical frame', price: 145 },
+          { name: 'Progressive 1.67 blue-cut lenses (pair)', price: 180 },
+        ],
+        rx: { od: { sph: '-2.25', cyl: '-0.75', axis: '175', add: '+2.00', pd: '32.0' },
+              os: { sph: '-2.50', cyl: '-0.50', axis: '10',  add: '+2.00', pd: '32.5' } } }),
+      mkClaim(now, { ref: 'IC-3041', date: isoDay(now, -2), branch: 'QCC', billNo: 'B-58201', customer: 'Salim Al Harthy', ageH: 50, payment: 'cash',
+        items: [
+          { name: 'Persol PO3007V frame', price: 98.5 },
+          { name: 'Single vision 1.50 photochromic (pair)', price: 65 },
+          { name: 'Cleaning kit', price: 4.5 },
+        ],
+        rx: { od: { sph: '-1.00', cyl: '', axis: '', add: '', pd: '31.5' },
+              os: { sph: '-1.25', cyl: '-0.25', axis: '90', add: '', pd: '31.5' } } }),
+    ],
     lensStock,
     lensRequests: [
       mkLensReq(now, lensStock, { ref: 'LR-2043', branch: 'SCC', status: 'requested', ageH: 1.5, note: 'Two jobs waiting on these',

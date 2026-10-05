@@ -2,7 +2,7 @@
 import {
   seedState, loc, locName, BRANCHES, FITTERS, AUDIENCES,
   FIT_STATUS, nextFitStatus, fitActor,
-  canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest,
+  canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   LENS_OWNER, lensFull, brandsFor,
 } from './data.js';
 
@@ -18,10 +18,18 @@ const subs = new Set();
 function load() {
   try {
     const raw = localStorage.getItem(STATE_KEY);
-    if (raw) { const s = JSON.parse(raw); if (s?.v === STATE_VERSION) return s; }
+    if (raw) { const s = JSON.parse(raw); if (s?.v === STATE_VERSION) return hydrate(s); }
   } catch { /* corrupted → reseed */ }
   const s = seedState();
   localStorage.setItem(STATE_KEY, JSON.stringify(s));
+  return s;
+}
+
+// Fills in collections added after a blob was first written, so shipping a new
+// module doesn't force everyone's saved records to be thrown away.
+function hydrate(s) {
+  s.claims ??= [];
+  s.seq.claim ??= 3000;
   return s;
 }
 
@@ -93,6 +101,9 @@ export const store = {
     return c?.unit === 'box' ? 'box' : 'pcs';
   },
   brandGroup(name) { return state.settings.brandGroups.find(g => g.name === name); },
+
+  claimsFor(code) { return state.claims.filter(c => canSeeClaim(c, code)); },
+  claim(id) { return state.claims.find(c => c.id === id); },
 
   get lensStock() { return state.lensStock; },
   lensItem(id) { return state.lensStock.find(i => i.id === id); },
@@ -287,6 +298,41 @@ export const store = {
     r.updatedAt = now;
     r.timeline.push({ at: now, by, text: `Declined${r.reason ? ` — ${r.reason}` : ''}` });
     commit({ by, module: 'lens', title: `${by} declined ${r.ref}`, sub: `→ ${locName(r.branch)}`, refs: [r.id] });
+  },
+
+  // ── Insurance claim receipts ──
+  createClaim(f, by) {
+    const now = Date.now();
+    state.seq.claim++;
+    const c = {
+      id: 'c' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      ref: `IC-${state.seq.claim}`,
+      date: f.date, branch: f.branch, billNo: f.billNo ?? '', customer: f.customer ?? '',
+      items: f.items.map((it, i) => ({ id: `ci${now.toString(36)}${i}`, name: it.name, price: Number(it.price) || 0 })),
+      rx: f.rx, payment: f.payment === 'card' ? 'card' : 'cash',
+      createdAt: now, updatedAt: now, by,
+    };
+    state.claims.unshift(c);
+    commit({ by, module: 'claims', title: `${by} raised claim ${c.ref}`, sub: c.customer, refs: [c.id] });
+    return c;
+  },
+  updateClaim(id, f, by) {
+    const c = this.claim(id);
+    if (!c) return;
+    const now = Date.now();
+    Object.assign(c, {
+      date: f.date, branch: f.branch, billNo: f.billNo ?? '', customer: f.customer ?? '',
+      items: f.items.map((it, i) => ({ id: it.id ?? `ci${now.toString(36)}${i}`, name: it.name, price: Number(it.price) || 0 })),
+      rx: f.rx, payment: f.payment === 'card' ? 'card' : 'cash', updatedAt: now,
+    });
+    commit({ by, module: 'claims', title: `${by} updated claim ${c.ref}`, sub: c.customer, refs: [c.id] });
+    return c;
+  },
+  removeClaim(id, by) {
+    const c = this.claim(id);
+    if (!c) return;
+    state.claims = state.claims.filter(x => x.id !== id);
+    commit({ by, module: 'claims', title: `${by} deleted claim ${c.ref}`, refs: [id] });
   },
 
   // ── Settings (admin) ──
