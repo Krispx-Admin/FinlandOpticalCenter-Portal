@@ -26,50 +26,57 @@ function renderLogin(preselect = null) {
   ];
   app.innerHTML = `
   <div class="login">
-    <aside class="login-brand">
-      <div class="lb-inner">
-        <div class="logo">${icons.glasses}<span>FOC<b>Portal</b></span></div>
-        <h1>One live board for the whole network.</h1>
-        <p>Fitting hand-offs and warehouse stock — every branch, fitting centre
-           and the warehouse looking at the same records, in real time.</p>
-        <div class="lb-live"><i></i> Live · shared across all locations</div>
-      </div>
-    </aside>
+    <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
     <main class="login-panel">
       <div class="lp-inner">
-        <h2>Sign in as your location</h2>
-        <p class="lp-sub">Pick your location, then enter its 6-digit code.</p>
-        ${groups.map(([title, role]) => `
-          <div class="lp-group">
-            <h3>${title}</h3>
-            <div class="lp-grid">
-              ${LOCATIONS.filter(l => l.role === role).map(l => `
-                <button class="loc-card role-${l.role} ${preselect === l.code ? 'sel' : ''}" data-loc="${l.code}">
-                  <span class="loc-code">${l.code}</span>
-                  <span class="loc-name">${esc(l.name)}</span>
-                </button>`).join('')}
-            </div>
-          </div>`).join('')}
-        <div class="pin-area ${preselect ? 'open' : ''}" id="pin-area">
-          ${preselect ? pinHTML(preselect) : ''}
-        </div>
+        <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
+
+        <section class="lp-step" id="step-pick">
+          <h2>Sign in</h2>
+          <p class="lp-sub">Choose your location.</p>
+          ${groups.map(([title, role]) => `
+            <div class="lp-group">
+              <h3>${title}</h3>
+              <div class="lp-grid">
+                ${LOCATIONS.filter(l => l.role === role).map(l => `
+                  <button class="loc-card role-${l.role}" data-loc="${l.code}">
+                    <span class="loc-code">${l.code}</span>
+                    <span class="loc-name">${esc(l.name)}</span>
+                  </button>`).join('')}
+              </div>
+            </div>`).join('')}
+        </section>
+
+        <section class="lp-step" id="step-code" hidden></section>
       </div>
     </main>
   </div>`;
 
+  // Picking a location swaps the grid for the code box, so the field is always
+  // in view — it used to sit below a long list and need scrolling to reach.
   app.querySelectorAll('[data-loc]').forEach(btn => btn.addEventListener('click', () => {
-    app.querySelectorAll('.loc-card').forEach(b => b.classList.toggle('sel', b === btn));
-    const area = app.querySelector('#pin-area');
-    area.classList.add('open');
-    area.innerHTML = pinHTML(btn.dataset.loc);
-    wirePin(btn.dataset.loc);
+    showCodeStep(btn.dataset.loc);
   }));
-  if (preselect) wirePin(preselect);
+  if (preselect) showCodeStep(preselect);
+}
+
+function showCodeStep(code) {
+  const pick = app.querySelector('#step-pick');
+  const step = app.querySelector('#step-code');
+  pick.hidden = true;
+  step.hidden = false;
+  step.innerHTML = pinHTML(code);
+  step.querySelector('[data-back]')?.addEventListener('click', () => {
+    step.hidden = true;
+    pick.hidden = false;
+  });
+  wirePin(code);
 }
 
 function pinHTML(code) {
   const l = loc(code);
   return `
+    <button class="lp-back" data-back>${icons.chevronRight}Change location</button>
     <div class="pin-card">
       <div class="pin-who"><span class="loc-chip">${code}</span> ${esc(l.name)} <em>· ${ROLES[l.role].label}</em></div>
       <form id="pin-form" autocomplete="off">
