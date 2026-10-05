@@ -121,16 +121,38 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .login-mark img { width: min(820px, 120vh); opacity: .045; transform: rotate(-30deg); }
 
-.login-panel { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: flex; justify-content: center; }
+.login-panel { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: flex; }
 .lp-inner {
-  width: min(1120px, 100%); padding: 26px 28px 36px;
+  width: min(1060px, 100%); margin: auto; padding: 92px 28px 40px;
   animation: fadeUp .45s ease both; display: flex; flex-direction: column;
 }
-.lp-logo { width: 190px; max-width: 54%; height: auto; align-self: center; margin-bottom: 16px; }
-.lp-inner h2 { font-size: 21px; }
-.lp-sub { color: var(--ink-2); margin: 5px 0 18px; }
-.lp-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); margin: 0 0 8px; }
-.lp-group + .lp-group { margin-top: 16px; }
+.lp-head { text-align: center; margin-bottom: 20px; }
+.lp-logo {
+  position: absolute; top: 22px; right: 30px; z-index: 2;
+  width: 184px; max-width: 40vw; height: auto;
+}
+.lp-inner h2 { font-size: 23px; }
+.lp-sub { color: var(--ink-2); margin: 5px 0 0; }
+.lp-group {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 15px; box-shadow: var(--shadow);
+}
+.lp-group h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-3); margin: 0 0 9px;
+}
+.lp-group + .lp-group { margin-top: 14px; }
+
+/* the warehouse gets the widest panel, and a card to match */
+.lp-wh { margin-bottom: 16px; border-color: var(--border-strong); }
+.lp-wh h3 { text-align: center; color: var(--brand); }
+.lp-wh .lp-grid { grid-template-columns: minmax(0, 340px); justify-content: center; }
+.lp-wh .loc-card {
+  flex-direction: row; align-items: center; justify-content: center;
+  gap: 11px; padding: 15px 18px;
+}
+.lp-wh .loc-name { font-size: 15px; }
+.lp-wh .loc-code { font-size: 12px; padding: 3px 9px; }
 .lp-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px; align-items: start; }
 .lp-col { min-width: 0; }
 .lp-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -148,7 +170,8 @@ svg { width: 18px; height: 18px; flex: none; }
 .loc-card.role-admin .loc-code { color: #fff; background: var(--brand); }
 .loc-name { font-weight: 600; font-size: 12.5px; }
 
-/* step two */
+/* step two — narrow and centred, not stretched across the full canvas */
+#step-code { width: min(440px, 100%); margin: 0 auto; }
 .lp-back {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 5px;
   background: none; border: none; color: var(--ink-2); font-size: 13px; font-weight: 600;

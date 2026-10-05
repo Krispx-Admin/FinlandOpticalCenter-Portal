@@ -18,15 +18,15 @@ let clockTimer = null;
 // ─────────────────────────── LOGIN ───────────────────────────
 function renderLogin(preselect = null) {
   teardownShell();
-  // Laid out as columns rather than a single stack, so every location is on
-  // screen at once. Retail gets the double-width column because it has most.
+  // The warehouse sits on its own wide panel above the rest; the other three
+  // run side by side so every location is on screen at once.
   const columns = [
     { wide: true, groups: [['Retail branches', 'retail']] },
-    { groups: [['Fitting centres', 'fitting'], ['Warehouse', 'admin']] },
+    { groups: [['Fitting centres', 'fitting']] },
     { groups: [['Clinics', 'clinic']] },
   ];
-  const groupHTML = ([title, role]) => `
-    <div class="lp-group">
+  const groupHTML = ([title, role], extra = '') => `
+    <div class="lp-group ${extra}">
       <h3>${title}</h3>
       <div class="lp-grid">
         ${LOCATIONS.filter(l => l.role === role).map(l => `
@@ -39,16 +39,18 @@ function renderLogin(preselect = null) {
   app.innerHTML = `
   <div class="login">
     <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
+    <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
     <main class="login-panel">
       <div class="lp-inner">
-        <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
-
         <section class="lp-step" id="step-pick">
-          <h2>Sign in</h2>
-          <p class="lp-sub">Choose your location.</p>
+          <header class="lp-head">
+            <h2>Sign in</h2>
+            <p class="lp-sub">Choose your location.</p>
+          </header>
+          ${groupHTML(['Warehouse', 'admin'], 'lp-wh')}
           <div class="lp-cols">
             ${columns.map(c => `
-              <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(groupHTML).join('')}</div>`).join('')}
+              <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
           </div>
         </section>
 
