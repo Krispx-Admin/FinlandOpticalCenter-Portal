@@ -1,15 +1,14 @@
-// ── State store: persistence, cross-tab realtime sync, mutations, simulator ──
+// ── State store: persistence, cross-tab realtime sync, mutations ──
 import {
-  seedState, loc, locName, BRANCHES, FITTERS, AUDIENCES,
+  seedState, loc, locName,
   FIT_STATUS, nextFitStatus, fitActor,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   LENS_OWNER, lensFull, brandsFor, normaliseRx,
 } from './data.js';
 
-const STATE_VERSION = 5;
-const STATE_KEY = 'focp.state.v5';
+const STATE_VERSION = 6;
+const STATE_KEY = 'focp.state.v6';
 const SESSION_KEY = 'focp.session';
-const LEADER_KEY = 'focp.leader';
 const TAB = Math.random().toString(36).slice(2, 10);
 
 let state = load();
@@ -110,11 +109,6 @@ export const store = {
   lensItem(id) { return state.lensStock.find(i => i.id === id); },
   lensRequestsFor(code) { return state.lensRequests.filter(r => canSeeLensRequest(r, code)); },
   lensRequest(id) { return state.lensRequests.find(r => r.id === id); },
-
-  resetDemo() {
-    state = seedState();
-    commit({ by: this.session?.code, module: 'system', title: 'Demo data reset' });
-  },
 
   // ── Fitting mutations ──
   createOrder(fields, by) {
@@ -434,114 +428,3 @@ export const store = {
     commit({ module: 'settings', title: 'Categories reordered' });
   },
 };
-
-// ── Live-activity simulator: the rest of the network keeps working ──────────
-// Exactly one tab (the elected leader) runs it; every tab sees the results
-// through the sync channel above.
-const SIM_NAMES = ['Ibrahim Al Wahaibi', 'Muna Al Saadi', 'Talal Al Busaidi', 'Rahma Al Ghafri', 'Adnan Al Shanfari', 'Shaikha Al Mamari', 'Faisal Al Hadhrami', 'Amal Al Rawahi'];
-const SIM_FRAMES = [
-  ['Ray-Ban', 'RB3025 Aviator', 'Single vision 1.60 AR'],
-  ['Gucci', 'GG1104O', 'Progressive 1.67 blue-cut'],
-  ['Persol', 'PO0714 folding', 'Single vision 1.50 tinted'],
-  ['Carrera', 'CA273', 'Single vision 1.56 blue-cut'],
-  ['Tom Ford', 'FT5634-B', 'Progressive 1.60 AR'],
-  ['Silhouette', 'Purist 5561', 'Progressive 1.74 AR'],
-];
-const rnd = a => a[Math.floor(Math.random() * a.length)];
-
-function isLeader() {
-  const now = Date.now();
-  let rec = null;
-  try { rec = JSON.parse(localStorage.getItem(LEADER_KEY)); } catch { /* ignore */ }
-  if (!rec || now - rec.ts > 11000 || rec.id === TAB) {
-    localStorage.setItem(LEADER_KEY, JSON.stringify({ id: TAB, ts: now }));
-    return true;
-  }
-  return false;
-}
-
-function simTick() {
-  if (!isLeader() || Math.random() > 0.5) return;
-  const me = store.session?.code;
-  const now = Date.now();
-  const ops = [];
-
-  // Move fitting orders along — acting as whichever location is naturally
-  // next, never as the signed-in location.
-  for (const o of state.orders) {
-    if (now - o.updatedAt < 100e3) continue;
-    if (o.status === 'pending' && !o.fitter) {
-      if (o.origin !== me) ops.push(() => store.sendToFitter(o.id, rnd(FITTERS).code, o.origin));
-      continue;
-    }
-    const actor = fitActor(o);
-    if (actor && actor !== me) {
-      ops.push(() => store.advanceOrders([o.id], actor));
-      if (o.urgent) ops.push(() => store.advanceOrders([o.id], actor)); // urgent moves faster
-    }
-  }
-  // Warehouse works its queue (unless the user *is* the warehouse).
-  if (me !== 'WH') {
-    for (const r of state.requests) {
-      if (r.status === 'placed' && now - r.updatedAt > 140e3) ops.push(() => store.completeRequest(r.id, 'WH'));
-    }
-  }
-  // Occasionally, somewhere in the network, a new sale needs fitting.
-  const active = state.orders.filter(o => o.status !== 'delivered').length;
-  if (active < 18 && Math.random() < 0.35) {
-    const origin = rnd(BRANCHES.filter(b => b.code !== me));
-    const [brand, model, lens] = rnd(SIM_FRAMES);
-    ops.push(() => store.createOrder({
-      ref: store.nextBillRef(), origin: origin.code,
-      customer: rnd(SIM_NAMES), brand, model, lens,
-      urgent: Math.random() < 0.15,
-    }, origin.code));
-  }
-  // The lens holder works its own queue (unless the user *is* the lens holder).
-  if (me !== LENS_OWNER) {
-    for (const r of state.lensRequests) {
-      if (r.status === 'requested' && now - r.updatedAt > 150e3) ops.push(() => store.confirmLensRequest(r.id, LENS_OWNER));
-    }
-  }
-  // …or a branch asks the lens holder for stock it can actually spare.
-  const openLens = state.lensRequests.filter(r => r.status === 'requested').length;
-  if (openLens < 6 && Math.random() < 0.16) {
-    const b = rnd(BRANCHES.filter(x => x.code !== me && x.code !== LENS_OWNER));
-    const avail = state.lensStock.filter(i => i.qty > 2);
-    if (b && avail.length) {
-      const it = rnd(avail);
-      const { id, updatedAt, qty, ...spec } = it;
-      ops.push(() => store.createLensRequest({
-        lines: [{ itemId: it.id, ...spec, qty: 1 + Math.floor(Math.random() * 2) }], note: '',
-      }, b.code));
-    }
-  }
-  // …or a branch places a stock request.
-  const open = state.requests.filter(r => r.status === 'placed').length;
-  if (me !== 'WH' && open < 8 && Math.random() < 0.18) {
-    const b = rnd(BRANCHES.filter(x => x.code !== me));
-    const cat = rnd(state.settings.categories);
-    if (cat) {
-      const line = { category: cat.name };
-      // An empty brand group just yields a brandless line rather than throwing.
-      if (cat.needsBrand) { const brand = rnd(store.brandsFor(cat)); if (brand) line.brand = brand; }
-      if (cat.needsAudience) line.audience = rnd(AUDIENCES);
-      if (cat.needsQty !== false) {
-        line.qty = 4 + Math.floor(Math.random() * 12);
-        line.unit = store.unitFor(cat);
-      }
-      line.note = '';
-      ops.push(() => store.createRequest({ lines: [line], note: '' }, b.code));
-    }
-  }
-
-  if (ops.length) rnd(ops)();
-}
-
-let simTimer = null;
-export function startSim() {
-  if (simTimer) return;
-  isLeader();
-  simTimer = setInterval(simTick, 13000);
-}
-export function stopSim() { clearInterval(simTimer); simTimer = null; }

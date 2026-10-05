@@ -1,6 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
 import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, canAdvanceOrder, isLensOwner } from './data.js';
-import { store, startSim, stopSim } from './store.js';
+import { store } from './store.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
@@ -52,7 +52,6 @@ function renderLogin(preselect = null) {
         <div class="pin-area ${preselect ? 'open' : ''}" id="pin-area">
           ${preselect ? pinHTML(preselect) : ''}
         </div>
-        <p class="demo-note">Demo PINs — branches &amp; fitting centres <code>1234</code>, warehouse <code>9999</code></p>
       </div>
     </main>
   </div>`;
@@ -151,7 +150,6 @@ function renderShell() {
           </div>
           <div class="side-actions">
             <button class="side-link" id="signout">${icons.logout}<span>Sign out</span></button>
-            <button class="side-link subtle" id="reset" title="Restore the seeded demo records">${icons.refresh}<span>Reset demo</span></button>
           </div>
         </div>
       </nav>
@@ -160,14 +158,9 @@ function renderShell() {
 
   renderNav(me, mod);
   app.querySelector('#signout').addEventListener('click', () => {
-    store.logout(); stopSim(); closeLayer(); renderLogin();
+    store.logout(); closeLayer(); renderLogin();
   });
-  app.querySelector('#reset').addEventListener('click', () => {
-    if (confirm('Reset all demo data back to the seeded state? This affects every open tab.')) store.resetDemo();
-  });
-
   mountModule(mod);
-  startSim();
 
   unsub = store.subscribe(event => {
     renderNav(store.session, currentModule());
@@ -179,9 +172,6 @@ function renderShell() {
         (event.module === 'lens' && event.refs?.some(id => { const r = store.state.lensRequests.find(x => x.id === id); return r && canSeeLensRequest(r, me.code); }));
       const tone = event.module === 'fitting' ? 'info' : event.module === 'lens' ? 'lens' : 'stock';
       if (relevant) toast({ title: event.title, sub: event.sub ?? '', tone });
-    }
-    if (event?.module === 'system') { // demo reset from any tab
-      mountModule(currentModule());
     }
   });
   clockTimer = setInterval(() => view?.onChange(), 45e3); // keep relative times fresh
