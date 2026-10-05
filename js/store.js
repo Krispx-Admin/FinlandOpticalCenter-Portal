@@ -244,16 +244,16 @@ export const store = {
   },
 
   // ── Lens requests (branch → holding centre) ──
-  createLensRequest({ lines, note }, by) {
+  createLensRequest({ lines, billNo }, by) {
     const now = Date.now();
     state.seq.lens++;
     const pcs = lines.reduce((s, l) => s + (l.qty || 0), 0);
     const r = {
       id: 'x' + now.toString(36) + Math.random().toString(36).slice(2, 6),
-      ref: `LR-${state.seq.lens}`, branch: by, status: 'requested', note: note ?? '', reason: '',
+      ref: `LR-${state.seq.lens}`, branch: by, status: 'requested', billNo: billNo ?? '', reason: '',
       lines: lines.map((l, i) => ({ id: `ll${now.toString(36)}${i}`, ...l })),
       createdAt: now, updatedAt: now,
-      timeline: [{ at: now, by, text: `Requested ${lines.length} lens type${lines.length > 1 ? 's' : ''}, ${pcs} pcs from ${locName(LENS_OWNER)}${note ? ` — ${note}` : ''}` }],
+      timeline: [{ at: now, by, text: `Requested ${lines.length} lens type${lines.length > 1 ? 's' : ''}, ${pcs} pcs from ${locName(LENS_OWNER)}${billNo ? ` — bill ${billNo}` : ''}` }],
     };
     state.lensRequests.unshift(r);
     commit({ by, module: 'lens', title: `${by} requested lenses ${r.ref}`, sub: `${lines.length} type${lines.length === 1 ? '' : 's'} · ${pcs} pcs`, refs: [r.id] });

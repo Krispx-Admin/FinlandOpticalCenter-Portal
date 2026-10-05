@@ -59,7 +59,7 @@ export function lensView(me) {
     if (!canShop && ui.branch !== 'all') list = list.filter(r => r.branch === ui.branch);
     if (ui.q && ui.tab !== 'shop') {
       const q = ui.q.toLowerCase();
-      list = list.filter(r => [r.ref, r.branch, locName(r.branch), ...r.lines.map(lensFull)]
+      list = list.filter(r => [r.ref, r.billNo, r.branch, locName(r.branch), ...r.lines.map(lensFull)]
         .some(v => String(v).toLowerCase().includes(q)));
     }
     const rank = { requested: 0, confirmed: 1, declined: 2 };
@@ -190,7 +190,7 @@ export function lensView(me) {
     const c = reqCounts();
     return `
       <section class="toolbar">
-        <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search ref, branch, lens…" value="${esc(ui.q)}"></div>
+        <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search ref, bill, branch, lens…" value="${esc(ui.q)}"></div>
         ${!canShop ? `<select class="sel" id="l-branch"><option value="all">All branches</option>${
           BRANCHES.filter(b => b.code !== LENS_OWNER).map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')
         }</select>` : ''}
@@ -257,7 +257,7 @@ export function lensView(me) {
         <div>
           <div class="dw-kicker">Lens request</div>
           <h2>${esc(r.ref)}</h2>
-          <div class="dw-sub">${locChip(r.branch)} ${esc(locName(r.branch))} → ${esc(locName(LENS_OWNER))}${r.note ? ` · “${esc(r.note)}”` : ''}</div>
+          <div class="dw-sub">${locChip(r.branch)} ${esc(locName(r.branch))} → ${esc(locName(LENS_OWNER))}${r.billNo ? ` · Bill ${esc(r.billNo)}` : ''}</div>
         </div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
@@ -347,7 +347,7 @@ export function lensView(me) {
             <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th><th class="num">Stock</th><th></th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <label>Request note <span class="opt">optional</span><input id="lens-note" placeholder="e.g. Two jobs waiting on these"></label>
+          <label>Bill number <span class="opt">optional</span><input id="lens-note" placeholder="e.g. B-58214"></label>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>
@@ -356,8 +356,8 @@ export function lensView(me) {
         </div>`;
     });
 
-    const keepNote = () => layer.el.querySelector('#lens-note')?.value ?? '';
-    const putNote = v => { const n = layer.el.querySelector('#lens-note'); if (n) n.value = v; };
+    const keepBill = () => layer.el.querySelector('#lens-note')?.value ?? '';
+    const putBill = v => { const n = layer.el.querySelector('#lens-note'); if (n) n.value = v; };
 
     layer.el.addEventListener('click', e => {
       if (e.target.closest('[data-close]')) return layer.close();
@@ -367,11 +367,11 @@ export function lensView(me) {
       if (plus || minus || drop) {
         const el = plus ?? minus ?? drop;
         const id = el.dataset.plus ?? el.dataset.minus ?? el.dataset.drop;
-        const note = keepNote();
+        const bill = keepBill();
         if (drop) cart.delete(id);
         else bump(id, plus ? 1 : -1);
         if (!cart.size) return layer.close();
-        layer.update(); putNote(note);
+        layer.update(); putBill(bill);
         refreshBody();
         return;
       }
@@ -381,7 +381,7 @@ export function lensView(me) {
           return i && { itemId: i.id, type: i.type, index: i.index, coating: i.coating, sph: i.sph, cyl: i.cyl, qty };
         }).filter(Boolean);
         if (!lines.length) return;
-        const r = store.createLensRequest({ lines, note: keepNote().trim() }, me.code);
+        const r = store.createLensRequest({ lines, billNo: keepBill().trim() }, me.code);
         cart.clear();
         layer.close();
         ui.tab = 'mine';
