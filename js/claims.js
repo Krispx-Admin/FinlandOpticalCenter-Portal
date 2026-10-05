@@ -1,7 +1,7 @@
 // ── Module 5: Insurance Claim Receipts — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_EYES, RX_FIELDS, blankRx, claimTotal,
+  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
@@ -17,6 +17,13 @@ const fmtDay = d => {
   return Number.isNaN(t) ? d : new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 const today = () => new Date().toISOString().slice(0, 10);
+// Writes a value at a dotted path, e.g. 'd.od.sph' or 'add.os'.
+const setPath = (obj, path, val) => {
+  const keys = path.split('.');
+  let o = obj;
+  for (let i = 0; i < keys.length - 1; i++) o = o[keys[i]];
+  o[keys.at(-1)] = val;
+};
 const payLabel = p => PAYMENT_TYPES.find(x => x.value === p)?.label ?? 'Cash';
 
 // ── The receipt sheet ──────────────────────────────────────────────────────
@@ -27,10 +34,10 @@ export const RECEIPT_CSS = `
   --r-ink:#15213a; --r-navy:#2b3b6b; --r-red:#e4424f;
   --r-line:#d5dce7; --r-soft:#eef2f8; --r-muted:#6b7890;
   position: relative; box-sizing: border-box;
-  width: 210mm; min-height: 297mm; padding: 14mm 15mm 16mm;
+  width: 210mm; min-height: 297mm; padding: 12mm 14mm 13mm;
   background: #fff; color: var(--r-ink);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
-  font-size: 10.5pt; line-height: 1.45;
+  font-size: 10pt; line-height: 1.35;
 }
 .receipt * { box-sizing: border-box; }
 
@@ -41,50 +48,56 @@ export const RECEIPT_CSS = `
   pointer-events: none; z-index: 0;
 }
 .rc-mark img { width: 190mm; height: auto; opacity: .055; transform: rotate(-30deg); }
-.rc-body { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 265mm; }
+.rc-body { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 272mm; }
 
-.rc-head { text-align: center; padding-bottom: 5mm; border-bottom: 2px solid var(--r-navy); }
-.rc-head img { width: 88mm; height: auto; display: block; margin: 0 auto; }
+.rc-head { text-align: center; padding-bottom: 3.5mm; border-bottom: 2px solid var(--r-navy); }
+.rc-head img { width: 62mm; height: auto; display: block; margin: 0 auto; }
 .rc-title {
-  margin-top: 4mm; font-size: 15pt; font-weight: 700; letter-spacing: .14em;
+  margin-top: 2.5mm; font-size: 12.5pt; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--r-navy);
 }
-.rc-title span { display: block; font-size: 8pt; letter-spacing: .18em; color: var(--r-red); margin-top: 1mm; }
+.rc-title span { display: block; font-size: 7pt; letter-spacing: .16em; color: var(--r-red); margin-top: .8mm; }
 
-.rc-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; margin: 6mm 0 0; }
-.rc-meta.one { grid-template-columns: 1fr; margin-top: 4mm; margin-bottom: 6mm; }
-.rc-meta > div { border-bottom: 1px solid var(--r-line); padding-bottom: 2mm; min-width: 0; }
-.rc-meta dt { font-size: 7.5pt; letter-spacing: .1em; text-transform: uppercase; color: var(--r-muted); font-weight: 700; margin: 0; }
-.rc-meta dd { margin: 1.5mm 0 0; font-size: 11pt; font-weight: 600; overflow-wrap: anywhere; }
+.rc-meta {
+  display: grid; grid-template-columns: .95fr 1.1fr .9fr .85fr 1.5fr;
+  gap: 3.5mm; margin: 4.5mm 0 5mm;
+}
+.rc-meta > div { border-bottom: 1px solid var(--r-line); padding-bottom: 1.6mm; min-width: 0; }
+.rc-meta dt { font-size: 6.8pt; letter-spacing: .09em; text-transform: uppercase; color: var(--r-muted); font-weight: 700; margin: 0; }
+.rc-meta dd { margin: 1mm 0 0; font-size: 9.5pt; font-weight: 600; overflow-wrap: anywhere; }
 
 .rc-sec {
-  font-size: 8pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: var(--r-navy); margin: 0 0 2.5mm; display: flex; align-items: center; gap: 3mm;
+  font-size: 7.5pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--r-navy); margin: 0 0 1.8mm; display: flex; align-items: center; gap: 3mm;
 }
 .rc-sec::after { content: ''; flex: 1; height: 1px; background: var(--r-line); }
 
-table.rc-tbl { width: 100%; border-collapse: collapse; margin-bottom: 6mm; }
-table.rc-tbl th, table.rc-tbl td { border: 1px solid var(--r-line); padding: 2.4mm 3mm; text-align: left; }
+table.rc-tbl { width: 100%; border-collapse: collapse; margin-bottom: 4.5mm; }
+table.rc-tbl th, table.rc-tbl td { border: 1px solid var(--r-line); padding: 1.6mm 2.5mm; text-align: left; }
 table.rc-tbl thead th {
-  background: var(--r-soft); color: var(--r-navy); font-size: 8pt;
+  background: var(--r-soft); color: var(--r-navy); font-size: 7.5pt;
   letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
 }
 table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowrap; }
-.rc-items tbody td { height: 8mm; }
+.rc-items tbody td { height: 6.4mm; }
 .rc-items tfoot td {
-  background: var(--r-soft); font-weight: 700; font-size: 11pt;
+  background: var(--r-soft); font-weight: 700; font-size: 10.5pt;
   color: var(--r-navy); border-top: 2px solid var(--r-navy);
 }
 
-.rc-rx th.eye, .rc-rx td.eye { background: var(--r-soft); font-weight: 700; width: 26mm; }
-.rc-rx th { text-align: center; }
-.rc-rx td { text-align: center; font-family: Consolas, ui-monospace, monospace; height: 8mm; font-size: 10.5pt; }
-.rc-rx td.eye { text-align: left; font-family: inherit; }
-.rc-rx td.eye small { color: var(--r-muted); font-weight: 600; }
+.rc-rx th, .rc-rx td { text-align: center; padding: 1.3mm 1.2mm; }
+.rc-rx tbody td { height: 6.4mm; font-family: Consolas, ui-monospace, monospace; font-size: 10pt; }
+.rc-rx .rx-lbl { background: var(--r-soft); font-weight: 700; width: 10mm; font-size: 10pt; color: var(--r-navy); }
+.rc-rx .rx-ipd { background: #f7f9fc; }
+.rc-rx .rx-mini {
+  background: var(--r-soft); font-size: 7.5pt; font-weight: 700; letter-spacing: .04em;
+  color: var(--r-navy); text-transform: none;
+}
+.rc-rx .rx-sum td { background: #fff; }
 
-.rc-foot { margin-top: auto; padding-top: 6mm; }
-.rc-pay { display: flex; align-items: stretch; gap: 6mm; }
-.rc-pay-box { flex: 1; border: 1px solid var(--r-line); border-radius: 2mm; padding: 3.5mm 4mm; }
+.rc-foot { margin-top: auto; padding-top: 4mm; }
+.rc-pay { display: flex; align-items: stretch; gap: 5mm; }
+.rc-pay-box { flex: 1; border: 1px solid var(--r-line); border-radius: 2mm; padding: 2.8mm 3.5mm; }
 .rc-ticks { display: flex; gap: 8mm; }
 .rc-tick { display: flex; align-items: center; gap: 2.5mm; font-size: 10.5pt; font-weight: 600; }
 .rc-tick i {
@@ -97,23 +110,64 @@ table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowra
   border: solid #fff; border-width: 0 1.2px 1.2px 0; transform: rotate(45deg);
 }
 .rc-total {
-  flex: 0 0 64mm; background: var(--r-navy); color: #fff; border-radius: 2mm;
-  padding: 3.5mm 4mm; display: flex; flex-direction: column; justify-content: center;
+  flex: 0 0 58mm; background: var(--r-navy); color: #fff; border-radius: 2mm;
+  padding: 2.8mm 3.5mm; display: flex; flex-direction: column; justify-content: center;
 }
 .rc-total span { font-size: 8pt; letter-spacing: .14em; text-transform: uppercase; opacity: .78; }
-.rc-total b { font-size: 17pt; margin-top: 1mm; }
+.rc-total b { font-size: 15pt; margin-top: .6mm; }
 .rc-total b em { font-style: normal; font-size: 10pt; opacity: .8; margin-left: 1.5mm; }
 
-.rc-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 16mm; margin-top: 13mm; }
+.rc-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 16mm; margin-top: 9mm; }
 .rc-sign div {
-  border-top: 1px solid var(--r-ink); padding-top: 2mm; font-size: 8.5pt;
+  border-top: 1px solid var(--r-ink); padding-top: 1.6mm; font-size: 8pt;
   letter-spacing: .08em; text-transform: uppercase; color: var(--r-muted); font-weight: 600;
 }
 .rc-note {
-  margin-top: 7mm; padding-top: 3mm; border-top: 1px solid var(--r-line);
-  font-size: 7.5pt; color: var(--r-muted); display: flex; justify-content: space-between; gap: 6mm;
+  margin-top: 5mm; padding-top: 2.5mm; border-top: 1px solid var(--r-line);
+  font-size: 7pt; color: var(--r-muted); display: flex; justify-content: space-between; gap: 6mm;
 }
+
+/* When a long product list does run past one page, break it sensibly:
+   repeat the table header and never split a row or the footer block. */
+table.rc-tbl thead { display: table-header-group; }
+table.rc-tbl tr, .rc-rx, .rc-foot, .rc-pay, .rc-sign { break-inside: avoid; }
 `;
+
+// Distance / Near rows, OD and OS on either side of a shared IPD column, with
+// Add and S.H. labelled in-line along the bottom row.
+function rxTableHTML(rx) {
+  const cells = (row, side) => RX_COLS.map(col => `<td>${esc(rx[row][side][col.key] ?? '')}</td>`).join('');
+  const heads = () => RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('');
+  return `
+    <table class="rc-tbl rc-rx">
+      <thead>
+        <tr>
+          <th class="rx-lbl" rowspan="2"></th>
+          <th colspan="4">OD</th>
+          <th class="rx-ipd"></th>
+          <th colspan="4">OS</th>
+        </tr>
+        <tr>${heads()}<th class="rx-ipd">IPD</th>${heads()}</tr>
+      </thead>
+      <tbody>
+        ${RX_ROWS.map(r => `
+          <tr>
+            <th class="rx-lbl" title="${esc(r.title)}">${esc(r.label)}</th>
+            ${cells(r.key, 'od')}
+            <td class="rx-ipd">${esc(rx[r.key].ipd ?? '')}</td>
+            ${cells(r.key, 'os')}
+          </tr>`).join('')}
+        <tr class="rx-sum">
+          <th class="rx-lbl"></th>
+          <th class="rx-mini">Add</th><td>${esc(rx.add.od)}</td>
+          <th class="rx-mini">S.H.</th><td>${esc(rx.sh.od)}</td>
+          <td class="rx-ipd"></td>
+          <th class="rx-mini">Add</th><td>${esc(rx.add.os)}</td>
+          <th class="rx-mini">S.H.</th><td>${esc(rx.sh.os)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
 
 export function receiptHTML(c) {
   const items = (c.items ?? []).length ? c.items : [{ name: '', price: null }];
@@ -132,8 +186,6 @@ export function receiptHTML(c) {
       <div><dt>Branch</dt><dd>${esc(locName(c.branch))}</dd></div>
       <div><dt>Bill Number</dt><dd>${esc(c.billNo || '—')}</dd></div>
       <div><dt>Receipt No.</dt><dd>${esc(c.ref)}</dd></div>
-    </dl>
-    <dl class="rc-meta one">
       <div><dt>Customer Name</dt><dd>${esc(c.customer || '—')}</dd></div>
     </dl>
 
@@ -147,16 +199,7 @@ export function receiptHTML(c) {
     </table>
 
     <h3 class="rc-sec">Prescription</h3>
-    <table class="rc-tbl rc-rx">
-      <thead><tr><th class="eye">Eye</th>${RX_FIELDS.map(f => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
-      <tbody>
-        ${RX_EYES.map(e => `
-          <tr>
-            <td class="eye">${esc(e.label)} <small>(${esc(e.abbr)})</small></td>
-            ${RX_FIELDS.map(f => `<td>${esc(c.rx?.[e.key]?.[f.key] ?? '')}</td>`).join('')}
-          </tr>`).join('')}
-      </tbody>
-    </table>
+    ${rxTableHTML(normaliseRx(c.rx))}
 
     <div class="rc-foot">
       <div class="rc-pay">
@@ -190,10 +233,13 @@ function receiptDoc(c) {
   html, body { margin: 0; padding: 0; background: #e9edf3; }
   .receipt { margin: 0 auto; box-shadow: 0 2px 18px rgba(0,0,0,.14); }
   ${RECEIPT_CSS}
-  @page { size: A4; margin: 0; }
+  @page { size: A4; margin: 12mm 14mm 13mm; }
   @media print {
     html, body { background: #fff; }
-    .receipt { box-shadow: none; margin: 0; }
+    /* The page box owns the margins now, so page two gets them too. */
+    .receipt { box-shadow: none; margin: 0; width: auto; min-height: 0; padding: 0; }
+    .rc-body { min-height: 268mm; }
+    .rc-mark { position: fixed; }
     /* Without this the faded mark and the filled bars are dropped by default. */
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
@@ -339,7 +385,7 @@ export function claimsView(me) {
         date: existing.date, branch: existing.branch, billNo: existing.billNo,
         customer: existing.customer, payment: existing.payment,
         items: existing.items.map(i => ({ ...i })),
-        rx: JSON.parse(JSON.stringify(existing.rx ?? blankRx())),
+        rx: JSON.parse(JSON.stringify(normaliseRx(existing.rx))),
       }
       : {
         date: today(), branch: isAdmin ? BRANCHES[0].code : me.code, billNo: '', customer: '',
@@ -383,16 +429,40 @@ export function claimsView(me) {
 
         <div class="fieldset">
           <div class="fs-head"><span>Prescription</span><span class="muted sm">Leave blank if not applicable</span></div>
-          <table class="rx-edit">
-            <thead><tr><th>Eye</th>${RX_FIELDS.map(f => `<th>${esc(f.label)}</th>`).join('')}</tr></thead>
-            <tbody>
-              ${RX_EYES.map(e => `
+          <div class="rx-wrap">
+            <table class="rx-edit">
+              <thead>
                 <tr>
-                  <th>${esc(e.label)} <small>${esc(e.abbr)}</small></th>
-                  ${RX_FIELDS.map(f => `<td><input value="${esc(draft.rx[e.key][f.key] ?? '')}" data-rx="${e.key}" data-fk="${f.key}" placeholder="—"></td>`).join('')}
-                </tr>`).join('')}
-            </tbody>
-          </table>
+                  <th rowspan="2"></th>
+                  <th colspan="4">OD</th>
+                  <th class="rx-ipd"></th>
+                  <th colspan="4">OS</th>
+                </tr>
+                <tr>
+                  ${RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('')}
+                  <th class="rx-ipd">IPD</th>
+                  ${RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${RX_ROWS.map(r => `
+                  <tr>
+                    <th title="${esc(r.title)}">${esc(r.label)}</th>
+                    ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].od[c.key] ?? '')}" data-rx="${r.key}.od.${c.key}"></td>`).join('')}
+                    <td class="rx-ipd"><input value="${esc(draft.rx[r.key].ipd ?? '')}" data-rx="${r.key}.ipd"></td>
+                    ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].os[c.key] ?? '')}" data-rx="${r.key}.os.${c.key}"></td>`).join('')}
+                  </tr>`).join('')}
+                <tr class="rx-sum">
+                  <th></th>
+                  <th class="rx-mini">Add</th><td><input value="${esc(draft.rx.add.od)}" data-rx="add.od"></td>
+                  <th class="rx-mini">S.H.</th><td><input value="${esc(draft.rx.sh.od)}" data-rx="sh.od"></td>
+                  <td class="rx-ipd"></td>
+                  <th class="rx-mini">Add</th><td><input value="${esc(draft.rx.add.os)}" data-rx="add.os"></td>
+                  <th class="rx-mini">S.H.</th><td><input value="${esc(draft.rx.sh.os)}" data-rx="sh.os"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="grid2">
@@ -431,7 +501,7 @@ export function claimsView(me) {
         if (t.dataset.it === 'price') showTotal();
         return;
       }
-      if (t.dataset.rx) { draft.rx[t.dataset.rx][t.dataset.fk] = t.value; return; }
+      if (t.dataset.rx) { setPath(draft.rx, t.dataset.rx, t.value); return; }
       sync();
     });
     el.addEventListener('change', sync);

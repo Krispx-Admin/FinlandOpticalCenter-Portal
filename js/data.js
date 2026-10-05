@@ -124,22 +124,49 @@ export const PAYMENT_TYPES = [
   { value: 'card', label: 'Card' },
 ];
 
-// A standard spectacle prescription grid: one row per eye, five columns.
-export const RX_EYES = [
-  { key: 'od', label: 'Right', abbr: 'OD' },
-  { key: 'os', label: 'Left', abbr: 'OS' },
+// Prescription grid: Distance / Near rows, OD and OS each carrying
+// SPH · CYL · AXIS · V.A., one shared IPD column between the two eyes, and
+// Add / S.H. per eye along the bottom.
+export const RX_ROWS = [
+  { key: 'd', label: 'D', title: 'Distance' },
+  { key: 'n', label: 'N', title: 'Near' },
 ];
-export const RX_FIELDS = [
+export const RX_EYES = [
+  { key: 'od', label: 'OD', title: 'Right eye' },
+  { key: 'os', label: 'OS', title: 'Left eye' },
+];
+export const RX_COLS = [
   { key: 'sph', label: 'SPH' },
   { key: 'cyl', label: 'CYL' },
   { key: 'axis', label: 'AXIS' },
-  { key: 'add', label: 'ADD' },
-  { key: 'pd', label: 'PD' },
+  { key: 'va', label: 'V.A.' },
 ];
+const blankEye = () => Object.fromEntries(RX_COLS.map(c => [c.key, '']));
 export const blankRx = () => ({
-  od: Object.fromEntries(RX_FIELDS.map(f => [f.key, ''])),
-  os: Object.fromEntries(RX_FIELDS.map(f => [f.key, ''])),
+  d: { od: blankEye(), os: blankEye(), ipd: '' },
+  n: { od: blankEye(), os: blankEye(), ipd: '' },
+  add: { od: '', os: '' },
+  sh: { od: '', os: '' },
 });
+
+// Claims written before the grid gained Distance/Near rows carry a flat
+// { od, os } shape. Fold those into the Distance row instead of losing them.
+export function normaliseRx(rx) {
+  if (rx?.d && rx?.n && rx?.add && rx?.sh) return rx;
+  const out = blankRx();
+  if (!rx) return out;
+  for (const e of ['od', 'os']) {
+    const o = rx[e] ?? {};
+    out.d[e].sph = o.sph ?? '';
+    out.d[e].cyl = o.cyl ?? '';
+    out.d[e].axis = o.axis ?? '';
+    out.add[e] = o.add ?? '';
+  }
+  // The old field was a monocular PD per eye; IPD is the distance across both.
+  const pds = ['od', 'os'].map(e => parseFloat(rx[e]?.pd)).filter(n => !Number.isNaN(n));
+  out.d.ipd = pds.length === 2 ? String(pds[0] + pds[1]) : pds.length ? String(pds[0]) : '';
+  return out;
+}
 export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);
 
 // ── Permissions ──
@@ -269,16 +296,24 @@ export function seedState() {
           { name: 'Tom Ford FT5401 optical frame', price: 145 },
           { name: 'Progressive 1.67 blue-cut lenses (pair)', price: 180 },
         ],
-        rx: { od: { sph: '-2.25', cyl: '-0.75', axis: '175', add: '+2.00', pd: '32.0' },
-              os: { sph: '-2.50', cyl: '-0.50', axis: '10',  add: '+2.00', pd: '32.5' } } }),
+        rx: {
+          d: { od: { sph: '-2.25', cyl: '-0.75', axis: '175', va: '6/6' },
+               os: { sph: '-2.50', cyl: '-0.50', axis: '10',  va: '6/6' }, ipd: '64.5' },
+          n: { od: { sph: '-0.25', cyl: '-0.75', axis: '175', va: 'N5' },
+               os: { sph: '-0.50', cyl: '-0.50', axis: '10',  va: 'N5' }, ipd: '62.0' },
+          add: { od: '+2.00', os: '+2.00' }, sh: { od: '18', os: '18' } } }),
       mkClaim(now, { ref: 'IC-3041', date: isoDay(now, -2), branch: 'QCC', billNo: 'B-58201', customer: 'Salim Al Harthy', ageH: 50, payment: 'cash',
         items: [
           { name: 'Persol PO3007V frame', price: 98.5 },
           { name: 'Single vision 1.50 photochromic (pair)', price: 65 },
           { name: 'Cleaning kit', price: 4.5 },
         ],
-        rx: { od: { sph: '-1.00', cyl: '', axis: '', add: '', pd: '31.5' },
-              os: { sph: '-1.25', cyl: '-0.25', axis: '90', add: '', pd: '31.5' } } }),
+        rx: {
+          d: { od: { sph: '-1.00', cyl: '',      axis: '',   va: '6/6' },
+               os: { sph: '-1.25', cyl: '-0.25', axis: '90', va: '6/9' }, ipd: '63.0' },
+          n: { od: { sph: '', cyl: '', axis: '', va: '' },
+               os: { sph: '', cyl: '', axis: '', va: '' }, ipd: '' },
+          add: { od: '', os: '' }, sh: { od: '', os: '' } } }),
     ],
     lensStock,
     lensRequests: [

@@ -3,7 +3,7 @@ import {
   seedState, loc, locName, BRANCHES, FITTERS, AUDIENCES,
   FIT_STATUS, nextFitStatus, fitActor,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
-  LENS_OWNER, lensFull, brandsFor,
+  LENS_OWNER, lensFull, brandsFor, normaliseRx,
 } from './data.js';
 
 const STATE_VERSION = 5;
@@ -30,6 +30,7 @@ function load() {
 function hydrate(s) {
   s.claims ??= [];
   s.seq.claim ??= 3000;
+  for (const c of s.claims) c.rx = normaliseRx(c.rx);
   return s;
 }
 
