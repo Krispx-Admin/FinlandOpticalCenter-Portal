@@ -18,12 +18,24 @@ let clockTimer = null;
 // ─────────────────────────── LOGIN ───────────────────────────
 function renderLogin(preselect = null) {
   teardownShell();
-  const groups = [
-    ['Retail branches', 'retail'],
-    ['Fitting centres', 'fitting'],
-    ['Clinics', 'clinic'],
-    ['Warehouse', 'admin'],
+  // Laid out as columns rather than a single stack, so every location is on
+  // screen at once. Retail gets the double-width column because it has most.
+  const columns = [
+    { wide: true, groups: [['Retail branches', 'retail']] },
+    { groups: [['Fitting centres', 'fitting'], ['Warehouse', 'admin']] },
+    { groups: [['Clinics', 'clinic']] },
   ];
+  const groupHTML = ([title, role]) => `
+    <div class="lp-group">
+      <h3>${title}</h3>
+      <div class="lp-grid">
+        ${LOCATIONS.filter(l => l.role === role).map(l => `
+          <button class="loc-card role-${l.role}" data-loc="${l.code}">
+            <span class="loc-code">${l.code}</span>
+            <span class="loc-name">${esc(l.name)}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
   app.innerHTML = `
   <div class="login">
     <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
@@ -34,17 +46,10 @@ function renderLogin(preselect = null) {
         <section class="lp-step" id="step-pick">
           <h2>Sign in</h2>
           <p class="lp-sub">Choose your location.</p>
-          ${groups.map(([title, role]) => `
-            <div class="lp-group">
-              <h3>${title}</h3>
-              <div class="lp-grid">
-                ${LOCATIONS.filter(l => l.role === role).map(l => `
-                  <button class="loc-card role-${l.role}" data-loc="${l.code}">
-                    <span class="loc-code">${l.code}</span>
-                    <span class="loc-name">${esc(l.name)}</span>
-                  </button>`).join('')}
-              </div>
-            </div>`).join('')}
+          <div class="lp-cols">
+            ${columns.map(c => `
+              <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(groupHTML).join('')}</div>`).join('')}
+          </div>
         </section>
 
         <section class="lp-step" id="step-code" hidden></section>

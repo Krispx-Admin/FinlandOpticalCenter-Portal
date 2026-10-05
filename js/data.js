@@ -3,13 +3,13 @@
 
 export const LOCATIONS = [
   // Retail branches
-  { code: 'MOUJ', name: 'Al Mouj',            role: 'retail' },
   { code: 'SCC',  name: 'Seeb City Centre',   role: 'retail' },
   { code: 'AV',   name: 'Avenues Mall',       role: 'retail' },
   { code: 'QCC',  name: 'Qurum City Centre',  role: 'retail' },
   { code: 'SLS',  name: 'Salalah Shop',       role: 'retail' },
   { code: 'SUR',  name: 'Sur',                role: 'retail' },
   // Fitting centres (sell + fit lenses)
+  { code: 'MOUJ', name: 'Al Mouj',            role: 'fitting' },
   { code: 'MOO',  name: 'Mall of Oman',       role: 'fitting' },
   { code: 'MGM',  name: 'Muscat Grand Mall',  role: 'fitting' },
   // Clinics (FOC Eye Clinics)
