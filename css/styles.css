@@ -133,18 +133,16 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .lp-inner h2 { font-size: 23px; }
 .lp-sub { color: var(--ink-2); margin: 5px 0 0; }
-.lp-group {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 14px 15px; box-shadow: var(--shadow);
-}
+/* No wrapper box: the location cards are already white, so a white panel
+   around them just flattened everything. The groups simply float on the page. */
 .lp-group h3 {
   font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
   color: var(--ink-3); margin: 0 0 9px;
 }
-.lp-group + .lp-group { margin-top: 14px; }
+.lp-group + .lp-group { margin-top: 18px; }
 
-/* the warehouse gets the widest panel, and a card to match */
-.lp-wh { margin-bottom: 16px; border-color: var(--border-strong); }
+/* the warehouse keeps the widest run and the larger card */
+.lp-wh { margin-bottom: 26px; }
 .lp-wh h3 { text-align: center; color: var(--brand); }
 .lp-wh .lp-grid { grid-template-columns: minmax(0, 340px); justify-content: center; }
 .lp-wh .loc-card {
@@ -153,7 +151,7 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .lp-wh .loc-name { font-size: 15px; }
 .lp-wh .loc-code { font-size: 12px; padding: 3px 9px; }
-.lp-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px; align-items: start; }
+.lp-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 26px; align-items: start; }
 .lp-col { min-width: 0; }
 .lp-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .lp-col.wide .lp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -163,7 +161,8 @@ svg { width: 18px; height: 18px; flex: none; }
   border-radius: 10px; padding: 9px 11px; text-align: left;
   transition: border-color var(--speed), box-shadow var(--speed), transform .15s;
 }
-.loc-card:hover { border-color: var(--brand); transform: translateY(-1px); box-shadow: var(--shadow); }
+.loc-card { box-shadow: 0 1px 2px rgba(19,48,86,.05); }
+.loc-card:hover { border-color: var(--brand); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(19,48,86,.12); }
 .loc-code { font-size: 10.5px; font-weight: 800; letter-spacing: .05em; color: var(--brand); background: var(--brand-soft); border-radius: 5px; padding: 1px 6px; }
 .loc-card.role-fitting .loc-code { color: var(--st-teal); background: #e2f5f3; }
 .loc-card.role-clinic .loc-code { color: var(--st-purple); background: #faeafc; }
