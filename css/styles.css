@@ -171,7 +171,6 @@ svg { width: 18px; height: 18px; flex: none; }
   transition: border-color var(--speed), box-shadow var(--speed);
 }
 #pin-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.13); }
-.cf-turnstile { margin-top: 12px; }
 .pin-err { color: var(--st-red); font-size: 12.5px; font-weight: 600; min-height: 18px; margin-top: 8px; }
 .shake { animation: shake .35s ease; }
 @keyframes shake { 20% { transform: translateX(-5px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } 90% { transform: translateX(2px); } }

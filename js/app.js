@@ -57,15 +57,6 @@ function renderLogin(preselect = null) {
     </main>
   </div>`;
 
-  // Turnstile only loads when a site key is configured.
-  if (auth.captchaEnabled() && !document.getElementById('cf-turnstile-js')) {
-    const sc = document.createElement('script');
-    sc.id = 'cf-turnstile-js';
-    sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    sc.async = true;
-    document.head.appendChild(sc);
-  }
-
   app.querySelectorAll('[data-loc]').forEach(btn => btn.addEventListener('click', () => {
     app.querySelectorAll('.loc-card').forEach(b => b.classList.toggle('sel', b === btn));
     const area = app.querySelector('#pin-area');
@@ -86,7 +77,6 @@ function pinHTML(code) {
                maxlength="6" pattern="\\d{6}" placeholder="••••••" aria-label="Six digit code" autofocus>
         <button class="btn btn-primary" type="submit" id="pin-go">Sign in ${icons.arrowRight}</button>
       </form>
-      ${auth.captchaEnabled() ? `<div class="cf-turnstile" data-sitekey="${auth.captchaSiteKey()}" data-callback="focCaptcha"></div>` : ''}
       <div class="pin-err" id="pin-err"></div>
     </div>`;
 }
@@ -112,7 +102,7 @@ function wirePin(code) {
     const was = btn.innerHTML;
     btn.textContent = 'Checking…';
 
-    const { branch, error } = await auth.signIn(code, entered, window.__focCaptchaToken);
+    const { branch, error } = await auth.signIn(code, entered);
 
     if (branch) {
       store.session = branch;
@@ -126,13 +116,8 @@ function wirePin(code) {
     err.textContent = error;
     form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
     input.select();
-    window.__focCaptchaToken = undefined;
-    window.turnstile?.reset?.();
   });
 }
-
-// Turnstile hands its token back through a global callback.
-window.focCaptcha = token => { window.__focCaptchaToken = token; };
 
 // ─────────────────────────── SHELL ───────────────────────────
 const MODULES = {

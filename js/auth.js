@@ -2,15 +2,12 @@
 // The branch code lives in the token's app_metadata, which is set server-side
 // and cannot be rewritten by the browser — so a branch cannot promote itself.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, emailFor, TURNSTILE_SITE_KEY } from './supabase-config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, emailFor } from './supabase-config.js';
 import { loc } from './data.js';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
 });
-
-export const captchaEnabled = () => !!TURNSTILE_SITE_KEY;
-export const captchaSiteKey = () => TURNSTILE_SITE_KEY;
 
 // Turns a signed-in Supabase user into the location record the modules expect,
 // so nothing downstream has to know authentication changed.
@@ -24,12 +21,10 @@ export async function currentBranch() {
   return branchOf(data?.session?.user);
 }
 
-export async function signIn(branchCode, code, captchaToken) {
-  const opts = captchaToken ? { captchaToken } : undefined;
+export async function signIn(branchCode, code) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: emailFor(branchCode),
     password: code,
-    options: opts,
   });
 
   if (error) {

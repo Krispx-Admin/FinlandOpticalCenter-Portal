@@ -9,6 +9,3 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // their branch on screen and the app resolves the address for them.
 export const emailFor = code => `${code.toLowerCase()}@finlandoptical.om`;
 
-// Cloudflare Turnstile site key. Leave empty until one is configured; the
-// sign-in form then runs without a challenge.
-export const TURNSTILE_SITE_KEY = '';
