@@ -1,6 +1,6 @@
 // ── State store: persistence, cross-tab realtime sync, mutations ──
 import {
-  seedState, loc, locName,
+  seedState, locName,
   FIT_STATUS, nextFitStatus, fitActor,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   LENS_OWNER, lensFull, brandsFor, normaliseRx,
@@ -8,7 +8,6 @@ import {
 
 const STATE_VERSION = 6;
 const STATE_KEY = 'focp.state.v6';
-const SESSION_KEY = 'focp.session';
 const TAB = Math.random().toString(36).slice(2, 10);
 
 let state = load();
@@ -63,25 +62,9 @@ export const store = {
   subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
 
   // ── Session ──
+  // Set by the shell from the signed-in Supabase user. There is deliberately
+  // no login() here any more: credentials are never checked in the browser.
   session: null,
-  restoreSession() {
-    const code = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
-    this.session = code ? loc(code) ?? null : null;
-    return this.session;
-  },
-  login(code, pin) {
-    const l = loc(code);
-    if (!l || l.pin !== pin) return null;
-    this.session = l;
-    sessionStorage.setItem(SESSION_KEY, code);
-    localStorage.setItem(SESSION_KEY, code);
-    return l;
-  },
-  logout() {
-    this.session = null;
-    sessionStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(SESSION_KEY);
-  },
 
   // ── Queries (already permission-scoped) ──
   ordersFor(code) { return state.orders.filter(o => canSeeOrder(o, code)); },

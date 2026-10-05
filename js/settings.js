@@ -1,7 +1,8 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
 import { UNITS } from './data.js';
 import { store } from './store.js';
-import { esc, icons } from './ui.js';
+import { branchAccess, setBranchCode } from './auth.js';
+import { esc, icons, relTime } from './ui.js';
 
 export function settingsView(me) {
   let root;
@@ -78,6 +79,49 @@ export function settingsView(me) {
     }).join('');
   }
 
+  // Reads through a database function that checks the caller is the warehouse,
+  // so a branch calling it directly gets nothing back.
+  async function loadAccess() {
+    const host = root.querySelector('#set-access');
+    if (!host) return;
+    const { rows, error } = await branchAccess();
+    if (error) { host.innerHTML = `<p class="muted sm">Could not load branch access — ${esc(error)}</p>`; return; }
+    host.innerHTML = rows.map(r => `
+      <div class="ba-row" data-branch="${esc(r.code)}">
+        <div class="ba-who">
+          <span class="loc-chip">${esc(r.code)}</span>
+          <b>${esc(r.name)}</b>
+          <span class="muted sm">${esc(r.role)}</span>
+        </div>
+        <div class="ba-seen muted sm">${r.has_account
+          ? (r.last_sign_in ? 'last signed in ' + relTime(Date.parse(r.last_sign_in)) : 'never signed in')
+          : 'no account'}</div>
+        <form class="ba-set" data-set="${esc(r.code)}">
+          <input name="code" inputmode="numeric" maxlength="6" pattern="\\d{6}"
+                 placeholder="new 6-digit code" ${r.has_account ? '' : 'disabled'} autocomplete="off">
+          <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account ? '' : 'disabled'}>Set</button>
+        </form>
+        <div class="ba-msg"></div>
+      </div>`).join('');
+  }
+
+  async function applyCode(form) {
+    const branch = form.dataset.set;
+    const row = form.closest('.ba-row');
+    const msg = row.querySelector('.ba-msg');
+    const input = form.querySelector('input');
+    const value = input.value.trim();
+    msg.className = 'ba-msg';
+    if (!/^\d{6}$/.test(value)) { msg.classList.add('bad'); msg.textContent = 'Six digits.'; return; }
+    msg.textContent = 'Saving…';
+    const { error } = await setBranchCode(branch, value);
+    if (error) { msg.classList.add('bad'); msg.textContent = error; return; }
+    msg.classList.add('good');
+    msg.textContent = 'Code updated';
+    input.value = '';
+    setTimeout(() => { msg.textContent = ''; msg.className = 'ba-msg'; }, 4000);
+  }
+
   function render() {
     root.innerHTML = `
       <header class="mod-head">
@@ -114,8 +158,19 @@ export function settingsView(me) {
           <input name="name" placeholder="New brand group — e.g. Solution brands" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add group</button>
         </form>
+      </section>
+
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.logout} Branch access</h2>
+          <p class="muted">Set the 6-digit code each branch signs in with. Codes are stored
+             hashed on the server — nobody, including you, can read an existing one, so
+             setting a new code is the way to recover a forgotten one.</p>
+        </div>
+        <div id="set-access"><p class="muted sm">Loading…</p></div>
       </section>`;
     wire();
+    loadAccess();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group
@@ -180,6 +235,9 @@ export function settingsView(me) {
         store.addBrandGroup(val('name'));
       } else if (f.dataset.addBrand) {
         store.addBrand(f.dataset.addBrand, val('name'));
+      } else if (f.dataset.set) {
+        applyCode(f);
+        return;                       // keeps the typed code until it succeeds
       } else return;
       f.reset();
     });

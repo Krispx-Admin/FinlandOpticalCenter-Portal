@@ -1,23 +1,24 @@
 // ── Static domain data: locations, catalogues, status machines, seed state ──
+// Locations carry no credentials: sign-in is handled by Supabase Auth.
 
 export const LOCATIONS = [
   // Retail branches
-  { code: 'MOUJ', name: 'Al Mouj',            role: 'retail',  pin: '1234' },
-  { code: 'SCC',  name: 'Seeb City Centre',   role: 'retail',  pin: '1234' },
-  { code: 'AV',   name: 'Avenues Mall',       role: 'retail',  pin: '1234' },
-  { code: 'QCC',  name: 'Qurum City Centre',  role: 'retail',  pin: '1234' },
-  { code: 'SLS',  name: 'Salalah Shop',       role: 'retail',  pin: '1234' },
-  { code: 'SUR',  name: 'Sur',                role: 'retail',  pin: '1234' },
+  { code: 'MOUJ', name: 'Al Mouj',            role: 'retail' },
+  { code: 'SCC',  name: 'Seeb City Centre',   role: 'retail' },
+  { code: 'AV',   name: 'Avenues Mall',       role: 'retail' },
+  { code: 'QCC',  name: 'Qurum City Centre',  role: 'retail' },
+  { code: 'SLS',  name: 'Salalah Shop',       role: 'retail' },
+  { code: 'SUR',  name: 'Sur',                role: 'retail' },
   // Fitting centres (sell + fit lenses)
-  { code: 'MOO',  name: 'Mall of Oman',       role: 'fitting', pin: '1234' },
-  { code: 'MGM',  name: 'Muscat Grand Mall',  role: 'fitting', pin: '1234' },
+  { code: 'MOO',  name: 'Mall of Oman',       role: 'fitting' },
+  { code: 'MGM',  name: 'Muscat Grand Mall',  role: 'fitting' },
   // Clinics (FOC Eye Clinics)
-  { code: 'QURFEC', name: 'Qurum FEC',        role: 'clinic',  pin: '1234' },
-  { code: 'SALFEC', name: 'Salalah FEC',      role: 'clinic',  pin: '1234' },
-  { code: 'SOHFEC', name: 'Sohar FEC',        role: 'clinic',  pin: '1234' },
-  { code: 'NIZFEC', name: 'Nizwa FEC',        role: 'clinic',  pin: '1234' },
+  { code: 'QURFEC', name: 'Qurum FEC',        role: 'clinic' },
+  { code: 'SALFEC', name: 'Salalah FEC',      role: 'clinic' },
+  { code: 'SOHFEC', name: 'Sohar FEC',        role: 'clinic' },
+  { code: 'NIZFEC', name: 'Nizwa FEC',        role: 'clinic' },
   // Warehouse / admin
-  { code: 'WH',   name: 'Warehouse (admin)',  role: 'admin',   pin: '9999' },
+  { code: 'WH',   name: 'Warehouse (admin)',  role: 'admin' },
 ];
 
 export const ROLES = {

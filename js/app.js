@@ -1,6 +1,7 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
 import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, canAdvanceOrder, isLensOwner } from './data.js';
 import { store } from './store.js';
+import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
@@ -37,7 +38,7 @@ function renderLogin(preselect = null) {
     <main class="login-panel">
       <div class="lp-inner">
         <h2>Sign in as your location</h2>
-        <p class="lp-sub">Pick your location, then enter its PIN.</p>
+        <p class="lp-sub">Pick your location, then enter its 6-digit code.</p>
         ${groups.map(([title, role]) => `
           <div class="lp-group">
             <h3>${title}</h3>
@@ -56,6 +57,15 @@ function renderLogin(preselect = null) {
     </main>
   </div>`;
 
+  // Turnstile only loads when a site key is configured.
+  if (auth.captchaEnabled() && !document.getElementById('cf-turnstile-js')) {
+    const sc = document.createElement('script');
+    sc.id = 'cf-turnstile-js';
+    sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    sc.async = true;
+    document.head.appendChild(sc);
+  }
+
   app.querySelectorAll('[data-loc]').forEach(btn => btn.addEventListener('click', () => {
     app.querySelectorAll('.loc-card').forEach(b => b.classList.toggle('sel', b === btn));
     const area = app.querySelector('#pin-area');
@@ -72,9 +82,11 @@ function pinHTML(code) {
     <div class="pin-card">
       <div class="pin-who"><span class="loc-chip">${code}</span> ${esc(l.name)} <em>· ${ROLES[l.role].label}</em></div>
       <form id="pin-form" autocomplete="off">
-        <input id="pin-input" inputmode="numeric" maxlength="4" pattern="\\d{4}" placeholder="••••" autofocus>
-        <button class="btn btn-primary" type="submit">Enter ${icons.arrowRight}</button>
+        <input id="pin-input" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="6" pattern="\\d{6}" placeholder="••••••" aria-label="Six digit code" autofocus>
+        <button class="btn btn-primary" type="submit" id="pin-go">Sign in ${icons.arrowRight}</button>
       </form>
+      ${auth.captchaEnabled() ? `<div class="cf-turnstile" data-sitekey="${auth.captchaSiteKey()}" data-callback="focCaptcha"></div>` : ''}
       <div class="pin-err" id="pin-err"></div>
     </div>`;
 }
@@ -82,21 +94,45 @@ function pinHTML(code) {
 function wirePin(code) {
   const form = app.querySelector('#pin-form');
   const input = app.querySelector('#pin-input');
+  const btn = app.querySelector('#pin-go');
+  const err = app.querySelector('#pin-err');
   input?.focus();
-  form?.addEventListener('submit', e => {
+
+  form?.addEventListener('submit', async e => {
     e.preventDefault();
-    const ok = store.login(code, input.value.trim());
-    if (ok) {
+    const entered = input.value.trim();
+    err.textContent = '';
+    if (!/^\d{6}$/.test(entered)) {
+      err.textContent = 'The code is six digits.';
+      return;
+    }
+    // The check happens on Supabase's servers, so the button has to wait.
+    btn.disabled = true;
+    input.disabled = true;
+    const was = btn.innerHTML;
+    btn.textContent = 'Checking…';
+
+    const { branch, error } = await auth.signIn(code, entered, window.__focCaptchaToken);
+
+    if (branch) {
+      store.session = branch;
       location.hash = '#/fitting';
       renderShell();
-    } else {
-      const err = app.querySelector('#pin-err');
-      err.textContent = 'Wrong PIN for this location.';
-      form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
-      input.select();
+      return;
     }
+    btn.disabled = false;
+    input.disabled = false;
+    btn.innerHTML = was;
+    err.textContent = error;
+    form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    input.select();
+    window.__focCaptchaToken = undefined;
+    window.turnstile?.reset?.();
   });
 }
+
+// Turnstile hands its token back through a global callback.
+window.focCaptcha = token => { window.__focCaptchaToken = token; };
 
 // ─────────────────────────── SHELL ───────────────────────────
 const MODULES = {
@@ -158,7 +194,7 @@ function renderShell() {
 
   renderNav(me, mod);
   app.querySelector('#signout').addEventListener('click', () => {
-    store.logout(); closeLayer(); renderLogin();
+    auth.signOut(); store.session = null; closeLayer(); renderLogin();
   });
   mountModule(mod);
 
@@ -221,5 +257,18 @@ window.addEventListener('hashchange', () => {
 });
 
 // ── boot ──
-store.restoreSession();
-if (store.session) renderShell(); else renderLogin();
+// Restoring a session asks Supabase, so this is asynchronous now.
+(async () => {
+  store.session = await auth.currentBranch();
+  if (store.session) renderShell(); else renderLogin();
+
+  // Follow the user out if they sign out in another tab, or their session expires.
+  auth.onAuthChange((branch, event) => {
+    if (event === 'SIGNED_OUT' || (!branch && store.session)) {
+      store.session = null;
+      teardownShell();
+      closeLayer();
+      renderLogin();
+    }
+  });
+})();
