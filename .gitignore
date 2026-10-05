@@ -1,1 +1,11 @@
 .claude/settings.local.json
+
+# Credentials — never commit. The Supabase anon key is public by design and
+# ships in the page, but tokens, service keys and env files must not.
+.env
+.env.*
+*.token
+*.pat
+.foc-supabase-token
+supabase/.temp/
+supabase/.branches/
