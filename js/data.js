@@ -193,23 +193,3 @@ export function canSeeLensRequest(r, code) {
   return isLensOwner(code) || loc(code)?.role === 'admin' || r.branch === code;
 }
 
-// ── Initial state ───────────────────────────────────────────────────────────
-// Starts empty: real records are entered by the branches. Only the catalogue
-// settings are pre-filled, since a request cannot be composed without at least
-// one category to pick.
-export function seedState() {
-  return {
-    v: 6,
-    rev: 1,
-    seq: { bill: 1000, req: 1000, lens: 1000, claim: 1000 },
-    settings: {
-      brandGroups: [{ name: DEFAULT_BRAND_GROUP, brands: [...BRANDS] }],
-      categories: DEFAULT_CATEGORIES.map(c => ({ ...c, brandGroup: DEFAULT_BRAND_GROUP })),
-    },
-    orders: [],
-    requests: [],
-    lensStock: [],
-    lensRequests: [],
-    claims: [],
-  };
-}

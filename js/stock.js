@@ -308,7 +308,7 @@ export function stockView(me) {
         l[f] = e.target.value;
       }
     });
-    layer.el.addEventListener('click', e => {
+    layer.el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
       if (e.target.closest('[data-add]')) {
         const note = preserveNote();
@@ -337,7 +337,12 @@ export function stockView(me) {
             return out;
           });
         if (!clean.length) return;
-        const r = store.createRequest({ lines: clean, note: preserveNote().trim() }, me.code);
+        const place = e.target.closest('[data-send]');
+        place.disabled = true;
+        const was = place.innerHTML;
+        place.textContent = 'Placing…';
+        const r = await store.createRequest({ lines: clean, note: preserveNote().trim() }, me.code);
+        if (!r) { place.disabled = false; place.innerHTML = was; return; }
         layer.close();
         openDrawer(r.id);
       }

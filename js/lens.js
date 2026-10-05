@@ -359,7 +359,7 @@ export function lensView(me) {
     const keepBill = () => layer.el.querySelector('#lens-note')?.value ?? '';
     const putBill = v => { const n = layer.el.querySelector('#lens-note'); if (n) n.value = v; };
 
-    layer.el.addEventListener('click', e => {
+    layer.el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
       const plus = e.target.closest('[data-plus]');
       const minus = e.target.closest('[data-minus]');
@@ -381,7 +381,12 @@ export function lensView(me) {
           return i && { itemId: i.id, type: i.type, index: i.index, coating: i.coating, sph: i.sph, cyl: i.cyl, qty };
         }).filter(Boolean);
         if (!lines.length) return;
-        const r = store.createLensRequest({ lines, billNo: keepBill().trim() }, me.code);
+        const send = e.target.closest('[data-send]');
+        send.disabled = true;
+        const was = send.innerHTML;
+        send.textContent = 'Sending…';
+        const r = await store.createLensRequest({ lines, billNo: keepBill().trim() }, me.code);
+        if (!r) { send.disabled = false; send.innerHTML = was; return; }
         cart.clear();
         layer.close();
         ui.tab = 'mine';
@@ -495,12 +500,18 @@ export function lensView(me) {
     preview();
     layer.el.addEventListener('input', preview);
     layer.el.addEventListener('change', preview);
-    layer.el.addEventListener('click', e => {
+    layer.el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
-      if (e.target.closest('[data-save]')) {
+      const save = e.target.closest('[data-save]');
+      if (save) {
         const f = read();
         if (f.qty <= 0) return;
-        store.addLensItem(f, me.code);
+        save.disabled = true;
+        const was = save.innerHTML;
+        save.textContent = 'Saving…';
+        if (!await store.addLensItem(f, me.code)) {
+          save.disabled = false; save.innerHTML = was; return;
+        }
         layer.close();
       }
     });

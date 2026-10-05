@@ -268,12 +268,19 @@ export function fittingView(me) {
       </form>
     `);
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
-    layer.el.querySelector('#nf').addEventListener('submit', e => {
+    layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
       const ref = f.get('ref').trim();
       if (!ref) return;
-      const o = store.createOrder({ ref, origin: me.code, customer: f.get('customer').trim() }, me.code);
+      // The order is written to the database, which can refuse it (a bill
+      // number already used here), so the form stays open until it lands.
+      const go = e.target.querySelector('[type=submit]');
+      go.disabled = true;
+      const was = go.innerHTML;
+      go.textContent = 'Saving…';
+      const o = await store.createOrder({ ref, origin: me.code, customer: f.get('customer').trim() }, me.code);
+      if (!o) { go.disabled = false; go.innerHTML = was; return; }
       layer.close();
       toast({ title: `${o.ref} logged`, sub: 'Use “Send to fitter” when it leaves your branch', tone: 'info' });
     });

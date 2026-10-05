@@ -505,7 +505,7 @@ export function claimsView(me) {
       sync();
     });
     el.addEventListener('change', sync);
-    el.addEventListener('click', e => {
+    el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
       if (e.target.closest('[data-add]')) { sync(); draft.items.push({ name: '', price: '' }); redrawItems(); return; }
       const rm = e.target.closest('[data-rm]');
@@ -516,9 +516,16 @@ export function claimsView(me) {
         if (!draft.customer.trim()) return toast({ title: 'Customer name is required', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
         const fields = { ...draft, customer: draft.customer.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
-        const saved = existing ? store.updateClaim(existing.id, fields, me.code) : store.createClaim(fields, me.code);
+        const save = e.target.closest('[data-save]');
+        save.disabled = true;
+        const was = save.innerHTML;
+        save.textContent = 'Saving…';
+        const saved = existing
+          ? await store.updateClaim(existing.id, fields, me.code)
+          : await store.createClaim(fields, me.code);
+        if (!saved) { save.disabled = false; save.innerHTML = was; return; }
         layer.close();
-        if (saved) openPreview(saved.id);
+        openPreview(saved.id);
       }
     });
   }

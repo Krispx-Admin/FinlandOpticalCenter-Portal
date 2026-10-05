@@ -121,7 +121,7 @@ function wirePin(code) {
     if (branch) {
       store.session = branch;
       location.hash = '#/fitting';
-      renderShell();
+      enterShell();
       return;
     }
     btn.disabled = false;
@@ -131,6 +131,60 @@ function wirePin(code) {
     form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
     input.select();
   });
+}
+
+// ─────────────────────────── LOADING ───────────────────────────
+// Records live in Postgres now, so there is a moment between proving who you
+// are and having anything to show. Say so rather than flashing an empty grid.
+function renderLoading(msg = 'Loading your branch…') {
+  app.innerHTML = `
+  <div class="login">
+    <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
+    <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
+    <main class="login-panel">
+      <div class="lp-inner lp-center">
+        <div class="boot"><span class="boot-spin"></span>${esc(msg)}</div>
+      </div>
+    </main>
+  </div>`;
+}
+
+function renderLoadError(detail, retry) {
+  app.innerHTML = `
+  <div class="login">
+    <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
+    <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
+    <main class="login-panel">
+      <div class="lp-inner lp-center">
+        <div class="pin-card boot-err">
+          <h2>Can't reach the server</h2>
+          <p class="muted">${esc(detail)}</p>
+          <div class="form-foot">
+            <button class="btn btn-ghost" id="boot-out">Sign out</button>
+            <button class="btn btn-primary" id="boot-retry">Try again</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>`;
+  app.querySelector('#boot-retry').addEventListener('click', retry);
+  app.querySelector('#boot-out').addEventListener('click', async () => {
+    await auth.signOut(); store.session = null; renderLogin();
+  });
+}
+
+// Pull everything this branch may see, then show the app. Called after a fresh
+// sign-in and after restoring a session.
+async function enterShell() {
+  teardownShell();   // in case a shell was already up: its subscription must go
+  renderLoading();
+  try {
+    await store.load();
+  } catch (e) {
+    renderLoadError(String(e?.message ?? e), enterShell);
+    return;
+  }
+  renderShell();
 }
 
 // ─────────────────────────── SHELL ───────────────────────────
@@ -193,7 +247,7 @@ function renderShell() {
 
   renderNav(me, mod);
   app.querySelector('#signout').addEventListener('click', () => {
-    auth.signOut(); store.session = null; closeLayer(); renderLogin();
+    auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
   });
   mountModule(mod);
 
@@ -256,14 +310,17 @@ window.addEventListener('hashchange', () => {
 });
 
 // ── boot ──
-// Restoring a session asks Supabase, so this is asynchronous now.
+// Restoring a session asks Supabase and loading the data asks Postgres, so
+// this is asynchronous now.
 (async () => {
+  renderLoading('Checking your session…');
   store.session = await auth.currentBranch();
-  if (store.session) renderShell(); else renderLogin();
+  if (store.session) await enterShell(); else renderLogin();
 
   // Follow the user out if they sign out in another tab, or their session expires.
   auth.onAuthChange((branch, event) => {
     if (event === 'SIGNED_OUT' || (!branch && store.session)) {
+      store.stop();
       store.session = null;
       teardownShell();
       closeLayer();

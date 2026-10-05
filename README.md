@@ -2,7 +2,7 @@
 
 An internal, real-time operations portal for a multi-branch optical retail
 chain: retail branches, lens-fitting centres, eye clinics and one central
-warehouse, all looking at the same live board.
+warehouse, all looking at the same live board, backed by Supabase.
 
 **Zero build step.** Plain HTML + CSS + ES modules — serve the folder with any
 static server:
@@ -24,38 +24,66 @@ python3 -m http.server 8000     # or: npx serve
 
 ## The model
 
-- **Users are locations, not people.** Sign in as a location with a short PIN.
+- **Users are locations, not people.** Each location has a Supabase Auth
+  account and a six-digit sign-in code. Codes are checked on Supabase's
+  servers, never in the browser, and are stored only as bcrypt hashes.
 - **Roles:** retail branch (sees only its own records), fitting centre (also
   sees jobs routed to it, and advances them), warehouse/admin (sees and
   oversees everything).
-- **Real-time:** state lives in `localStorage` and syncs instantly across tabs
-  via `BroadcastChannel` — open two tabs, sign in as two locations, and watch
-  actions land on both boards. A background simulator (one elected leader tab)
-  keeps the rest of the network "working" so the board feels alive.
-- Login persists across refresh; each tab can hold a different location.
+- **The data is shared, not local.** Every record lives in Postgres. A request
+  placed at Seeb is visible at the warehouse immediately, on a different
+  computer, and survives clearing the browser.
+- **Enforced in the database.** Each login's JWT carries a `branch_code` in
+  `app_metadata`, which is set server-side and cannot be rewritten by the
+  browser. Row level security on every table keys off that claim, so a branch
+  cannot read another branch's claims even by crafting its own requests. The
+  permission checks in `js/data.js` are a second layer, not the only one.
+- **Realtime.** The client subscribes to Postgres changes, so another branch's
+  action lands on this board within a moment and raises a toast.
+- **Atomic where it matters.** Confirming a lens request deducts the shelf and
+  completing a stock request closes it inside a single database function —
+  two people acting at once cannot both claim the last lens.
+- Sign-in persists across refresh; signing out in one tab signs out the rest.
 
-## Demo credentials
+## Sign-in codes
 
-| Locations | PIN |
-|---|---|
-| All branches & fitting centres | `1234` |
-| Warehouse (admin) | `9999` |
-
-“Reset demo” in the sidebar restores the seeded records (all tabs).
+Each location has its own six-digit code. The warehouse sets and changes them
+all under **Settings → Branch access**; nobody, including the warehouse, can
+read an existing code back. The codes are kept outside this repository.
 
 ## Layout
 
 ```
 index.html
-css/styles.css      design system, layout, micro-animations
-js/data.js          locations, catalogue, status machines, permissions, seed data
-js/store.js         state, persistence, cross-tab sync, mutations, simulator
+css/styles.css      design system, layout, micro-animations, A4 print rules
+js/data.js          locations, catalogue, status machines, permissions
+js/auth.js          Supabase sign-in, session, warehouse code control
+js/supabase-config.js   project URL and anon key (public by design)
+js/db.js            row <-> app mapping, collection loads, realtime
+js/store.js         in-memory cache, mutations, change notification
 js/ui.js            DOM helpers, icons, toasts, modal/drawer layers
-js/app.js           login, shell, navigation, live toasts
+js/app.js           login, boot, shell, navigation, live toasts
 js/fitting.js       Module 1 — Fitting Log
 js/stock.js         Module 2 — Stock Requests / Warehouse queue
-js/settings.js      Module 3 — Settings: categories & brand groups (admin)
+js/settings.js      Module 3 — Settings: categories, brand groups, branch access
 js/lens.js          Module 4 — Lens Stock
 js/claims.js        Module 5 — Insurance Claim Receipts (A4 print)
 img/                brand logos used on the printed receipt
+supabase/*.sql      schema, row level security, functions, realtime
 ```
+
+## Database
+
+Applied in order:
+
+| File | What it adds |
+|---|---|
+| `supabase/schema.sql` | branches, claims (+ items, prescriptions), orders (+ events), lens stock, lens requests (+ lines, events); RLS on all of them; the atomic `confirm_lens_request`; realtime publication |
+| `supabase/branch-codes.sql` | `set_branch_code` and `branch_access` — warehouse-only, reject weak codes |
+| `supabase/schema-02-shared.sql` | stock requests (+ lines, events), shared settings, reference numbers from database sequences, `complete_stock_request` |
+| `supabase/schema-03-lens-topup.sql` | `add_lens_stock` — adding to a spec already on the shelf is one statement, so it cannot double-count |
+
+Reference numbers (`SR-…`, `LR-…`, `IC-…`) are allocated by Postgres sequences
+as part of the insert, so two branches acting at the same instant cannot be
+given the same one. A fitting order's reference is the branch's own bill
+number and is unique per branch, not globally.

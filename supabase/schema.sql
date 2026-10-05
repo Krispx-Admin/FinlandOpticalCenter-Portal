@@ -2,9 +2,9 @@
 --  FOC Portal — Postgres schema
 --  Covers: Insurance Claim Receipts · Fitting Log · Lens Stock
 -- ============================================================================
---  STATUS: not yet applied. Run this in the Supabase SQL editor (or let the
---  build apply it). Creating the tables does NOT make the app use them — the
---  portal still reads and writes localStorage until it is rewired.
+--  STATUS: applied, and live. The portal reads and writes these tables; see
+--  js/db.js for the row mapping and js/store.js for the writes. Stock requests
+--  and settings arrived later, in schema-02-shared.sql.
 --
 --  Security model, in one paragraph: every staff login is a Supabase Auth user
 --  carrying a branch_code in its app_metadata, which is set server-side and so
@@ -12,8 +12,8 @@
 --  Row level security is ON for every table with no permissive default, so a
 --  leaked anon key on its own reads nothing.
 --
---  Not covered yet: Stock Requests and Settings (categories / brand groups),
---  which stay on localStorage for now. They slot in the same way when wanted.
+--  Stock Requests and Settings live in schema-02-shared.sql, which also moves
+--  reference numbers onto database sequences.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -456,7 +456,9 @@ on conflict (code) do update
 --     set through the admin API. It must be app_metadata, not user_metadata:
 --     user_metadata is editable by the signed-in user, so a branch could
 --     rewrite its own code and read everyone else's claims.
+--     DONE — see js/auth.js.
 --   · Rewire the app: supabase-js client, real sign-in replacing the PIN
 --     screen, and async reads/writes in place of the synchronous store.
---   · Stock Requests and Settings still live in localStorage.
+--     DONE — see js/db.js and js/store.js.
+--   · Stock Requests and Settings — DONE, in schema-02-shared.sql.
 -- ============================================================================

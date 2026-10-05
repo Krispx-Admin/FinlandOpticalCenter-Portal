@@ -169,6 +169,22 @@ svg { width: 18px; height: 18px; flex: none; }
 .loc-card.role-admin .loc-code { color: #fff; background: var(--brand); }
 .loc-name { font-weight: 600; font-size: 12.5px; }
 
+/* boot — shown while the branch's records come down from the server */
+.lp-center { align-items: center; justify-content: center; }
+.boot {
+  display: flex; align-items: center; gap: 11px;
+  color: var(--ink-2); font-weight: 600; font-size: 14px;
+}
+.boot-spin {
+  width: 17px; height: 17px; flex: none; border-radius: 50%;
+  border: 2px solid var(--border-strong); border-top-color: var(--brand);
+  animation: bootSpin .7s linear infinite;
+}
+@keyframes bootSpin { to { transform: rotate(360deg); } }
+.boot-err { width: min(440px, 100%); text-align: left; }
+.boot-err h2 { font-size: 18px; margin: 0 0 6px; }
+.boot-err .muted { margin: 0 0 4px; word-break: break-word; }
+
 /* step two — narrow and centred, not stretched across the full canvas */
 #step-code { width: min(440px, 100%); margin: 0 auto; }
 .lp-back {
