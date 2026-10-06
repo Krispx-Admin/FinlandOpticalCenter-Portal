@@ -628,6 +628,31 @@ svg { width: 18px; height: 18px; flex: none; }
 .brand-x:hover { background: var(--st-red); color: #fff; }
 .brand-x svg { width: 11px; height: 11px; }
 
+/* ── Which way the job goes: frame travels, or lenses do ── */
+.fulfil { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.fulfil-opt {
+  display: block; cursor: pointer; padding: 12px 14px; border-radius: 11px;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  transition: border-color var(--speed), background var(--speed), box-shadow var(--speed);
+}
+.fulfil-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.fulfil-opt b { display: block; font-size: 13.5px; font-weight: 650; color: var(--brand-ink); }
+.fulfil-opt span { display: block; margin-top: 3px; font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+.fulfil-opt:hover { border-color: var(--brand); }
+.fulfil-opt.on {
+  border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 1px var(--brand);
+}
+.fulfil-opt.on b { color: var(--brand); }
+@media (max-width: 620px) { .fulfil { grid-template-columns: 1fr; } }
+
+/* …and the same fact, read back on the request itself */
+.fulfil-chip {
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+  background: #eef1f5; color: var(--ink-2);
+}
+.fulfil-chip.receive_lens { background: #e2f5f3; color: var(--st-teal); }
+
 /* ── Lens catalogue editor: the three lists the shelf is built from ── */
 .lens-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .lens-list h4 {

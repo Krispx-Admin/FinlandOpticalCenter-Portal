@@ -61,6 +61,9 @@ const toLensRequest = r => ({
   id: r.id, ref: r.ref, branch: r.branch_code, status: r.status,
   // The form calls this "Bill Number"; the column is the generic `note`.
   billNo: r.note ?? '', reason: r.reason ?? '',
+  customer: r.customer ?? '',
+  // How the job gets done, and the fitting order opened alongside it.
+  fulfilment: r.fulfilment ?? 'send_frames', orderId: r.order_id ?? null,
   lines: (r.lens_request_lines ?? []).map(l => ({
     id: l.id, itemId: l.stock_id, type: l.lens_type, index: l.lens_index,
     coating: l.coating, sph: num(l.sph), cyl: num(l.cyl), qty: l.qty,
@@ -132,11 +135,9 @@ export const stockLineRows = (requestId, lines) => lines.map((l, i) => ({
   qty: l.qty ?? null, unit: l.unit ?? null, note: l.note ?? '',
 }));
 
-export const lensLineRows = (requestId, lines) => lines.map(l => ({
-  request_id: requestId, stock_id: l.itemId ?? null,
-  lens_type: l.type, lens_index: l.index, coating: l.coating,
-  sph: l.sph, cyl: l.cyl, qty: l.qty,
-}));
+// Lens request lines are written by create_lens_request, inside the same
+// transaction as the request and the fitting order it opens, so there is no
+// row-builder for them here.
 
 export const claimRow = (f, by) => ({
   claim_date: f.date, branch_code: f.branch, bill_no: f.billNo ?? '',

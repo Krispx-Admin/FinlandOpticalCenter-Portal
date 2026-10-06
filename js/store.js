@@ -385,21 +385,25 @@ export const store = {
   },
 
   // ── Lens requests (branch → holding centre) ──
-  createLensRequest({ lines, billNo }, by) {
-    return run(['lensRequests'], async () => {
-      const pcs = lines.reduce((s, l) => s + (l.qty || 0), 0);
-      const row = ok(await supabase.from('lens_requests')
-        .insert({ branch_code: by, status: 'requested', note: billNo ?? '' })
-        .select('id, ref').single());
-      ok(await supabase.from('lens_request_lines').insert(db.lensLineRows(row.id, lines)));
-      ok(await supabase.from('lens_request_events').insert({
-        request_id: row.id, by_code: by,
-        text: `Requested ${lines.length} lens type${lines.length > 1 ? 's' : ''}, ${pcs} pcs from ${locName(LENS_OWNER)}${billNo ? ` — bill ${billNo}` : ''}`,
+  // The request, its lines and the fitting order it opens all happen inside one
+  // database function. The bill number is unique per branch, so the order is
+  // the part that can fail; doing this as three calls from here would leave a
+  // lens request with no job behind it the first time someone retyped a bill
+  // number. The function also decides the fitter, so a branch cannot name
+  // itself one.
+  createLensRequest({ lines, billNo, customer, fulfilment }, by) {
+    return run(['lensRequests', 'orders'], async () => {
+      const row = ok(await supabase.rpc('create_lens_request', {
+        p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines,
       }));
+      const pcs = lines.reduce((s, l) => s + (l.qty || 0), 0);
       return { ...row, lines, pcs };
     }, r => ({
       by, module: 'lens', title: `${by} requested lenses ${r.ref}`,
-      sub: `${r.lines.length} type${r.lines.length === 1 ? '' : 's'} · ${r.pcs} pcs`, refs: [r.id],
+      sub: r.fulfilment === 'receive_lens'
+        ? `${r.pcs} pcs to ${locName(by)} · fitting here`
+        : `${r.pcs} pcs · frame going to ${locName(LENS_OWNER)}`,
+      refs: [r.id],
     })).then(r => (r ? this.lensRequest(r.id) : null));
   },
 

@@ -100,8 +100,11 @@ export const FIT_STATUS = {
 // A self-fit order's own vocabulary: nothing is "at the fitter" when the fitter
 // is you, and nothing is "delivered" when the customer has yet to walk in.
 const SELF_STATUS = {
-  at_fitter: { label: 'In fitting', color: 'purple', action: 'Mark as done', actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
-  delivered: { label: 'Done',       color: 'done',   action: null,           actor: null,     done: null },
+  // Pending with the fitter already set is a job the lens request opened: the
+  // bench is waiting on the lenses, not on anyone choosing where to send it.
+  pending:   { label: 'Pending',    color: 'slate',  action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
+  at_fitter: { label: 'In fitting', color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
+  delivered: { label: 'Done',       color: 'done',   action: null,            actor: null,     done: null },
 };
 
 // What one order's pill and button say. A frame on the road names the place it
@@ -152,6 +155,22 @@ export const DEFAULT_LENS_COATINGS = ['None', 'AR', 'Blue-cut', 'Photochromic'];
 // what lens_stock.coating defaults to.
 export const BARE_COATING = 'None';
 export const LOW_LENS_STOCK = 4; // at or below this, flag it as running low
+
+// Asking for lenses is really asking for one of two things. A branch with no
+// bench can only mean the first; a fitting centre chooses.
+export const FULFILMENT = {
+  send_frames: {
+    label: 'Send the frame over',
+    sub: 'The frame travels there and is cut on their bench.',
+    chip: 'Frame goes over',
+  },
+  receive_lens: {
+    label: 'Receive the lenses',
+    sub: 'The lenses travel here and you cut them yourself — no frame in transit.',
+    chip: 'Lenses come here',
+  },
+};
+export const canCutOwnLenses = role => role === 'fitting' || role === 'admin';
 
 // A branch asks, MGM answers. Confirming ships the lenses and draws down stock.
 export const LENSREQ_STATUS = {

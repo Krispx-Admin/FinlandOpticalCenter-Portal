@@ -1,6 +1,6 @@
 // ── Module 4: Lens Stock — MGM keeps the shelf, every branch shops from it ──
 import {
-  LENS_OWNER, BARE_COATING, LOW_LENS_STOCK,
+  LENS_OWNER, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull,
 } from './data.js';
 import { store } from './store.js';
@@ -264,19 +264,28 @@ export function lensView(me) {
            <button class="btn btn-ghost" data-cancel-decline>Cancel</button>
            <button class="btn btn-danger" data-do-decline="${r.id}">Decline request</button>
          </div>`
+      // Confirming means two different physical acts, so it says which one.
       : `<button class="btn btn-ghost btn-danger-text" data-decline="${r.id}">Decline</button>
-         <button class="btn btn-primary" data-confirm="${r.id}">${icons.check} Confirm &amp; deduct stock</button>`;
+         <button class="btn btn-primary" data-confirm="${r.id}">${icons.check} ${
+           r.fulfilment === 'receive_lens'
+             ? `Send lenses to ${esc(locName(r.branch))}`
+             : 'Confirm &amp; deduct stock'}</button>`;
     return `
       <div class="dw-head">
         <div>
           <div class="dw-kicker">Lens request</div>
           <h2>${esc(r.ref)}</h2>
           <div class="dw-sub">${locChip(r.branch)} ${esc(locName(r.branch))} → ${esc(locName(LENS_OWNER))}${r.billNo ? ` · Bill ${esc(r.billNo)}` : ''}</div>
+          ${r.customer ? `<div class="dw-sub">${esc(r.customer)}</div>` : ''}
         </div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="dw-body">
-        <div class="dw-status-row">${pill(LENSREQ_STATUS, r.status)}<span class="dw-when">updated ${relTime(r.updatedAt)}</span></div>
+        <div class="dw-status-row">
+          ${pill(LENSREQ_STATUS, r.status)}
+          <span class="fulfil-chip ${r.fulfilment}">${esc(FULFILMENT[r.fulfilment]?.chip ?? '')}</span>
+          <span class="dw-when">updated ${relTime(r.updatedAt)}</span>
+        </div>
         ${r.status === 'declined' && r.reason ? `<div class="review-hint decline-note">${icons.flag} ${esc(r.reason)}</div>` : ''}
         <table class="lines">
           <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th>${canAct ? '<th class="num">On shelf</th>' : ''}</tr></thead>
@@ -331,6 +340,13 @@ export function lensView(me) {
 
   // ── cart → request composer ──
   function cartModal() {
+    // A branch with a bench can keep the job and have the lenses sent over;
+    // anywhere else the frame has to travel, so there is nothing to choose.
+    const canCut = canCutOwnLenses(me.role);
+    const draft = {
+      customer: '', billNo: '',
+      fulfilment: canCut ? 'receive_lens' : 'send_frames',
+    };
     const layer = openLayer('modal', () => {
       const rows = [...cart.entries()].map(([id, qty]) => {
         const i = store.lensItem(id);
@@ -361,7 +377,20 @@ export function lensView(me) {
             <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th><th class="num">Stock</th><th></th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <label>Bill number <span class="opt">optional</span><input id="lens-note" placeholder="e.g. B-58214"></label>
+          <div class="grid2">
+            <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
+            <label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>
+          </div>
+          ${canCut ? `
+            <div class="fulfil">
+              ${Object.entries(FULFILMENT).map(([k, f]) => `
+                <label class="fulfil-opt ${draft.fulfilment === k ? 'on' : ''}">
+                  <input type="radio" name="fulfil" value="${k}" ${draft.fulfilment === k ? 'checked' : ''}>
+                  <b>${esc(f.label)}</b>
+                  <span>${esc(f.sub)}</span>
+                </label>`).join('')}
+            </div>` : ''}
+          <p class="muted">A fitting order opens for this bill either way, and sits as Pending until the lenses are in.</p>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>
@@ -370,8 +399,18 @@ export function lensView(me) {
         </div>`;
     });
 
-    const keepBill = () => layer.el.querySelector('#lens-note')?.value ?? '';
-    const putBill = v => { const n = layer.el.querySelector('#lens-note'); if (n) n.value = v; };
+    // Changing the basket redraws the whole panel, so what has been typed has
+    // to be read back out first or it is lost on every + and −.
+    const sync = () => {
+      const q = sel => layer.el.querySelector(sel);
+      draft.customer = q('#lens-cust')?.value ?? draft.customer;
+      draft.billNo = q('#lens-note')?.value ?? draft.billNo;
+      draft.fulfilment = q('input[name=fulfil]:checked')?.value ?? draft.fulfilment;
+    };
+
+    layer.el.addEventListener('change', e => {
+      if (e.target.name === 'fulfil') { sync(); layer.update(); }
+    });
 
     layer.el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
@@ -381,11 +420,11 @@ export function lensView(me) {
       if (plus || minus || drop) {
         const el = plus ?? minus ?? drop;
         const id = el.dataset.plus ?? el.dataset.minus ?? el.dataset.drop;
-        const bill = keepBill();
+        sync();
         if (drop) cart.delete(id);
         else bump(id, plus ? 1 : -1);
         if (!cart.size) return layer.close();
-        layer.update(); putBill(bill);
+        layer.update();
         refreshBody();
         return;
       }
@@ -395,11 +434,22 @@ export function lensView(me) {
           return i && { itemId: i.id, type: i.type, index: i.index, coating: i.coating, sph: i.sph, cyl: i.cyl, qty };
         }).filter(Boolean);
         if (!lines.length) return;
+        sync();
+        // The bill number and the name open a fitting order, so neither can be
+        // a blank or a run of spaces.
+        const cust = layer.el.querySelector('#lens-cust');
+        const bill = layer.el.querySelector('#lens-note');
+        cust.value = draft.customer = draft.customer.trim();
+        bill.value = draft.billNo = draft.billNo.trim();
+        if (!cust.reportValidity() || !bill.reportValidity()) return;
+
         const send = e.target.closest('[data-send]');
         send.disabled = true;
         const was = send.innerHTML;
         send.textContent = 'Sending…';
-        const r = await store.createLensRequest({ lines, billNo: keepBill().trim() }, me.code);
+        const r = await store.createLensRequest({
+          lines, billNo: draft.billNo, customer: draft.customer, fulfilment: draft.fulfilment,
+        }, me.code);
         if (!r) { send.disabled = false; send.innerHTML = was; return; }
         cart.clear();
         layer.close();
