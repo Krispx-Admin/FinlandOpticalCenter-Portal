@@ -257,7 +257,7 @@ export function fittingView(me) {
       </div>
       <form class="form" id="nf">
         <div class="grid2">
-          <label>Bill number <input name="ref" required value="${esc(store.nextBillRef())}" autofocus></label>
+          <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <p class="muted">You'll pick which fitting centre to send it to after it's logged.</p>

@@ -127,14 +127,6 @@ export const store = {
   order(id) { return state.orders.find(o => o.id === id); },
   request(id) { return state.requests.find(r => r.id === id); },
 
-  // Suggests the next bill number from this branch's own highest one. Bill
-  // books are per branch, so other branches' numbers are irrelevant here.
-  nextBillRef() {
-    const mine = state.orders.filter(o => o.origin === this.session?.code);
-    const top = mine.reduce((m, o) => Math.max(m, parseInt(String(o.ref).replace(/\D/g, ''), 10) || 0), 1000);
-    return `B-${top + 1}`;
-  },
-
   // Resolved through the store so the composer and the drawer can never
   // disagree about which brands a category offers or how it's counted.
   brandsFor(cat) {
