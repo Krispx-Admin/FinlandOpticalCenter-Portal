@@ -16,7 +16,7 @@ import * as db from './db.js';
 import {
   locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
-  LENS_OWNER, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
+  LENS_OWNER, BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
 } from './data.js';
 import { toast } from './ui.js';
 
@@ -24,6 +24,7 @@ import { toast } from './ui.js';
 // yet" rather than throwing.
 let state = {
   settings: { brandGroups: [], categories: [] },
+  lensCatalogue: { types: [], indices: [], coatings: [] },
   orders: [], requests: [], lensStock: [], lensRequests: [], claims: [],
 };
 
@@ -74,9 +75,12 @@ async function run(keys, work, describe) {
 const SKIP = Symbol('skip');
 
 // Which screen cares about each collection, for routing refreshes.
+// What the three catalogue lists are called when a toast names one.
+const LENS_OPTION_LABEL = { types: 'lens types', indices: 'indices', coatings: 'coatings' };
+
 const MODULE_OF = {
   orders: 'fitting', requests: 'stock', lensStock: 'lens',
-  lensRequests: 'lens', claims: 'claims', settings: 'settings',
+  lensRequests: 'lens', lensCatalogue: 'lens', claims: 'claims', settings: 'settings',
 };
 
 const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
@@ -143,6 +147,19 @@ export const store = {
   claim(id) { return state.claims.find(c => c.id === id); },
 
   get lensStock() { return state.lensStock; },
+
+  // What the shelf is allowed to hold. Every branch reads these to shop; the
+  // lens-holding branch edits them from the shelf's cog.
+  get lensTypes() { return state.lensCatalogue.types; },
+  get lensIndices() { return state.lensCatalogue.indices; },
+  get lensCoatings() { return state.lensCatalogue.coatings; },
+
+  // How many rows on the shelf still name this value — removing one that is in
+  // use would leave stock nothing in the list describes.
+  lensOptionUse(kind, value) {
+    const field = { types: 'type', indices: 'index', coatings: 'coating' }[kind];
+    return field ? state.lensStock.filter(i => i[field] === value).length : 0;
+  },
   lensItem(id) { return state.lensStock.find(i => i.id === id); },
   lensRequestsFor(code) { return state.lensRequests.filter(r => canSeeLensRequest(r, code)); },
   lensRequest(id) { return state.lensRequests.find(r => r.id === id); },
@@ -332,6 +349,41 @@ export const store = {
     }, { by, module: 'lens', title: `${by} removed lens stock`, sub: lensFull(i), refs: [id] });
   },
 
+  // ── Lens catalogue ──
+  // The lists the shelf is built from. Edited optimistically and pushed whole,
+  // like settings: the database refuses anyone but the lens holder and the
+  // warehouse, and a refusal rolls the screen back from the server.
+  addLensOption(kind, value) {
+    value = String(value).trim();
+    const list = state.lensCatalogue[kind];
+    if (!list || !value || list.some(v => v.toLowerCase() === value.toLowerCase())) return Promise.resolve(null);
+    list.push(value);
+    // Indices are numbers wearing text, so they belong in numeric order
+    // wherever they were typed. Types and coatings keep the order given.
+    if (kind === 'indices') list.sort((a, b) => parseFloat(a) - parseFloat(b));
+    return saveLensCatalogue({ module: 'lens', title: `${value} added to ${LENS_OPTION_LABEL[kind]}` });
+  },
+
+  removeLensOption(kind, value) {
+    const list = state.lensCatalogue[kind];
+    if (!list || !list.includes(value)) return Promise.resolve(null);
+    // Pulling a value out from under stock that uses it would leave rows the
+    // filters cannot describe, so the shelf has to be clear of it first.
+    const used = this.lensOptionUse(kind, value);
+    if (used) {
+      toast({
+        title: `${value} is still on the shelf`,
+        sub: `${used} lens ${used === 1 ? 'line uses' : 'lines use'} it. Clear ${used === 1 ? 'it' : 'them'} first.`,
+        tone: 'lens',
+      });
+      return Promise.resolve(null);
+    }
+    if (list.length <= 1) return Promise.resolve(null);          // never empty the list
+    if (kind === 'coatings' && value === BARE_COATING) return Promise.resolve(null);
+    state.lensCatalogue[kind] = list.filter(v => v !== value);
+    return saveLensCatalogue({ module: 'lens', title: `${value} removed from ${LENS_OPTION_LABEL[kind]}` });
+  },
+
   // ── Lens requests (branch → holding centre) ──
   createLensRequest({ lines, billNo }, by) {
     return run(['lensRequests'], async () => {
@@ -517,6 +569,21 @@ export const store = {
     return saveSettings({ module: 'settings', title: 'Categories reordered' });
   },
 };
+
+// Writes the whole catalogue back. Only the lens holder and the warehouse may;
+// for anyone else the database refuses and the optimistic edit is undone.
+async function saveLensCatalogue(event) {
+  try {
+    await db.saveLensCatalogue(state.lensCatalogue);
+    commit(event);
+    return true;
+  } catch (e) {
+    toast({ title: 'Lens list did not save', sub: explain(e), tone: 'lens' });
+    Object.assign(state, await db.reload(['lensCatalogue']).catch(() => ({})));
+    commit({ module: 'lens' });
+    return false;
+  }
+}
 
 // Writes the whole settings document back. Only the warehouse may; for anyone
 // else the database refuses and the optimistic edit is undone.

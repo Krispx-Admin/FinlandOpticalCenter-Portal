@@ -1,6 +1,6 @@
 // ── Module 4: Lens Stock — MGM keeps the shelf, every branch shops from it ──
 import {
-  LENS_OWNER, LENS_TYPES, LENS_INDICES, LENS_COATINGS, LOW_LENS_STOCK,
+  LENS_OWNER, BARE_COATING, LOW_LENS_STOCK,
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull,
 } from './data.js';
 import { store } from './store.js';
@@ -16,10 +16,23 @@ const REQ_CHIPS = [
 const pcsOf = r => r.lines.reduce((s, l) => s + (l.qty || 0), 0);
 const isLow = i => i.qty > 0 && i.qty <= LOW_LENS_STOCK;
 
+// The handy default, unless whoever keeps the shelf has removed it.
+const pick = (list, preferred) => (list.includes(preferred) ? preferred : list[0]);
+
+// The three lists, as the editor presents them.
+const LENS_LISTS = [
+  ['types',    'Lens types', 'e.g. Office'],
+  ['indices',  'Indices',    'e.g. 1.80'],
+  ['coatings', 'Coatings',   'e.g. Anti-fog'],
+];
+
 export function lensView(me) {
   const isOwner = isLensOwner(me.code);
   const isAdmin = me.role === 'admin';
   const canShop = !isOwner && !isAdmin;
+  // The branch that keeps the lenses decides what may go on the shelf. The
+  // warehouse can too — it is the same pair the database lets write.
+  const canEditLists = isOwner || isAdmin;
 
   const ui = {
     tab: canShop ? 'shop' : 'queue',
@@ -49,7 +62,7 @@ export function lensView(me) {
       list = list.filter(i => lensFull(i).toLowerCase().includes(q));
     }
     return list.sort((a, b) =>
-      LENS_TYPES.indexOf(a.type) - LENS_TYPES.indexOf(b.type) ||
+      store.lensTypes.indexOf(a.type) - store.lensTypes.indexOf(b.type) ||
       a.index.localeCompare(b.index) || a.sph - b.sph || a.cyl - b.cyl);
   }
 
@@ -137,9 +150,9 @@ export function lensView(me) {
     return `
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search type, index, power…" value="${esc(ui.q)}"></div>
-        ${sel('l-type', 'All types', LENS_TYPES, ui.type)}
-        ${sel('l-index', 'All indices', LENS_INDICES, ui.index)}
-        ${sel('l-coating', 'All coatings', LENS_COATINGS, ui.coating)}
+        ${sel('l-type', 'All types', store.lensTypes, ui.type)}
+        ${sel('l-index', 'All indices', store.lensIndices, ui.index)}
+        ${sel('l-coating', 'All coatings', store.lensCoatings, ui.coating)}
         <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>In stock only</label>
       </section>
       ${list.length
@@ -211,10 +224,11 @@ export function lensView(me) {
     return `
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search type, index, power…" value="${esc(ui.q)}"></div>
-        ${sel('l-type', 'All types', LENS_TYPES, ui.type)}
-        ${sel('l-index', 'All indices', LENS_INDICES, ui.index)}
-        ${sel('l-coating', 'All coatings', LENS_COATINGS, ui.coating)}
+        ${sel('l-type', 'All types', store.lensTypes, ui.type)}
+        ${sel('l-index', 'All indices', store.lensIndices, ui.index)}
+        ${sel('l-coating', 'All coatings', store.lensCoatings, ui.coating)}
         <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>Hide empty</label>
+        ${canEditLists ? `<button class="icon-btn" id="l-cog" title="Edit lens types, indices and coatings">${icons.settings}</button>` : ''}
       </section>
       ${isOwner ? `<div class="review-hint">${icons.box} Keep these counts matching the drawer. Confirming a request deducts from them automatically.</div>` : ''}
       ${list.length ? `
@@ -457,6 +471,59 @@ export function lensView(me) {
     for (const r of store.state.lensRequests) { ui.seen.add(r.id); ui.prevStatus.set(r.id, r.status); }
   }
 
+  // ── what the shelf may hold (owner or warehouse) ──
+  function catalogueModal() {
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Lens stock</div><h2>What the shelf can hold</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <p class="muted">These three lists fill the dropdowns here and on every branch's lens screen. A value still on the shelf cannot be removed — clear its stock first.</p>
+        <div class="lens-lists">
+          ${LENS_LISTS.map(([kind, title, hint]) => {
+            const list = store.state.lensCatalogue[kind];
+            return `
+            <div class="lens-list">
+              <h4>${title}<span>${list.length}</span></h4>
+              <div class="set-brands">
+                ${list.map(v => {
+                  const used = store.lensOptionUse(kind, v);
+                  const kept = (kind === 'coatings' && v === BARE_COATING) || list.length <= 1;
+                  return `<span class="set-brand ${used ? 'in-use' : ''}" title="${kept ? 'Always available' : used ? `${used} on the shelf` : ''}">${esc(v)}${
+                    kept ? '' : `<button class="brand-x" data-del="${esc(v)}" data-kind="${kind}" title="Remove">${icons.x}</button>`}</span>`;
+                }).join('')}
+              </div>
+              <form class="set-add sm" data-add="${kind}">
+                <input name="v" placeholder="${hint}" required autocomplete="off">
+                <button class="btn btn-ghost btn-sm" type="submit">${icons.plus} Add</button>
+              </form>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`);
+
+    layer.el.addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target.closest('[data-add]');
+      if (!form) return;
+      const input = form.querySelector('input');
+      const value = input.value.trim();
+      input.value = value;
+      if (!form.reportValidity()) return;
+      await store.addLensOption(form.dataset.add, value);
+      layer.update();
+      layer.el.querySelector(`[data-add="${form.dataset.add}"] input`)?.focus();
+    });
+    layer.el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      const x = e.target.closest('[data-del]');
+      if (!x) return;
+      await store.removeLensOption(x.dataset.kind, x.dataset.del);
+      layer.update();
+    });
+  }
+
   // ── add-stock composer (owner only) ──
   function addStockModal() {
     const layer = openLayer('modal', () => `
@@ -466,11 +533,11 @@ export function lensView(me) {
       </div>
       <div class="form">
         <div class="grid2">
-          <label>Lens type<select id="f-type">${LENS_TYPES.map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
-          <label>Index<select id="f-index">${LENS_INDICES.map(t => `<option ${t === '1.60' ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          <label>Lens type<select id="f-type">${store.lensTypes.map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
+          <label>Index<select id="f-index">${store.lensIndices.map(t => `<option ${t === pick(store.lensIndices, '1.60') ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
         </div>
         <div class="grid2">
-          <label>Coating<select id="f-coating">${LENS_COATINGS.map(t => `<option ${t === 'AR' ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+          <label>Coating<select id="f-coating">${store.lensCoatings.map(t => `<option ${t === pick(store.lensCoatings, 'AR') ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
           <label>Quantity<input id="f-qty" type="number" min="1" max="999" value="10"></label>
         </div>
         <div class="grid2">
@@ -525,6 +592,7 @@ export function lensView(me) {
     root.querySelector('#l-index')?.addEventListener('change', e => { ui.index = e.target.value; refreshBody(); });
     root.querySelector('#l-coating')?.addEventListener('change', e => { ui.coating = e.target.value; refreshBody(); });
     root.querySelector('#l-instock')?.addEventListener('change', e => { ui.inStock = e.target.checked; refreshBody(); });
+    root.querySelector('#l-cog')?.addEventListener('click', catalogueModal);
     root.querySelector('#l-branch')?.addEventListener('change', e => { ui.branch = e.target.value; refreshBody(); });
     root.querySelectorAll('[data-qty]').forEach(el => {
       el.addEventListener('change', ev => store.setLensQty(ev.target.dataset.qty, ev.target.value, me.code));

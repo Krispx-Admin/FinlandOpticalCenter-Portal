@@ -140,9 +140,17 @@ export const REQ_STATUS = {
 // One fitting centre physically holds the loose-lens stock and owns the shelf
 // count; every other location browses it and requests against it.
 export const LENS_OWNER = 'MGM';
-export const LENS_TYPES = ['Single vision', 'Bifocal', 'Progressive'];
-export const LENS_INDICES = ['1.50', '1.56', '1.60', '1.67', '1.74'];
-export const LENS_COATINGS = ['None', 'AR', 'Blue-cut', 'Photochromic'];
+// What the shelf may hold. These are only the starting lists: the branch that
+// holds the lenses edits them from the shelf's own cog, and they live in the
+// database from the first edit on. Falling back to these when the row is empty
+// keeps one definition of the defaults.
+export const DEFAULT_LENS_TYPES = ['Single vision', 'Bifocal', 'Progressive'];
+export const DEFAULT_LENS_INDICES = ['1.50', '1.56', '1.60', '1.67', '1.74'];
+export const DEFAULT_LENS_COATINGS = ['None', 'AR', 'Blue-cut', 'Photochromic'];
+
+// "No coating" is a real answer, not a list entry anyone should delete: it is
+// what lens_stock.coating defaults to.
+export const BARE_COATING = 'None';
 export const LOW_LENS_STOCK = 4; // at or below this, flag it as running low
 
 // A branch asks, MGM answers. Confirming ships the lenses and draws down stock.
@@ -169,8 +177,12 @@ export const PAYMENT_TYPES = [
 ];
 
 // Prescription grid: Distance / Near rows, OD and OS each carrying
-// SPH · CYL · AXIS · V.A., one shared IPD column between the two eyes, and
-// Add / S.H. per eye along the bottom.
+// SPH · CYL · AXIS · V.A., and one Add per eye along the bottom.
+//
+// IPD and segment height used to sit here too. They were a column and a pair of
+// labels wedged between the eyes, and the room they took came out of SPH — the
+// one figure nobody can afford to misread. They are not on an insurance claim
+// anyway, so the grid is now nine even columns and every power fits.
 export const RX_ROWS = [
   { key: 'd', label: 'D', title: 'Distance' },
   { key: 'n', label: 'N', title: 'Near' },
@@ -187,16 +199,18 @@ export const RX_COLS = [
 ];
 const blankEye = () => Object.fromEntries(RX_COLS.map(c => [c.key, '']));
 export const blankRx = () => ({
-  d: { od: blankEye(), os: blankEye(), ipd: '' },
-  n: { od: blankEye(), os: blankEye(), ipd: '' },
+  d: { od: blankEye(), os: blankEye() },
+  n: { od: blankEye(), os: blankEye() },
   add: { od: '', os: '' },
-  sh: { od: '', os: '' },
 });
 
 // Claims written before the grid gained Distance/Near rows carry a flat
 // { od, os } shape. Fold those into the Distance row instead of losing them.
 export function normaliseRx(rx) {
-  if (rx?.d && rx?.n && rx?.add && rx?.sh) return rx;
+  // An older claim may still carry ipd and sh alongside these. Nothing reads
+  // them any more, and handing them back untouched beats dropping what someone
+  // once typed in case the grid ever wants them again.
+  if (rx?.d && rx?.n && rx?.add) return rx;
   const out = blankRx();
   if (!rx) return out;
   for (const e of ['od', 'os']) {
@@ -206,9 +220,6 @@ export function normaliseRx(rx) {
     out.d[e].axis = o.axis ?? '';
     out.add[e] = o.add ?? '';
   }
-  // The old field was a monocular PD per eye; IPD is the distance across both.
-  const pds = ['od', 'os'].map(e => parseFloat(rx[e]?.pd)).filter(n => !Number.isNaN(n));
-  out.d.ipd = pds.length === 2 ? String(pds[0] + pds[1]) : pds.length ? String(pds[0]) : '';
   return out;
 }
 export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);

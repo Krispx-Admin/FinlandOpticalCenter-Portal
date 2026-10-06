@@ -16,6 +16,7 @@ import { supabase } from './auth.js';
 import {
   blankRx, normaliseRx, locName,
   BRANDS, DEFAULT_BRAND_GROUP, DEFAULT_CATEGORIES,
+  DEFAULT_LENS_TYPES, DEFAULT_LENS_INDICES, DEFAULT_LENS_COATINGS,
   RX_EYES, RX_COLS,
 } from './data.js';
 
@@ -31,7 +32,6 @@ const toOrder = r => ({
   id: r.id, ref: r.ref,
   origin: r.origin_code, fitter: r.fitter_code ?? null,
   customer: r.customer ?? '', phone: r.phone ?? '',
-  brand: r.brand ?? '', model: r.model ?? '', lens: r.lens ?? '',
   urgent: !!r.urgent, note: r.note ?? '', status: r.status,
   createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   timeline: timeline(r.order_events),
@@ -75,10 +75,10 @@ function toClaim(r) {
     const row = rx[p.line];
     if (!row) continue;
     for (const e of RX_EYES) for (const c of RX_COLS) row[e.key][c.key] = p[`${e.key}_${c.key}`] ?? '';
-    row.ipd = p.ipd ?? '';
   }
   rx.add = { od: r.add_od ?? '', os: r.add_os ?? '' };
-  rx.sh = { od: r.sh_od ?? '', os: r.sh_os ?? '' };
+  // ipd, sh_od and sh_os are still columns on older claims. The grid dropped
+  // them, so they are read past rather than carried into the app.
   return {
     id: r.id, ref: r.ref, date: r.claim_date, branch: r.branch_code,
     billNo: r.bill_no ?? '', customer: r.customer ?? '',
@@ -101,12 +101,28 @@ function toSettings(r) {
   return { brandGroups: groups, categories: cats };
 }
 
+// Same bargain as settings: an empty list means nobody has edited it yet, so
+// hand back the starting one rather than an empty dropdown.
+function toLensCatalogue(r) {
+  return {
+    types:    r?.types?.length    ? r.types    : [...DEFAULT_LENS_TYPES],
+    indices:  r?.indices?.length  ? r.indices  : [...DEFAULT_LENS_INDICES],
+    coatings: r?.coatings?.length ? r.coatings : [...DEFAULT_LENS_COATINGS],
+  };
+}
+
+// Single-row documents, as opposed to the collections above: one row each,
+// shared by the whole network, read whole and written whole.
+const DOCS = {
+  settings:      ['app_settings',   'brand_groups, categories', toSettings],
+  lensCatalogue: ['lens_catalogue', 'types, indices, coatings', toLensCatalogue],
+};
+
 // ── App → row ───────────────────────────────────────────────────────────────
 
 export const orderRow = (f, by) => ({
   ref: f.ref, origin_code: f.origin ?? by, fitter_code: f.fitter ?? null,
   customer: f.customer ?? '', phone: f.phone ?? '',
-  brand: f.brand ?? '', model: f.model ?? '', lens: f.lens ?? '',
   urgent: !!f.urgent, note: f.note ?? '', status: 'pending',
 });
 
@@ -126,7 +142,6 @@ export const claimRow = (f, by) => ({
   claim_date: f.date, branch_code: f.branch, bill_no: f.billNo ?? '',
   customer: f.customer ?? '', payment: f.payment === 'card' ? 'card' : 'cash',
   add_od: f.rx?.add?.od ?? '', add_os: f.rx?.add?.os ?? '',
-  sh_od: f.rx?.sh?.od ?? '', sh_os: f.rx?.sh?.os ?? '',
   ...(by ? { created_by: by } : {}),
 });
 
@@ -135,7 +150,7 @@ export const claimItemRows = (claimId, items) => items.map((it, i) => ({
 }));
 
 export const claimRxRows = (claimId, rx) => ['d', 'n'].map(line => {
-  const row = { claim_id: claimId, line, ipd: rx?.[line]?.ipd ?? '' };
+  const row = { claim_id: claimId, line };
   for (const e of RX_EYES) for (const c of RX_COLS) {
     row[`${e.key}_${c.key}`] = rx?.[line]?.[e.key]?.[c.key] ?? '';
   }
@@ -169,11 +184,11 @@ async function fetchCollection(key) {
   return data.map(map);
 }
 
-async function fetchSettings() {
-  const { data, error } = await supabase.from('app_settings')
-    .select('brand_groups, categories').eq('id', 1).maybeSingle();
-  if (error) throw new Error(`settings: ${error.message}`);
-  return toSettings(data);
+async function fetchDoc(key) {
+  const [table, select, map] = DOCS[key];
+  const { data, error } = await supabase.from(table).select(select).eq('id', 1).maybeSingle();
+  if (error) throw new Error(`${key}: ${error.message}`);
+  return map(data);
 }
 
 // The portal kept its records in localStorage until this rewrite. Those
@@ -189,19 +204,26 @@ export function forgetLocalCopy() {
 
 // Everything the signed-in branch can see, in parallel.
 export async function loadAll() {
-  const [settings, ...cols] = await Promise.all([
-    fetchSettings(), ...COLLECTIONS.map(fetchCollection),
-  ]);
-  const out = { settings };
-  COLLECTIONS.forEach((k, i) => { out[k] = cols[i]; });
+  const docs = Object.keys(DOCS);
+  const all = await Promise.all([...docs.map(fetchDoc), ...COLLECTIONS.map(fetchCollection)]);
+  const out = {};
+  docs.forEach((k, i) => { out[k] = all[i]; });
+  COLLECTIONS.forEach((k, i) => { out[k] = all[docs.length + i]; });
   return out;
 }
 
 // Reload named collections only — a write touches one or two, not all six.
 export async function reload(keys) {
-  const list = [...new Set(keys)].filter(k => k === 'settings' || SELECTS[k]);
-  const vals = await Promise.all(list.map(k => (k === 'settings' ? fetchSettings() : fetchCollection(k))));
+  const list = [...new Set(keys)].filter(k => DOCS[k] || SELECTS[k]);
+  const vals = await Promise.all(list.map(k => (DOCS[k] ? fetchDoc(k) : fetchCollection(k))));
   return Object.fromEntries(list.map((k, i) => [k, vals[i]]));
+}
+
+export async function saveLensCatalogue(cat) {
+  const { error } = await supabase.from('lens_catalogue').update({
+    types: cat.types, indices: cat.indices, coatings: cat.coatings,
+  }).eq('id', 1);
+  if (error) throw new Error(error.message);
 }
 
 export async function saveSettings(settings) {
@@ -222,7 +244,7 @@ const TABLE_COLLECTION = {
   lens_requests: 'lensRequests', lens_request_lines: 'lensRequests', lens_request_events: 'lensRequests',
   // Confirming a request draws the shelf down, so the shelf has to come back too.
   claims: 'claims', claim_items: 'claims', claim_prescriptions: 'claims',
-  app_settings: 'settings',
+  app_settings: 'settings', lens_catalogue: 'lensCatalogue',
 };
 
 // The *_events tables already hold a human sentence written by whoever acted

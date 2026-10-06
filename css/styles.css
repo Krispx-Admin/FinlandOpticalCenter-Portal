@@ -628,6 +628,21 @@ svg { width: 18px; height: 18px; flex: none; }
 .brand-x:hover { background: var(--st-red); color: #fff; }
 .brand-x svg { width: 11px; height: 11px; }
 
+/* ── Lens catalogue editor: the three lists the shelf is built from ── */
+.lens-lists { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.lens-list h4 {
+  margin: 0 0 9px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink-3); display: flex; align-items: center; gap: 7px;
+}
+.lens-list h4 span {
+  font-size: 10.5px; letter-spacing: 0; background: var(--brand-soft);
+  color: var(--brand); border-radius: 999px; padding: 1px 7px;
+}
+/* a value the shelf is using reads as settled rather than removable */
+.lens-list .set-brand.in-use { background: #eef1f5; color: var(--ink-2); }
+.lens-list .set-brand { cursor: default; }
+@media (max-width: 720px) { .lens-lists { grid-template-columns: 1fr; } }
+
 /* ── Lines review table ── */
 .lines { width: 100%; border-collapse: collapse; margin-top: 14px; }
 .lines th {
@@ -773,25 +788,35 @@ svg { width: 18px; height: 18px; flex: none; }
 .ci-row input[type=number] { text-align: right; font-variant-numeric: tabular-nums; }
 .ci-row input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
 
-/* 10 columns is wide for a modal, so let it scroll rather than squash. */
+/* Eight power columns and a label. Fixed layout with a colgroup is what keeps
+   them even: with automatic layout the widest cell in a column wins, so a
+   heading like AXIS or a label in the bottom row stole room from SPH until a
+   reading as ordinary as -10.25 no longer fit inside its box. */
 .rx-wrap { overflow-x: auto; }
-table.rx-edit { width: 100%; min-width: 560px; border-collapse: collapse; }
+table.rx-edit {
+  width: 100%; min-width: 520px; border-collapse: collapse; table-layout: fixed;
+}
 table.rx-edit th, table.rx-edit td { border: 1px solid var(--border); padding: 0; text-align: center; }
+col.rx-lbl-col { width: 44px; }
 table.rx-edit thead th {
   background: var(--page); font-size: 10.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .04em; color: var(--ink-2); padding: 5px 2px;
 }
+/* the eye heading spans its four columns, so give it some presence */
+table.rx-edit thead tr:first-child th[colspan] { font-size: 11.5px; color: var(--brand); }
 table.rx-edit tbody th {
-  background: var(--page); color: var(--brand); font-size: 13px; font-weight: 700; width: 34px;
+  background: var(--page); color: var(--brand); font-size: 13px; font-weight: 700;
 }
 table.rx-edit .rx-mini {
   font-size: 10.5px; font-weight: 700; color: var(--brand); background: var(--brand-soft);
-  letter-spacing: .03em; white-space: nowrap; padding: 0 6px;
+  letter-spacing: .03em; white-space: nowrap;
 }
-table.rx-edit .rx-ipd { background: #fafbfd; }
+/* Add is one value per eye, so its cell spans that eye rather than pretending
+   to belong to a single power column. */
+table.rx-edit .rx-sum td { background: #fcfdff; }
 table.rx-edit input {
-  width: 100%; border: none; border-radius: 0; padding: 7px 3px;
-  font-size: 12.5px; text-align: center; outline: none; background: transparent; color: var(--ink);
+  width: 100%; border: none; border-radius: 0; padding: 8px 4px;
+  font-size: 13px; text-align: center; outline: none; background: transparent; color: var(--ink);
   font-family: ui-monospace, Consolas, monospace;
 }
 table.rx-edit input:focus { background: var(--brand-soft); box-shadow: inset 0 0 0 2px var(--brand); }

@@ -32,7 +32,7 @@ export function fittingView(me) {
     if (isAdmin && ui.fitter !== 'all') list = list.filter(o => o.fitter === ui.fitter);
     if (ui.q) {
       const q = ui.q.toLowerCase();
-      list = list.filter(o => [o.ref, o.customer, o.brand, o.model, o.origin, o.fitter, locName(o.origin), o.fitter ? locName(o.fitter) : '']
+      list = list.filter(o => [o.ref, o.customer, o.origin, o.fitter, locName(o.origin), o.fitter ? locName(o.fitter) : '']
         .some(v => String(v).toLowerCase().includes(q)));
     }
     return list.sort((a, b) => (b.urgent - a.urgent) || (b.updatedAt - a.updatedAt));
@@ -107,7 +107,6 @@ export function fittingView(me) {
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       const title = o.customer || 'No customer name';
-      const frame = [o.brand, o.model].filter(Boolean).join(' ') + (o.lens ? ` · ${o.lens}` : '');
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${o.urgent ? 'row-urgent' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
         <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' ? 'disabled' : ''}><i></i></label>
@@ -117,7 +116,7 @@ export function fittingView(me) {
             ${o.urgent ? urgentTag() : ''}
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub">${frame ? `<span class="row-sub-txt">${esc(frame)}</span>` : ''}<span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${frame ? '· ' : ''}${relTime(o.createdAt)}</span></div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span></div>
         </div>
         <div class="row-journey">${journey(o)}</div>
         <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true }).label })}</div>

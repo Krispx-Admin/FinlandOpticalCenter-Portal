@@ -85,15 +85,16 @@ table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowra
   color: var(--r-navy); border-top: 2px solid var(--r-navy);
 }
 
+/* Fixed layout and a colgroup so the eight power columns are equal on paper
+   too — a printed SPH that runs out of its box is worse than one on screen. */
+.rc-rx { table-layout: fixed; }
 .rc-rx th, .rc-rx td { text-align: center; padding: 1.3mm 1.2mm; }
 .rc-rx tbody td { height: 6.4mm; font-family: Consolas, ui-monospace, monospace; font-size: 10pt; }
-.rc-rx .rx-lbl { background: var(--r-soft); font-weight: 700; width: 10mm; font-size: 10pt; color: var(--r-navy); }
-.rc-rx .rx-ipd { background: #f7f9fc; }
-.rc-rx .rx-mini {
-  background: var(--r-soft); font-size: 7.5pt; font-weight: 700; letter-spacing: .04em;
-  color: var(--r-navy); text-transform: none;
+.rc-rx col.rx-lbl-col { width: 11mm; }
+.rc-rx .rx-lbl { background: var(--r-soft); font-weight: 700; font-size: 9.5pt; color: var(--r-navy); }
+.rc-rx .rx-sum td {
+  background: #fff; font-family: Consolas, ui-monospace, monospace; font-size: 10pt;
 }
-.rc-rx .rx-sum td { background: #fff; }
 
 .rc-foot { margin-top: auto; padding-top: 4mm; }
 .rc-pay { display: flex; align-items: stretch; gap: 5mm; }
@@ -133,37 +134,34 @@ table.rc-tbl thead { display: table-header-group; }
 table.rc-tbl tr, .rc-rx, .rc-foot, .rc-pay, .rc-sign { break-inside: avoid; }
 `;
 
-// Distance / Near rows, OD and OS on either side of a shared IPD column, with
-// Add and S.H. labelled in-line along the bottom row.
+// Distance / Near rows, OD and OS each with SPH · CYL · AXIS · V.A., and one
+// Add per eye along the bottom. Nine even columns: the colgroup gives every
+// power the same room, so SPH cannot be squeezed by a wordier neighbour.
 function rxTableHTML(rx) {
   const cells = (row, side) => RX_COLS.map(col => `<td>${esc(rx[row][side][col.key] ?? '')}</td>`).join('');
   const heads = () => RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('');
   return `
     <table class="rc-tbl rc-rx">
+      <colgroup><col class="rx-lbl-col"><col span="8"></colgroup>
       <thead>
         <tr>
           <th class="rx-lbl" rowspan="2"></th>
           <th colspan="4">OD</th>
-          <th class="rx-ipd"></th>
           <th colspan="4">OS</th>
         </tr>
-        <tr>${heads()}<th class="rx-ipd">IPD</th>${heads()}</tr>
+        <tr>${heads()}${heads()}</tr>
       </thead>
       <tbody>
         ${RX_ROWS.map(r => `
           <tr>
             <th class="rx-lbl" title="${esc(r.title)}">${esc(r.label)}</th>
             ${cells(r.key, 'od')}
-            <td class="rx-ipd">${esc(rx[r.key].ipd ?? '')}</td>
             ${cells(r.key, 'os')}
           </tr>`).join('')}
         <tr class="rx-sum">
-          <th class="rx-lbl"></th>
-          <th class="rx-mini">Add</th><td>${esc(rx.add.od)}</td>
-          <th class="rx-mini">S.H.</th><td>${esc(rx.sh.od)}</td>
-          <td class="rx-ipd"></td>
-          <th class="rx-mini">Add</th><td>${esc(rx.add.os)}</td>
-          <th class="rx-mini">S.H.</th><td>${esc(rx.sh.os)}</td>
+          <th class="rx-lbl">Add</th>
+          <td colspan="4">${esc(rx.add.od)}</td>
+          <td colspan="4">${esc(rx.add.os)}</td>
         </tr>
       </tbody>
     </table>`;
@@ -431,16 +429,15 @@ export function claimsView(me) {
           <div class="fs-head"><span>Prescription</span><span class="muted sm">Leave blank if not applicable</span></div>
           <div class="rx-wrap">
             <table class="rx-edit">
+              <colgroup><col class="rx-lbl-col"><col span="8"></colgroup>
               <thead>
                 <tr>
                   <th rowspan="2"></th>
                   <th colspan="4">OD</th>
-                  <th class="rx-ipd"></th>
                   <th colspan="4">OS</th>
                 </tr>
                 <tr>
                   ${RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('')}
-                  <th class="rx-ipd">IPD</th>
                   ${RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('')}
                 </tr>
               </thead>
@@ -449,16 +446,12 @@ export function claimsView(me) {
                   <tr>
                     <th title="${esc(r.title)}">${esc(r.label)}</th>
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].od[c.key] ?? '')}" data-rx="${r.key}.od.${c.key}"></td>`).join('')}
-                    <td class="rx-ipd"><input value="${esc(draft.rx[r.key].ipd ?? '')}" data-rx="${r.key}.ipd"></td>
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].os[c.key] ?? '')}" data-rx="${r.key}.os.${c.key}"></td>`).join('')}
                   </tr>`).join('')}
                 <tr class="rx-sum">
-                  <th></th>
-                  <th class="rx-mini">Add</th><td><input value="${esc(draft.rx.add.od)}" data-rx="add.od"></td>
-                  <th class="rx-mini">S.H.</th><td><input value="${esc(draft.rx.sh.od)}" data-rx="sh.od"></td>
-                  <td class="rx-ipd"></td>
-                  <th class="rx-mini">Add</th><td><input value="${esc(draft.rx.add.os)}" data-rx="add.os"></td>
-                  <th class="rx-mini">S.H.</th><td><input value="${esc(draft.rx.sh.os)}" data-rx="sh.os"></td>
+                  <th class="rx-mini">Add</th>
+                  <td colspan="4"><input value="${esc(draft.rx.add.od)}" data-rx="add.od"></td>
+                  <td colspan="4"><input value="${esc(draft.rx.add.os)}" data-rx="add.os"></td>
                 </tr>
               </tbody>
             </table>
