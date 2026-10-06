@@ -6,7 +6,7 @@ export const LOCATIONS = [
   { code: 'SCC',  name: 'Seeb City Centre',   role: 'retail' },
   { code: 'AV',   name: 'Avenues Mall',       role: 'retail' },
   { code: 'QCC',  name: 'Qurum City Centre',  role: 'retail' },
-  { code: 'SLS',  name: 'Salalah Shop',       role: 'retail' },
+  { code: 'SAL',  name: 'Salalah Shop',       role: 'retail' },
   { code: 'SUR',  name: 'Sur',                role: 'retail' },
   // Fitting centres (sell + fit lenses)
   { code: 'MOUJ', name: 'Al Mouj',            role: 'fitting' },
@@ -68,20 +68,56 @@ export const brandsFor = (settings, cat) =>
   settings?.brandGroups?.find(g => g.name === cat?.brandGroup)?.brands ?? [];
 
 // ── Fitting pipeline state machine ──
+// The long road: a branch sells the frame, it travels to a fitting centre for
+// its lenses, and it travels back to be collected where it was bought.
 export const FIT_FLOW = ['pending', 'to_fitter', 'at_fitter', 'ready', 'returning', 'delivered'];
+
+// The short road. A fitting centre that sells a frame it will glaze itself has
+// nothing to put in a van: the frame never leaves the building and the customer
+// collects from the same counter. So both road legs drop out, and with them the
+// hand-over at each end — there is no arrival to confirm and no delivery back.
+export const SELF_FLOW = ['pending', 'at_fitter', 'delivered'];
+export const isSelfFit = o => !!o.fitter && o.fitter === o.origin;
+export const flowFor = o => (isSelfFit(o) ? SELF_FLOW : FIT_FLOW);
+
+// These labels are the generic ones, for the filter chips, where no single
+// order is in view. An order's own words come from fitStep.
 export const FIT_STATUS = {
-  pending:   { label: 'Pending',                color: 'slate',  action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
-  to_fitter: { label: 'In transit to fitter',   color: 'blue',   action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
-  at_fitter: { label: 'At fitter',              color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
-  ready:     { label: 'Ready',                  color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
-  returning: { label: 'Returning to branch',    color: 'teal',   action: 'Confirm delivery',actor: 'origin', done: 'Delivered back at origin branch' },
-  delivered: { label: 'Delivered',              color: 'done',   action: null,              actor: null,     done: null },
+  pending:   { label: 'Pending',    color: 'slate',  action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
+  to_fitter: { label: 'In transit', color: 'blue',   action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
+  at_fitter: { label: 'At fitter',  color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
+  ready:     { label: 'Ready',      color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
+  returning: { label: 'Returning',  color: 'teal',   action: 'Confirm delivery',actor: 'origin', done: 'Delivered back at origin branch' },
+  delivered: { label: 'Delivered',  color: 'done',   action: null,              actor: null,     done: null },
 };
-export const nextFitStatus = s => FIT_FLOW[FIT_FLOW.indexOf(s) + 1] ?? null;
+
+// A self-fit order's own vocabulary: nothing is "at the fitter" when the fitter
+// is you, and nothing is "delivered" when the customer has yet to walk in.
+const SELF_STATUS = {
+  at_fitter: { label: 'In fitting', color: 'purple', action: 'Mark as done', actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
+  delivered: { label: 'Done',       color: 'done',   action: null,           actor: null,     done: null },
+};
+
+// What one order's pill and button say. A frame on the road names the place it
+// is heading for rather than the role, so a branch reads where its own frame
+// is. `long` spells the place out; the compact form uses the code, which is
+// what the journey chips next to it already show.
+export function fitStep(o, { long = false } = {}) {
+  const base = (isSelfFit(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
+  const where = code => (long ? locName(code) : code);
+  if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
+  if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
+  return base;
+}
+
+export const nextFitStatus = o => {
+  const f = flowFor(o);
+  return f[f.indexOf(o.status) + 1] ?? null;
+};
 
 // Which location acts on an order in its current status.
 export function fitActor(order) {
-  const a = FIT_STATUS[order.status].actor;
+  const a = fitStep(order).actor;
   return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter : null;
 }
 

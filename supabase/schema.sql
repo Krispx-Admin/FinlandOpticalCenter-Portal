@@ -436,7 +436,7 @@ insert into public.branches (code, name, role, holds_lens_stock) values
   ('SCC',    'Seeb City Centre',  'retail',  false),
   ('AV',     'Avenues Mall',      'retail',  false),
   ('QCC',    'Qurum City Centre', 'retail',  false),
-  ('SLS',    'Salalah Shop',      'retail',  false),
+  ('SAL',    'Salalah Shop',      'retail',  false),
   ('SUR',    'Sur',               'retail',  false),
   ('MOO',    'Mall of Oman',      'fitting', false),
   ('MGM',    'Muscat Grand Mall', 'fitting', true),    -- holds the lens shelf

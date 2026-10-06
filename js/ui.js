@@ -56,10 +56,15 @@ export const icons = {
 };
 
 // ── Status pill ──
-export function pill(def, key, { flash = false } = {}) {
-  const s = def[key];
-  return `<span class="pill s-${s.color}${flash ? ' pill-flash' : ''}" data-status="${key}"><i class="dot"></i>${esc(s.label)}</span>`;
+// Most pills read their words straight out of a status map. The fitting log's
+// depend on the order too — which fitter, which branch — so it builds the step
+// itself and calls stepPill. The text sits in its own span so a long label can
+// ellipsis inside a narrow column instead of spilling out of the pill.
+export function stepPill(s, { flash = false, title = '' } = {}) {
+  return `<span class="pill s-${s.color}${flash ? ' pill-flash' : ''}"${title ? ` title="${esc(title)}"` : ''}>`
+    + `<i class="dot"></i><span class="pill-t">${esc(s.label)}</span></span>`;
 }
+export const pill = (def, key, opts) => stepPill(def[key], opts);
 
 export function urgentTag() {
   return `<span class="pill s-red urgent-tag">${icons.zap}Urgent</span>`;

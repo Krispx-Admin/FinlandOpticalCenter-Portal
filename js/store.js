@@ -14,7 +14,7 @@
 import { supabase } from './auth.js';
 import * as db from './db.js';
 import {
-  locName, FIT_STATUS, nextFitStatus,
+  locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   LENS_OWNER, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
 } from './data.js';
@@ -162,27 +162,42 @@ export const store = {
     })).then(row => (row ? this.order(row.id) : null));
   },
 
-  // Assign a fitter to pending orders and put them in transit. The filters go
-  // on the update itself, so an order another branch already sent is skipped
-  // by the database rather than by a stale read here.
+  // Assign a fitter to pending orders and set them going. An order whose own
+  // branch is the fitter has no journey to make, so it lands on the bench
+  // directly; the rest go on the road.
+  //
+  // The cache only decides which of the two an order is — origin never changes,
+  // so it cannot get that wrong. Both updates still carry their guards, so an
+  // order another branch already sent is skipped by the database rather than by
+  // a stale read here.
   sendOrdersToFitter(ids, fitter, by) {
+    const here = ids.filter(id => this.order(id)?.origin === fitter);
+    const away = ids.filter(id => !here.includes(id));
+    const legs = [
+      { ids: away, status: 'to_fitter', text: `Sent to ${locName(fitter)} — in transit to fitter` },
+      { ids: here, status: 'at_fitter', text: `Kept at ${locName(fitter)} for fitting — no transit` },
+    ].filter(l => l.ids.length);
+
     return run(['orders'], async () => {
-      const moved = ok(await supabase.from('orders')
-        .update({ fitter_code: fitter, status: 'to_fitter' })
-        .in('id', ids).eq('status', 'pending').is('fitter_code', null)
-        .select('id, ref'));
-      if (!moved.length) return SKIP;
-      ok(await supabase.from('order_events').insert(moved.map(o => ({
-        order_id: o.id, by_code: by,
-        text: `Sent to ${locName(fitter)} — in transit to fitter`,
-      }))));
-      return moved;
+      const moved = (await Promise.all(legs.map(async leg => {
+        const rows = ok(await supabase.from('orders')
+          .update({ fitter_code: fitter, status: leg.status })
+          .in('id', leg.ids).eq('status', 'pending').is('fitter_code', null)
+          .select('id, ref'));
+        if (!rows.length) return [];
+        ok(await supabase.from('order_events').insert(rows.map(o => ({
+          order_id: o.id, by_code: by, text: leg.text,
+        }))));
+        return rows;
+      }))).flat();
+      return moved.length ? moved : SKIP;
     }, moved => ({
       by, module: 'fitting',
       title: moved.length === 1
-        ? `${by} · ${moved[0].ref} → ${FIT_STATUS.to_fitter.label}`
+        ? `${by} · ${moved[0].ref} → ${fitStep(this.order(moved[0].id) ?? {}).label}`
         : `${by} sent ${moved.length} orders to ${locName(fitter)}`,
-      sub: `→ ${locName(fitter)}`, refs: moved.map(o => o.id),
+      sub: here.length && !away.length ? 'Fitted in-house — no transit' : `→ ${locName(fitter)}`,
+      refs: moved.map(o => o.id),
     })).then(moved => (moved ?? []).map(o => this.order(o.id)).filter(Boolean));
   },
 
@@ -195,7 +210,7 @@ export const store = {
     return run(['orders'], async () => {
       const plan = ids.map(id => this.order(id))
         .filter(o => o && canAdvanceOrder(o, by) && !(o.status === 'pending' && !o.fitter))
-        .map(o => ({ o, from: o.status, to: nextFitStatus(o.status) }))
+        .map(o => ({ o, from: o.status, to: nextFitStatus(o) }))
         .filter(p => p.to);
       if (!plan.length) return SKIP;
 
@@ -204,7 +219,7 @@ export const store = {
           .eq('id', p.o.id).eq('status', p.from).select('id, ref, customer'));
         if (!rows.length) return null;
         ok(await supabase.from('order_events').insert({
-          order_id: p.o.id, by_code: by, text: FIT_STATUS[p.from].done,
+          order_id: p.o.id, by_code: by, text: fitStep(p.o).done,
         }));
         return { ...rows[0], status: p.to };
       }))).filter(Boolean);
@@ -213,7 +228,7 @@ export const store = {
     }, done => ({
       by, module: 'fitting',
       title: done.length === 1
-        ? `${by} · ${done[0].ref} → ${FIT_STATUS[done[0].status].label}`
+        ? `${by} · ${done[0].ref} → ${fitStep(this.order(done[0].id) ?? done[0]).label}`
         : `${by} moved ${done.length} orders forward`,
       sub: done.length === 1 ? (done[0].customer || done[0].ref) : done.map(o => o.ref).join(', '),
       refs: done.map(o => o.id),

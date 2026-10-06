@@ -1,12 +1,12 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
-import { FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, locName, fitActor, canAdvanceOrder } from './data.js';
+import { FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, locName, fitStep, fitActor, isSelfFit, canAdvanceOrder } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
+import { esc, relTime, fmtDT, icons, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
 
 const CHIP_DEFS = [
   { key: 'active', label: 'All active' },
   ...FIT_FLOW.filter(s => s !== 'delivered').map(s => ({ key: s, label: FIT_STATUS[s].label })),
-  { key: 'delivered', label: 'Delivered' },
+  { key: 'delivered', label: 'Completed' },
 ];
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
@@ -59,6 +59,13 @@ export function fittingView(me) {
       </div>`;
     const fitterCode = o.fitter ?? '?';
     const fitterName = o.fitter ? locName(o.fitter) : 'Unassigned';
+    // Nothing travelled, so there is no road to draw — one node, and a word
+    // about why the rest of the diagram is missing.
+    if (isSelfFit(o)) return `
+      <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
+        ${node(o.fitter, o.status === 'delivered' ? 'ready' : 'done', fitterName)}
+        <span class="j-inhouse">${o.status === 'delivered' ? 'Fitted in-house' : 'In-house — no transit'}</span>
+      </div>`;
     return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
         ${node(o.origin, 'done', locName(o.origin))}
@@ -80,7 +87,7 @@ export function fittingView(me) {
     return t(active.length, 'Active orders')
       + t(active.filter(o => o.urgent).length, 'Urgent', 'stat-red')
       + t(mine.length, isAdmin ? 'Awaiting action' : 'Need your action', 'stat-brand')
-      + t(week.length, 'Delivered · 7d');
+      + t(week.length, 'Completed · 7d');
   }
 
   // ── list ──
@@ -91,7 +98,7 @@ export function fittingView(me) {
       const isNew = !ui.seen.has(o.id);
       const changed = ui.prevStatus.get(o.id) !== o.status;
       const can = canAdvanceOrder(o, me.code);
-      const st = FIT_STATUS[o.status];
+      const st = fitStep(o);
       const selected = ui.selected.has(o.id);
       const needsFitter = o.status === 'pending' && !o.fitter;
       // Primary action: pick a fitter, advance, or show who we're waiting on.
@@ -113,7 +120,7 @@ export function fittingView(me) {
           <div class="row-sub">${frame ? `<span class="row-sub-txt">${esc(frame)}</span>` : ''}<span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${frame ? '· ' : ''}${relTime(o.createdAt)}</span></div>
         </div>
         <div class="row-journey">${journey(o)}</div>
-        <div class="row-status">${pill(FIT_STATUS, o.status, { flash: changed })}</div>
+        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
           <button class="icon-btn open-arrow" data-open="${o.id}" title="Open order">${icons.chevronRight}</button>
@@ -130,7 +137,7 @@ export function fittingView(me) {
     for (const o of sel) {
       const label = !canAdvanceOrder(o, me.code) ? null
         : (o.status === 'pending' && !o.fitter) ? 'Send to fitter'
-        : FIT_STATUS[o.status].action;
+        : fitStep(o).action;
       if (!label) { ok = false; continue; }
       if (action === null) action = label;
       else if (action !== label) ok = false;
@@ -165,7 +172,7 @@ export function fittingView(me) {
     const o = store.order(drawerId);
     if (!o) return `<div class="pad">Order no longer exists.</div>`;
     const can = canAdvanceOrder(o, me.code);
-    const st = FIT_STATUS[o.status];
+    const st = fitStep(o, { long: true });
     const needsFitter = o.status === 'pending' && !o.fitter;
     return `
       <div class="dw-head">
@@ -177,11 +184,11 @@ export function fittingView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="dw-body">
-        <div class="dw-status-row">${pill(FIT_STATUS, o.status)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
+        <div class="dw-status-row">${stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
         ${journey(o, true)}
         <div class="kv">
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
-          <div><span>Fitting centre</span><b>${o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}` : '<span class="muted">Not assigned yet</span>'}</b></div>
+          <div><span>Fitting centre</span><b>${o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}${isSelfFit(o) ? ' <span class="muted">· in-house</span>' : ''}` : '<span class="muted">Not assigned yet</span>'}</b></div>
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
         <div class="dw-actions">
@@ -221,6 +228,12 @@ export function fittingView(me) {
     const orders = ids.map(id => store.order(id)).filter(o => o && o.status === 'pending' && !o.fitter);
     if (!orders.length) return;
     const what = orders.length === 1 ? orders[0].ref : `${orders.length} orders`;
+    // If every frame here was sold by a fitting centre, that centre can simply
+    // keep them — so it leads the list and says so, rather than hiding among
+    // the places a van would have to drive to.
+    const from = orders[0].origin;
+    const home = orders.every(o => o.origin === from) && FITTERS.find(f => f.code === from);
+    const order = home ? [home, ...FITTERS.filter(f => f.code !== home.code)] : FITTERS;
     const layer = openLayer('modal', () => `
       <div class="dw-head">
         <div><div class="dw-kicker">Send to fitter</div><h2>Choose a fitting centre for ${esc(what)}</h2></div>
@@ -229,10 +242,11 @@ export function fittingView(me) {
       <div class="form">
         <p class="muted">Pick where ${orders.length === 1 ? 'this frame' : 'these frames'} should go for lens fitting.</p>
         <div class="picker-grid">
-          ${FITTERS.map(f => `
-            <button class="picker-card" data-fitter="${f.code}">
+          ${order.map(f => `
+            <button class="picker-card ${home && f.code === home.code ? 'picker-home' : ''}" data-fitter="${f.code}">
               <span class="loc-chip">${f.code}</span>
               <b>${esc(f.name)}</b>
+              ${home && f.code === home.code ? '<span class="picker-note">Keep here — no transit</span>' : ''}
               ${icons.arrowRight}
             </button>`).join('')}
         </div>
@@ -260,7 +274,9 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
-        <p class="muted">You'll pick which fitting centre to send it to after it's logged.</p>
+        <p class="muted">${me.role === 'fitting'
+          ? 'It sits as Pending until the lenses arrive. Then use “Send to fitter” — pick your own centre to keep it here and skip the transit.'
+          : "You'll pick which fitting centre to send it to after it's logged."}</p>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
           <button type="submit" class="btn btn-primary">${icons.send} Log order</button>
@@ -288,7 +304,13 @@ export function fittingView(me) {
       const o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
       layer.close();
-      toast({ title: `${o.ref} logged`, sub: 'Use “Send to fitter” when it leaves your branch', tone: 'info' });
+      toast({
+        title: `${o.ref} logged`,
+        sub: me.role === 'fitting'
+          ? 'Use “Send to fitter” when the lenses arrive'
+          : 'Use “Send to fitter” when it leaves your branch',
+        tone: 'info',
+      });
     });
   }
 
