@@ -78,7 +78,13 @@ export const FIT_FLOW = ['pending', 'to_fitter', 'at_fitter', 'ready', 'returnin
 // hand-over at each end — there is no arrival to confirm and no delivery back.
 export const SELF_FLOW = ['pending', 'at_fitter', 'delivered'];
 export const isSelfFit = o => !!o.fitter && o.fitter === o.origin;
-export const flowFor = o => (isSelfFit(o) ? SELF_FLOW : FIT_FLOW);
+
+// An order already on the road finishes the way it started, even if its fitter
+// is its origin — orders logged before the short road existed sit at stages
+// SELF_FLOW has no answer for, and the alternative is a button offering to
+// send a frame backwards.
+export const onShortRoad = o => isSelfFit(o) && SELF_FLOW.includes(o.status);
+export const flowFor = o => (onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
 
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
@@ -103,7 +109,7 @@ const SELF_STATUS = {
 // is. `long` spells the place out; the compact form uses the code, which is
 // what the journey chips next to it already show.
 export function fitStep(o, { long = false } = {}) {
-  const base = (isSelfFit(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
+  const base = (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
   if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
@@ -112,7 +118,8 @@ export function fitStep(o, { long = false } = {}) {
 
 export const nextFitStatus = o => {
   const f = flowFor(o);
-  return f[f.indexOf(o.status) + 1] ?? null;
+  const i = f.indexOf(o.status);
+  return i < 0 ? null : f[i + 1] ?? null;
 };
 
 // Which location acts on an order in its current status.

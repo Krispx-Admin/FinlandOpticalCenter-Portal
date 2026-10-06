@@ -1,5 +1,5 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
-import { FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, locName, fitStep, fitActor, isSelfFit, canAdvanceOrder } from './data.js';
+import { FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
 
@@ -61,7 +61,7 @@ export function fittingView(me) {
     const fitterName = o.fitter ? locName(o.fitter) : 'Unassigned';
     // Nothing travelled, so there is no road to draw — one node, and a word
     // about why the rest of the diagram is missing.
-    if (isSelfFit(o)) return `
+    if (onShortRoad(o)) return `
       <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
         ${node(o.fitter, o.status === 'delivered' ? 'ready' : 'done', fitterName)}
         <span class="j-inhouse">${o.status === 'delivered' ? 'Fitted in-house' : 'In-house — no transit'}</span>
