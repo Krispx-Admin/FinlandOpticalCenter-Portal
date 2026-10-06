@@ -312,10 +312,48 @@ window.addEventListener('hashchange', () => {
   if (store.session && app.querySelector('.shell') && currentModule() !== mountedKey) mountModule(currentModule());
 });
 
+// ── presenter mode ──
+// For recording tutorials: ?present switches it on for the tab, ?present=0
+// off. Everyone else never downloads it.
+function presenterWanted() {
+  const q = new URLSearchParams(location.search).get('present');
+  try {
+    if (q === '0') sessionStorage.removeItem('focp.present');
+    else if (q !== null) sessionStorage.setItem('focp.present', '1');
+    return sessionStorage.getItem('focp.present') === '1';
+  } catch {
+    return q !== null && q !== '0';
+  }
+}
+
+// How presenter mode changes branch between chapters. It is the sign-in form
+// without the form — the same auth.signIn, so it opens no door the form does
+// not. Signing in replaces the session; if the code is refused, the branch
+// that was signed in stays signed in and its screen comes back.
+async function switchBranch(code, pin) {
+  store.stop();
+  teardownShell();
+  closeLayer();
+  const { branch, error } = await auth.signIn(code, pin);
+  if (!branch) {
+    if (store.session) await enterShell();
+    throw new Error(error || 'sign-in refused');
+  }
+  store.session = branch;
+  location.hash = '#/fitting';
+  await enterShell();
+  return branch;
+}
+
 // ── boot ──
 // Restoring a session asks Supabase and loading the data asks Postgres, so
 // this is asynchronous now.
 (async () => {
+  if (presenterWanted()) {
+    import('./present.js')
+      .then(m => m.start({ switchBranch }))
+      .catch(e => console.error('presenter mode failed to load', e));
+  }
   renderLoading('Checking your session…');
   store.session = await auth.currentBranch();
   if (store.session) await enterShell(); else renderLogin();
