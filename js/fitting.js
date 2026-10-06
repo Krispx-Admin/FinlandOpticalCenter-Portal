@@ -258,7 +258,7 @@ export function fittingView(me) {
       <form class="form" id="nf">
         <div class="grid2">
           <label>Bill number <input name="ref" required value="${esc(store.nextBillRef())}" autofocus></label>
-          <label>Customer name <span class="opt">optional</span><input name="customer" placeholder="e.g. Ahmed Al Balushi"></label>
+          <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <p class="muted">You'll pick which fitting centre to send it to after it's logged.</p>
         <div class="form-foot">
@@ -272,14 +272,20 @@ export function fittingView(me) {
       e.preventDefault();
       const f = new FormData(e.target);
       const ref = f.get('ref').trim();
-      if (!ref) return;
+      const customer = f.get('customer').trim();
+      // A name of only spaces passes the browser's own required check, so put
+      // the trimmed values back and let it re-check — that way an empty field
+      // gets the usual prompt instead of a button that quietly does nothing.
+      e.target.elements.ref.value = ref;
+      e.target.elements.customer.value = customer;
+      if (!e.target.reportValidity()) return;
       // The order is written to the database, which can refuse it (a bill
       // number already used here), so the form stays open until it lands.
       const go = e.target.querySelector('[type=submit]');
       go.disabled = true;
       const was = go.innerHTML;
       go.textContent = 'Saving…';
-      const o = await store.createOrder({ ref, origin: me.code, customer: f.get('customer').trim() }, me.code);
+      const o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
       layer.close();
       toast({ title: `${o.ref} logged`, sub: 'Use “Send to fitter” when it leaves your branch', tone: 'info' });
