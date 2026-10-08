@@ -86,6 +86,8 @@ Applied in order:
 | `supabase/schema-05-lens-catalogue.sql` | `lens_catalogue` — the lens types, indices and coatings the holder edits |
 | `supabase/schema-06-drop-frame-columns.sql` | drops the unused `orders.brand/model/lens` — **not applied** |
 | `supabase/schema-07-lens-request-fulfilment.sql` | `create_lens_request` — a lens request opens its fitting order, frame over or lenses here |
+| `supabase/schema-08-lens-auto-deduct.sql` | requests deducted the shelf as placed — applied, then undone by 09 |
+| `supabase/schema-09-lens-confirm-again.sql` | puts back schema-07's `create_lens_request`: MGM confirms each request |
 
 Reference numbers (`SR-…`, `LR-…`, `IC-…`) are allocated by Postgres sequences
 as part of the insert, so two branches acting at the same instant cannot be

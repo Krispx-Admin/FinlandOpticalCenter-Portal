@@ -218,8 +218,9 @@ Bill number + customer name required on the request (they become the order).
 
 MGM CONFIRMS (confirm_lens_request: deducts with row locks, ships what is
 there and logs "Short on: …") or DECLINES with a reason. An automatic-deduct
-version (schema-08) was written and then dropped at the user's request on
-2026-10-08 — it was never applied. Don't bring it back unasked.
+version (schema-08) WAS applied by the user in the SQL editor on 2026-10-08,
+then they asked for confirmation back: schema-09 restores schema-07's
+create_lens_request. Don't bring auto-deduct back unasked.
 
 STOCK LENS NOTE: a fitting order opened by a lens request (lens_requests.order_id)
 shows "Stock Lens" under its journey in the list (and in the row
@@ -278,7 +279,16 @@ Migrations are applied by hand, in order. Each file has a header with
                                  uses those columns either way) <<<
   schema-07-lens-request-fulfilment.sql  lens_requests.customer/fulfilment/
                              order_id; lens_owner_code(); create_lens_request()
-  (No schema-08: the auto-deduct migration was dropped unapplied.)
+  schema-08-lens-auto-deduct.sql  create_lens_request deducted the shelf and
+                             confirmed at once; also auto-confirmed LR-1012.
+                             APPLIED by the user 2026-10-08, then superseded.
+                             Auto-confirmed while live: LR-1012..LR-1016 (all
+                             MOUJ test bills: 22, teh, MJJJJ, fewf, fe).
+  schema-09-lens-confirm-again.sql  restores schema-07's create_lens_request
+                             (request left 'requested', shelf untouched).
+                             >>> NOT YET APPLIED as of 2026-10-08 — user to run
+                                 it in the Supabase SQL editor. Until then new
+                                 requests still confirm themselves. <<<
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -490,10 +500,13 @@ Rules:
   Journey diagram: code pins joined by segments; done = navy, fitter node
   turns green when ready, moving segment animates blue.
   Stock Lens note (.stock-tag): tiny ITALIC text, NO box, no icon (8.5px,
-  600, navy). Absolutely positioned inside the .journey (top:100%), centred
-  under it, so it never pushes the journey off the row's vertical centre — the
-  user asked for exactly that. In-house journeys are inline-flex in rows so
-  it centres under the node + words.
+  600, navy). Hangs off the MIDDLE node (.j-mid: the fitter, or the only node
+  of an in-house job): x = centred on that pin; y = midway between the pin's
+  bottom and the row's bottom border. The cell, journey and .j-mid stretch to
+  the row's content height H (pins stay centred), so top = 75% + 11.625px
+  with translate -50% -50% (pin 20.5px, row padding 13px — re-measure if
+  those change). Measured: 7.0px above and below, dx 0, at 1300 and 1600px.
+  It never moves the journey off the row's vertical centre.
   Fitting Log status pills are smaller than elsewhere (10px, padding 2px 7px,
   5px dot) and, above 1180px, CENTRED between the two worst cases: the end of
   the widest journey (QURFEC → MOUJ → QURFEC = 237px) and the start of the
@@ -599,7 +612,11 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
- 2026-10-08  Auto-deduct dropped (schema-08 deleted, never applied): MGM
+ 2026-10-08  User had run schema-08 by hand; schema-08 restored to the repo
+             as applied and schema-09 added to restore MGM's confirmation
+             (NOT YET APPLIED). Stock Lens note centred on the middle pin and
+             midway between pin and row border.
+ 2026-10-08  Auto-deduct dropped (schema-08 deleted, thought unapplied): MGM
              confirms again. Lens-request orders read Waiting Lens Confirmation
              (no action) -> Lens Confirmed + Send to fitter, or -> Waiting for
              Lenses for in-house; Lens Declined if declined. Stock Lens is now

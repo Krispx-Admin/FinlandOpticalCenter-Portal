@@ -19,8 +19,8 @@ CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] }
 
 // Orders a lens request opened wear this under their journey, and in the list
 // subtitle when the journey column is hidden on a narrow screen. Under the
-// journey it hangs below it rather than taking room, so the journey stays
-// centred in the row like every other.
+// journey it hangs below the middle pin rather than taking room, so the
+// journey stays centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
@@ -68,10 +68,12 @@ export function fittingView(me) {
     const seg2 = stage >= 5 ? 'done' : stage === 4 ? 'moving' : '';
     // Fitter node: brand navy from the moment it's in play, green once ready.
     const fitterCls = stage >= READY_IDX ? 'ready' : stage >= 1 ? 'done' : '';
-    const node = (code, cls, lbl) => `
+    // `tail` hangs off the middle node — the fitter, or the only node of an
+    // in-house job — so a note under it centres on that pin.
+    const node = (code, cls, lbl, extra = '') => `
       <div class="j-node ${cls}">
         <span class="j-pin">${esc(code)}</span>
-        ${big ? `<span class="j-lbl">${esc(lbl)}</span>` : ''}
+        ${big ? `<span class="j-lbl">${esc(lbl)}</span>` : ''}${extra}
       </div>`;
     const fitterCode = o.fitter ?? '?';
     const fitterName = o.fitter ? locName(o.fitter) : 'Unassigned';
@@ -79,18 +81,16 @@ export function fittingView(me) {
     // about why the rest of the diagram is missing.
     if (onShortRoad(o)) return `
       <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
-        ${node(o.fitter, o.status === 'delivered' ? 'ready' : 'done', fitterName)}
+        ${node(o.fitter, `${o.status === 'delivered' ? 'ready' : 'done'} j-mid`, fitterName, tail)}
         <span class="j-inhouse">${o.status === 'delivered' ? 'Fitted in-house' : 'In-house — no transit'}</span>
-        ${tail}
       </div>`;
     return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
         ${node(o.origin, 'done', locName(o.origin))}
         <i class="j-seg ${seg1}"></i>
-        ${node(fitterCode, fitterCls, fitterName)}
+        ${node(fitterCode, `${fitterCls} j-mid`, fitterName, tail)}
         <i class="j-seg ${seg2}"></i>
         ${node(o.origin, stage >= 5 ? 'done' : '', 'Back at branch')}
-        ${tail}
       </div>`;
   }
 
