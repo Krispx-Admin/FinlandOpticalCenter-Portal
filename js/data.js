@@ -89,14 +89,12 @@ export const flowFor = o => (onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
 //
-// The labels say what the job is waiting for, not where the van is. From the
-// moment a frame is sent until it is marked ready it is simply waiting to be
-// fitted — on the road or on the bench — so both stages share those words and
-// that colour. The fitter still confirms arrival; the journey diagram is what
-// shows the frame on the road.
+// The labels say what the job is waiting for: the lenses, then the road, then
+// the bench. On the road the order names the centre it is heading for (see
+// fitStep); the chip keeps the generic word.
 export const FIT_STATUS = {
   pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
-  to_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
+  to_fitter: { label: 'In transit',           color: 'blue',   action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
   returning: { label: 'Returning',            color: 'teal',   action: 'Confirm delivery',actor: 'origin', done: 'Delivered back at origin branch' },
@@ -113,13 +111,14 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
-// What one order's pill and button say. A frame on its way back names the
-// branch it is returning to, so that branch reads it as its own. `long` spells
-// the place out; the compact form uses the code, which is what the journey
-// chips next to it already show.
+// What one order's pill and button say. A frame on the road names the place it
+// is heading for rather than the role, so a branch reads where its own frame
+// is. `long` spells the place out; the compact form uses the code, which is
+// what the journey chips next to it already show.
 export function fitStep(o, { long = false } = {}) {
   const base = (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
+  if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
   if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
   return base;
 }

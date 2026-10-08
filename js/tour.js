@@ -78,7 +78,7 @@ const seeb = [
   ['reset'],
   ['tap', '[data-fitter="MGM"]'],
   beat(900),
-  ['caption', 'Now it reads “Waiting to be Fitted”', 'Muscat Grand Mall sees it coming straight away'],
+  ['caption', 'Now it reads “In transit to MGM”', 'Muscat Grand Mall sees it coming straight away'],
   ['focus', '{seebOrder} >> .row-status', { zoom: 1.8 }],
   beat(2400),
   ['focus', '{seebOrder} >> .row-journey', { zoom: 1.8 }],

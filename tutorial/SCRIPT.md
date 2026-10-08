@@ -38,7 +38,7 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 | Taps **New fitting order**; types a bill number and **Ahmed Al Balushi** | A customer has bought glasses — log the frame · The bill number from the bill book, and the customer's name. *Both are required* |
 | Taps **Log order**; spotlight on the new row | Logged — it reads "Waiting for Lenses" until it leaves the branch |
 | Taps **Send to fitter**; zoom on the fitting-centre picker; taps **Muscat Grand Mall** | When the driver collects it: Send to fitter · Choose the fitting centre that will cut the lenses |
-| Zoom: the status pill, then the journey diagram | Now it reads "Waiting to be Fitted". *Muscat Grand Mall sees it coming straight away* · Its journey: Seeb → Muscat Grand Mall → back to Seeb |
+| Zoom: the status pill, then the journey diagram | Now it reads "In transit to MGM". *Muscat Grand Mall sees it coming straight away* · Its journey: Seeb → Muscat Grand Mall → back to Seeb |
 | Opens the order; zoom on the timeline | Open any order to see its whole history |
 
 **Stock Requests**

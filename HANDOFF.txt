@@ -145,18 +145,18 @@ LONG ROAD (FIT_FLOW):
   pending -> to_fitter -> at_fitter -> ready -> returning -> delivered
   status     label                 pill color  action button      who acts
   pending    Waiting for Lenses    slate       Send to fitter     origin
-  to_fitter  Waiting to be Fitted  purple      Confirm arrival    fitter
+  to_fitter  In transit to X       blue        Confirm arrival    fitter
   at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
   ready      Ready                 green       Send to branch     fitter
   returning  Returning to X        teal        Confirm delivery   origin
   delivered  Delivered             done(grey)  —                  —
-  (Labels chosen by the user on 2026-10-08. to_fitter and at_fitter
-   deliberately share a label and colour; the journey diagram's moving segment
-   is what shows the frame on the road. Confirm arrival still exists.
-   fitStep(o) names only the returning branch: "Returning to SCC" — code in
-   the list, full name with long:true in drawer/hover.)
-  Filter chips are built one per DISTINCT label (fitting.js CHIP_DEFS), so the
-  two "Waiting to be Fitted" stages share one chip, key 'to_fitter'.
+  (Labels chosen by the user on 2026-10-08; they briefly made to_fitter
+   "Waiting to be Fitted" too, then asked for "In transit" back.
+   fitStep(o) names the place: "In transit to MGM", "Returning to SCC" — code
+   in the list, full name with long:true in drawer/hover; chips use the
+   generic FIT_STATUS label "In transit".)
+  Filter chips are built one per DISTINCT label (fitting.js CHIP_DEFS), so if
+  two stages ever share a label again they share a chip automatically.
 
 SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale):
   pending -> at_fitter -> delivered, labels Waiting for Lenses / In fitting / Done,
@@ -453,7 +453,7 @@ Rules:
 
 8.2 Status pills  .pill.s-{slate|blue|purple|green|teal|amber|red|done}
   Tinted background + border + coloured dot + text. Meaning in this app:
-    slate  waiting for lenses      blue   stock request placed / card payment
+    slate  waiting for lenses      blue   in transit / stock request placed / card payment
     purple waiting to be fitted / in fitting
     green  ready / completed / confirmed / cash
     teal   returning; fitting-centre role; "Lenses come here"; lens coatings
@@ -496,6 +496,10 @@ Rules:
   journey it sits left instead.
   Fitting Log status pills sit 20px into their column (24px at ≤1360px) so
   they never touch the journey — the journey column itself never moves.
+  List journeys use SMALL pins (9px, padding 1px 5px, gap 5px) and segments
+  min 26px, so the road and the in-transit animation always show. The user
+  disliked squeezed segments — never shrink segments to make things fit; shrink
+  pins or move the pill instead. The drawer's journey-big keeps large pins.
   Empty states: .empty with a faded 38px icon + one line.
   Hint banners: .review-hint (amber), .decline-note (red).
 
@@ -504,7 +508,7 @@ Rules:
   content (padding 30px 36px 60px). Sidebar: logo, nav (active item = white
   14% bg + inset white bar), amber count badges, "Live · synced" green ping,
   location card, Sign out.
-  Breakpoints: 1360px (row journeys tighten: gap 6px, segments min 8px),
+  Breakpoints: 1360px (Fitting Log pill padding 20 -> 24px),
   1180px (journey column hides), 900px (sidebar collapses to a
   74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
   Login: logomark watermark, logo top-left, "Sign in / Choose your location.",
@@ -594,6 +598,9 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-08  to_fitter back to "In transit to X" (blue, own chip); list
+             journey pins made smaller, segments min 26px so the in-transit
+             animation shows; the mid-width segment squeeze was removed.
  2026-10-08  Stock Lens tag: icon removed, smaller, centred under the
              journey. schema-08 extended to auto-confirm leftover requests;
              applying it from Claude was blocked — still NOT APPLIED.
