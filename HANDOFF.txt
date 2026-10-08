@@ -494,10 +494,15 @@ Rules:
   navy text, 1px #cdd8e8 border, 5px radius, 9.5px bold; CENTRED under the
   journey (display:table; margin:5px auto 0). Under a one-node in-house
   journey it sits left instead.
-  Fitting Log status pills sit 20px into their column (24px at ≤1360px) so
-  they never touch the journey — the journey column itself never moves.
-  Fitting Log status pills are a size smaller than elsewhere (11px, padding
-  3px 8px, 6px dot) — the user's choice for keeping them clear of the journey.
+  Fitting Log status pills are smaller than elsewhere (10px, padding 2px 7px,
+  5px dot) and, above 1180px, CENTRED between the two worst cases: the end of
+  the widest journey (QURFEC → MOUJ → QURFEC = 237px) and the start of the
+  widest action ("Confirm delivery →" 140px + 6px + 30px arrow = 176px).
+  Done in CSS with #f-list as a size container: journey column =
+  (100cqw − 490px) / 2.4, see the comment above the @media (min-width:1181px)
+  block in styles.css. RE-MEASURE those two constants if pins, buttons,
+  action labels or location codes change (measure with headless Edge).
+  The pill uses `translate`, not `transform`, so pillFlash still plays.
   The JOURNEY KEEPS ITS ORIGINAL SIZE (pins 10px, gap 8px, segments min 22px):
   the user rejected both shorter segments (hid the in-transit animation) and
   smaller pins. To make room, shrink/move the pill, never the pipeline.
@@ -509,7 +514,7 @@ Rules:
   content (padding 30px 36px 60px). Sidebar: logo, nav (active item = white
   14% bg + inset white bar), amber count badges, "Live · synced" green ping,
   location card, Sign out.
-  Breakpoints: 1360px (Fitting Log pill padding 20 -> 24px),
+  Breakpoints: 1181px+ (Fitting Log pills centred by formula),
   1180px (journey column hides), 900px (sidebar collapses to a
   74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
   Login: logomark watermark, logo top-left, "Sign in / Choose your location.",
@@ -568,10 +573,6 @@ Rules:
     a fitter (i.e. self-fit jobs waiting on lenses) — intentional, they're
     waiting on lenses, not on anyone.
   - Error toasts reuse tone 'stock' (amber dot) — there is no dedicated error tone.
-  - Between 1180px and ~1240px wide, an order whose origin has a six-letter
-    code (the clinics, e.g. QURFEC) still has its journey touch the status
-    pill. Fixing it would mean moving or squeezing the pipeline, which the
-    user asked not to do. Four-letter codes are clear at every width.
   - No "decline" or undo for an auto-deducted lens request: if MGM can't
     actually supply it, the count has to be corrected on the shelf by hand.
 
@@ -599,6 +600,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-08  Fitting Log pills smaller again (10px) and centred between the
+             widest journey's end and the widest action's start (CSS, cqw).
  2026-10-08  Smaller-pins change reverted: pipeline back to original size;
              Fitting Log status pills made smaller instead (what was meant).
  2026-10-08  to_fitter back to "In transit to X" (blue, own chip); the

@@ -354,11 +354,36 @@ svg { width: 18px; height: 18px; flex: none; }
 .row-status { min-width: 0; }
 /* The padding keeps clear water between the pill and the end of the journey
    beside it. It moves only the pill: the journey column keeps its place. */
-#f-list .row-status { padding-left: 20px; }
-/* The Fitting Log's status pills run a size smaller than elsewhere, so they
-   stay clear of the journey beside them without the journey giving way. */
-#f-list .row-status .pill { font-size: 11px; padding: 3px 8px; gap: 5px; }
-#f-list .row-status .pill .dot { width: 6px; height: 6px; }
+/* The Fitting Log's status pills run smaller than elsewhere, so they stay
+   clear of the journey beside them without the journey giving way. */
+#f-list .row-status .pill { font-size: 10px; padding: 2px 7px; gap: 4px; }
+#f-list .row-status .pill .dot { width: 5px; height: 5px; }
+
+/* …and each pill is centred in the gap between the two worst cases either
+   side of it: the end of the widest journey any order can draw, and the start
+   of the widest action button. So whatever a row holds, the pill is never
+   nearer one than the other. Measured with this stylesheet (re-measure if
+   the pins, the buttons or the location codes change):
+     widest journey  QURFEC → MOUJ → QURFEC, segments at their minimum  237px
+     widest action   "Confirm delivery →" 140px + 6px gap + 30px arrow   176px
+   The row grid is 30px | 1.4fr | 1fr | 190px | 180px with 14px gaps and 16px
+   padding inside a 1px border, so with the list as the container the journey
+   column is (100cqw − 490px) / 2.4 wide. A journey fills its column less its
+   18px padding, or overflows it when it cannot fit. Only above 1180px, where
+   the journey column is shown and this grid applies. */
+@media (min-width: 1181px) {
+  #f-list { container-type: inline-size; }
+  #f-list .row-status {
+    --widest-journey: 237px;
+    --widest-action: 176px;
+    --j: calc((100cqw - 490px) / 2.4);
+    --pipe-end: max(calc(var(--j) - 18px), var(--widest-journey));
+    --btn-start: calc(var(--j) + 398px - var(--widest-action));
+    --mid: calc((var(--pipe-end) + var(--btn-start)) / 2 - var(--j) - 14px);
+  }
+  /* `translate`, not `transform`, so the status-change flash still plays */
+  #f-list .row-status .pill { position: relative; left: var(--mid); translate: -50% 0; }
+}
 .row-status .pill { max-width: 100%; }
 .pill-t { overflow: hidden; text-overflow: ellipsis; }
 .row-act { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
@@ -891,11 +916,6 @@ table.rx-edit input:focus { background: var(--brand-soft); box-shadow: inset 0 0
 .t-sub { color: rgba(255,255,255,.65); font-size: 12px; margin-top: 1px; }
 
 /* ── Responsive ── */
-/* On a mid-size screen the journey column runs narrower than the journey,
-   which spills towards the pill — so the pill moves a little further over. */
-@media (max-width: 1360px) {
-  #f-list .row-status { padding-left: 24px; }
-}
 @media (max-width: 1180px) {
   .row { grid-template-columns: 30px minmax(200px,1.6fr) 185px 170px; }
   .row-journey { display: none; }
