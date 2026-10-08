@@ -36,9 +36,9 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 | Zoom: the stat tiles | Fitting Log. *Every frame that leaves the branch to have its lenses fitted* · Active orders, urgent ones, and the ones waiting on you |
 | Zoom: the filter chips | Filter by where each frame is on its journey |
 | Taps **New fitting order**; types a bill number and **Ahmed Al Balushi** | A customer has bought glasses — log the frame · The bill number from the bill book, and the customer's name. *Both are required* |
-| Taps **Log order**; spotlight on the new row | Logged — it stays Pending until it leaves the branch |
+| Taps **Log order**; spotlight on the new row | Logged — it reads "Waiting for Lenses" until it leaves the branch |
 | Taps **Send to fitter**; zoom on the fitting-centre picker; taps **Muscat Grand Mall** | When the driver collects it: Send to fitter · Choose the fitting centre that will cut the lenses |
-| Zoom: the status pill, then the journey diagram | Now it reads "In transit to MGM". *Muscat Grand Mall sees it coming straight away* · Its journey: Seeb → Muscat Grand Mall → back to Seeb |
+| Zoom: the status pill, then the journey diagram | Now it reads "Waiting to be Fitted". *Muscat Grand Mall sees it coming straight away* · Its journey: Seeb → Muscat Grand Mall → back to Seeb |
 | Opens the order; zoom on the timeline | Open any order to see its whole history |
 
 **Stock Requests**
@@ -58,7 +58,7 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 | Taps **Add**, then **+** | Two — one for each eye |
 | Taps **Review & request**; types **Fatma Al Hinai** and a bill number | Who it's for: the customer and the bill number. *The fitting order opens from this by itself* |
 | Taps **Send request** | Sent to Muscat Grand Mall. *A shop has no bench, so the frame goes over to be cut there* |
-| Back to the Fitting Log; spotlight on the new order | …and that job is already in the fitting log |
+| Back to the Fitting Log; spotlight on the new order and its Stock Lens tag | …and that job is already in the fitting log. *Tagged Stock Lens — open it to see which lenses* |
 
 **Insurance Claims**
 
@@ -80,7 +80,7 @@ Card: *"A fitting centre — it cuts lenses on its own bench."*
 | Taps **Receive the lenses**; types **Maryam Al Kindi** and a bill number; **Send request** | — |
 | Zoom: the "Lenses come here" tag | Marked "Lenses come here" |
 | Fitting Log: spotlight on the order that opened by itself | The job is already in Al Mouj's fitting log. *In-house — the frame never leaves the building* |
-| Opens it: one-node journey, then the timeline | It waits as Pending until the lenses arrive |
+| Opens it: one-node journey, then the timeline | It reads "Waiting for Lenses" until they arrive |
 
 ## Chapter 3: Muscat Grand Mall, fitting centre and lens holder (about 3 min)
 
@@ -98,7 +98,7 @@ Card: *"Fits lenses for other branches and for itself — and keeps the lens she
 
 | On screen | Caption |
 |---|---|
-| **New fitting order**: bill number and **Khalid Al Harthy** | A customer buys glasses here, at Muscat Grand Mall · It sits as Pending until the lenses come in from the supplier |
+| **New fitting order**: bill number and **Khalid Al Harthy** | A customer buys glasses here, at Muscat Grand Mall · It reads "Waiting for Lenses" until they come in from the supplier |
 | **Send to fitter**: zoom on its own centre at the top of the picker | Lenses in? Send to fitter — and keep it here · Your own centre comes first: no transit, no driver |
 | Taps it; then **Mark as done**; shown under Completed | Straight to "In fitting" · Done — it waits here for the customer to collect it. *No transit and no delivery step* |
 
@@ -107,8 +107,8 @@ Card: *"Fits lenses for other branches and for itself — and keeps the lens she
 | On screen | Caption |
 |---|---|
 | Lens Stock: the incoming requests | Lens Stock — every branch's lens requests arrive here |
-| Opens Al Mouj's; zoom on its tag, then on **Send lenses to Al Mouj**; presses it | Al Mouj will cut these itself, so the lenses travel · One press sends them and takes them off the shelf |
-| Opens Seeb's; zoom on its tag; **Confirm & deduct stock** | Seeb's frame is coming here, so these stay on this bench |
+| Opens Al Mouj's; zoom on its tag, then on its timeline | Al Mouj will cut these itself, so the lenses travel · Nothing to confirm. *The lenses came off the shelf the moment Al Mouj asked* |
+| Opens Seeb's; zoom on its tag | Seeb's frame is coming here, so these stay on this bench |
 
 **The shelf**
 

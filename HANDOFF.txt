@@ -44,7 +44,8 @@ tutorial video. See section 10.
     https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm
 - Run locally:  npx serve -l 8000 .     (or  python -m http.server 8000)
                 then open http://localhost:8000
-- Syntax-check a module:  node --check js/fitting.js
+- node is NOT installed on this machine, so no `node --check`. Test UI by
+  rendering the real modules in headless Edge (see end of section 11).
 - Earlier chats verified UI changes with throwaway Puppeteer scripts
   (smoke.mjs etc.) kept OUTSIDE the repo. None are committed.
 - Git remote: https://github.com/Krispx-Admin/FinlandOpticalCenter-Portal.git
@@ -85,8 +86,8 @@ tutorial/HANDOFF.md      how an agent drives Chrome to record the tutorial
 tutorial/SCRIPT.md       human-readable tutorial script (mirror of js/tour.js —
                          change one, change the other)
 tutorial/demo-cleanup.sql removes everything a tutorial take created (DEMO- bills)
-README.md                overview — NOTE: its Database table stops at schema-03
-                         and its Layout omits present.js / tour.js / tutorial/.
+README.md                overview + migration table — NOTE: its Layout omits
+                         present.js / tour.js / tutorial/.
 
 ================================================================================
  4. THE DOMAIN MODEL
@@ -142,18 +143,23 @@ branch, not globally — index orders_ref_per_branch). Never auto-suggest it
 
 LONG ROAD (FIT_FLOW):
   pending -> to_fitter -> at_fitter -> ready -> returning -> delivered
-  status     label            pill color  action button      who acts
-  pending    Pending          slate       Send to fitter     origin
-  to_fitter  In transit to X  blue        Confirm arrival    fitter
-  at_fitter  At fitter        purple      Mark ready         fitter
-  ready      Ready            green       Send to branch     fitter
-  returning  Returning to X   teal        Confirm delivery   origin
-  delivered  Delivered        done(grey)  —                  —
-  (fitStep(o) names the place: "In transit to MGM", "Returning to SCC";
-   long:true gives full names for drawer/hover.)
+  status     label                 pill color  action button      who acts
+  pending    Waiting for Lenses    slate       Send to fitter     origin
+  to_fitter  Waiting to be Fitted  purple      Confirm arrival    fitter
+  at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
+  ready      Ready                 green       Send to branch     fitter
+  returning  Returning to X        teal        Confirm delivery   origin
+  delivered  Delivered             done(grey)  —                  —
+  (Labels chosen by the user on 2026-10-08. to_fitter and at_fitter
+   deliberately share a label and colour; the journey diagram's moving segment
+   is what shows the frame on the road. Confirm arrival still exists.
+   fitStep(o) names only the returning branch: "Returning to SCC" — code in
+   the list, full name with long:true in drawer/hover.)
+  Filter chips are built one per DISTINCT label (fitting.js CHIP_DEFS), so the
+  two "Waiting to be Fitted" stages share one chip, key 'to_fitter'.
 
 SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale):
-  pending -> at_fitter -> delivered, labels Pending / In fitting / Done,
+  pending -> at_fitter -> delivered, labels Waiting for Lenses / In fitting / Done,
   actions "Start fitting" / "Mark as done". No transit, journey diagram shows
   one node + "In-house — no transit". onShortRoad(o) is only true if the
   current status is on SELF_FLOW, so legacy self-fit orders mid-long-road
@@ -195,10 +201,21 @@ DB transaction (create_lens_request):
   receive_lens "Receive the lenses"   -> order fitter = requester (self-fit);
                 only fitting centres/admin may choose this (checked in DB)
 Bill number + customer name required on the request (they become the order).
-Confirm (RPC confirm_lens_request) deducts stock atomically with row locks;
-ships what's available and logs "Short on: …" if short. MGM's confirm button
-reads "Send lenses to <branch>" for receive_lens, "Confirm & deduct stock"
-otherwise.
+
+AUTO-DEDUCT (schema-08, asked for 2026-10-08): MGM no longer confirms.
+create_lens_request locks each shelf row, refuses the WHOLE request if any
+line is short ("Only N left of … — refresh and try again"), deducts, and
+inserts the request already 'confirmed'. Line specs are copied from the shelf
+row, not from the browser. One lens_request_event per request.
+Legacy: confirm_lens_request + the Confirm/Decline UI remain for any request
+still 'requested' (placed before schema-08). MGM's lens list now defaults to
+the "All" chip.
+
+STOCK LENS TAG: a fitting order opened by a lens request (lens_requests.order_id)
+shows a "Stock Lens" tag under its journey in the list (and in the row
+subtitle below 1180px), and its drawer has a "Stock lens" section: request
+status, fulfilment chip, LR ref, and the lines (type, index, coating, SPH, CYL,
+qty). Lookup: store.lensRequestForOrder(orderId). No DB change needed.
 
 4.5 INSURANCE CLAIMS
 --------------------
@@ -251,6 +268,11 @@ Migrations are applied by hand, in order. Each file has a header with
                                  uses those columns either way) <<<
   schema-07-lens-request-fulfilment.sql  lens_requests.customer/fulfilment/
                              order_id; lens_owner_code(); create_lens_request()
+  schema-08-lens-auto-deduct.sql  create_lens_request deducts the shelf and
+                             records the request as confirmed
+                             >>> NOT YET APPLIED as of 2026-10-08 — the user must
+                                 run it in the Supabase SQL editor. The app works
+                                 before and after it (old confirm flow until then). <<<
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -420,8 +442,9 @@ Rules:
 
 8.2 Status pills  .pill.s-{slate|blue|purple|green|teal|amber|red|done}
   Tinted background + border + coloured dot + text. Meaning in this app:
-    slate  pending                 blue   in transit / placed / card payment
-    purple at fitter / in fitting  green  ready / completed / confirmed / cash
+    slate  waiting for lenses      blue   stock request placed / card payment
+    purple waiting to be fitted / in fitting
+    green  ready / completed / confirmed / cash
     teal   returning; fitting-centre role; "Lenses come here"; lens coatings
     amber  awaiting (MGM, warehouse); low stock; warnings (.review-hint)
     red    urgent / declined / out of stock / danger
@@ -456,6 +479,10 @@ Rules:
   amber #fbbf24, lens teal #2dd4bf), max 4, pointer-events none.
   Journey diagram: code pins joined by segments; done = navy, fitter node
   turns green when ready, moving segment animates blue.
+  Stock Lens tag (.stock-tag): brand-soft fill, navy text, 1px #cdd8e8 border,
+  6px radius, 10.5px bold, lens icon; sits under the journey (margin-top 7px).
+  Fitting Log status pills sit 20px into their column (24px at ≤1360px) so
+  they never touch the journey — the journey column itself never moves.
   Empty states: .empty with a faded 38px icon + one line.
   Hint banners: .review-hint (amber), .decline-note (red).
 
@@ -464,7 +491,8 @@ Rules:
   content (padding 30px 36px 60px). Sidebar: logo, nav (active item = white
   14% bg + inset white bar), amber count badges, "Live · synced" green ping,
   location card, Sign out.
-  Breakpoints: 1180px (journey column hides), 900px (sidebar collapses to a
+  Breakpoints: 1360px (row journeys tighten: gap 6px, segments min 8px),
+  1180px (journey column hides), 900px (sidebar collapses to a
   74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
   Login: logomark watermark, logo top-left, "Sign in / Choose your location.",
   warehouse card centred on top, then 3 columns (retail 2-wide, fitting,
@@ -507,8 +535,7 @@ Rules:
 ================================================================================
  11. KNOWN GAPS / TECH DEBT (fix only when asked)
 ================================================================================
-  - README Database table lists only schema.sql..03; Layout omits present.js,
-    tour.js, tutorial/.
+  - README Layout omits present.js, tour.js, tutorial/.
   - schema-06 (drop orders.brand/model/lens) not applied — irreversible, left
     for a deliberate decision.
   - orders.phone and orders.note are never written by the UI (drawer shows
@@ -523,6 +550,20 @@ Rules:
     a fitter (i.e. self-fit jobs waiting on lenses) — intentional, they're
     waiting on lenses, not on anyone.
   - Error toasts reuse tone 'stock' (amber dot) — there is no dedicated error tone.
+  - Between 1180px and ~1240px wide, an order whose origin has a six-letter
+    code (the clinics, e.g. QURFEC) still has its journey touch the status
+    pill. Fixing it would mean moving or squeezing the pipeline, which the
+    user asked not to do. Four-letter codes are clear at every width.
+  - No "decline" or undo for an auto-deducted lens request: if MGM can't
+    actually supply it, the count has to be corrected on the shelf by hand.
+
+ HOW TO TEST UI WITHOUT SIGNING IN: node is NOT installed on this machine.
+  Copy js/ css/ img/ to the scratchpad, add a test.html that imports
+  store.js + a module view, fills store.state with sample rows
+  (Object.assign(store.state, {...})), mounts the view, serve it with
+  `python -m http.server`, and screenshot with headless Edge:
+  "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" --headless=new
+  --virtual-time-budget=8000 --screenshot=out.png --window-size=1440,820 URL
 
 ================================================================================
  12. CHECKLIST BEFORE SAYING A TASK IS DONE
@@ -533,13 +574,19 @@ Rules:
   [ ] DB change = new schema-NN file + RLS + realtime + db.js mapping + store.
   [ ] Permissions enforced in SQL, mirrored in data.js.
   [ ] Tour selectors/text still match if UI copy changed (tour.js, SCRIPT.md).
-  [ ] node --check on edited JS files; served locally and clicked through.
+  [ ] Rendered the edited module in headless Edge with sample data (sec. 11).
   [ ] THIS FILE updated (sections touched + change log).
   [ ] Committed and pushed to origin/main.
 
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-08  Fitting statuses renamed (Waiting for Lenses / Waiting to be
+             Fitted / Ready / Returning to X / Delivered), shared chip; Fitting
+             Log pills spaced off the journey; Stock Lens tag + lens list on
+             orders opened by a lens request; lens requests auto-deduct the
+             shelf (schema-08, NOT YET APPLIED); tour + SCRIPT.md + README
+             updated to match.
  2026-10-08  Standing rule added: commit and push to main after every change.
  2026-10-08  HANDOFF.txt created after a full read of the repo (all JS, CSS,
              SQL, tutorial docs, git history to c552b96). Live DB was not

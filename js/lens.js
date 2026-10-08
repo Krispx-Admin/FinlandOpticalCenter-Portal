@@ -36,7 +36,10 @@ export function lensView(me) {
 
   const ui = {
     tab: canShop ? 'shop' : 'queue',
-    chip: isOwner ? 'requested' : 'all',
+    // A request comes off the shelf the moment it is placed, so there is
+    // nothing waiting on MGM by default — the holder starts on the full list.
+    // Any request older than that still sorts first while it is open.
+    chip: 'all',
     q: '', type: 'all', index: 'all', coating: 'all', inStock: true,
     branch: 'all',
     seen: new Set(store.state.lensRequests.map(r => r.id)),
@@ -390,7 +393,7 @@ export function lensView(me) {
                   <span>${esc(f.sub)}</span>
                 </label>`).join('')}
             </div>` : ''}
-          <p class="muted">A fitting order opens for this bill either way, and sits as Pending until the lenses are in.</p>
+          <p class="muted">A fitting order opens for this bill either way, and the lenses come off ${esc(locName(LENS_OWNER))}’s shelf as soon as you send this.</p>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>

@@ -163,6 +163,9 @@ export const store = {
   lensItem(id) { return state.lensStock.find(i => i.id === id); },
   lensRequestsFor(code) { return state.lensRequests.filter(r => canSeeLensRequest(r, code)); },
   lensRequest(id) { return state.lensRequests.find(r => r.id === id); },
+  // The lens request that opened a fitting order, if one did. Both sides of the
+  // job can see it: the asking branch owns it and the fitter holds the shelf.
+  lensRequestForOrder(orderId) { return state.lensRequests.find(r => r.orderId === orderId); },
 
   // ── Fitting mutations ──
   createOrder(fields, by) {
@@ -390,9 +393,10 @@ export const store = {
   // the part that can fail; doing this as three calls from here would leave a
   // lens request with no job behind it the first time someone retyped a bill
   // number. The function also decides the fitter, so a branch cannot name
-  // itself one.
+  // itself one, and takes the lenses off the shelf in the same transaction —
+  // there is no confirming step for the holding branch any more.
   createLensRequest({ lines, billNo, customer, fulfilment }, by) {
-    return run(['lensRequests', 'orders'], async () => {
+    return run(['lensRequests', 'orders', 'lensStock'], async () => {
       const row = ok(await supabase.rpc('create_lens_request', {
         p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines,
       }));

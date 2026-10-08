@@ -1,13 +1,25 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
-import { FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder } from './data.js';
+import {
+  FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, fmtPwr,
+} from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
 
-const CHIP_DEFS = [
-  { key: 'active', label: 'All active' },
-  ...FIT_FLOW.filter(s => s !== 'delivered').map(s => ({ key: s, label: FIT_STATUS[s].label })),
-  { key: 'delivered', label: 'Completed' },
-];
+// One chip per distinct label, so two stages that read the same — on the way
+// to the fitter and on the bench are both "Waiting to be Fitted" — share a chip
+// rather than showing the same words twice. A chip's key is its first status.
+const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
+for (const s of FIT_FLOW.filter(s => s !== 'delivered')) {
+  const same = CHIP_DEFS.find(d => d.label === FIT_STATUS[s].label);
+  if (same) same.statuses.push(s);
+  else CHIP_DEFS.push({ key: s, label: FIT_STATUS[s].label, statuses: [s] });
+}
+CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] });
+
+// Orders a lens request opened wear this under their journey, and in the list
+// subtitle when the journey column is hidden on a narrow screen.
+const stockTag = (cls = '') => `<span class="stock-tag ${cls}">${icons.lens}Stock Lens</span>`;
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
 
@@ -26,7 +38,10 @@ export function fittingView(me) {
   function visible() {
     let list = store.ordersFor(me.code);
     if (ui.chip === 'active') list = list.filter(o => o.status !== 'delivered');
-    else list = list.filter(o => o.status === ui.chip);
+    else {
+      const chip = CHIP_DEFS.find(d => d.key === ui.chip);
+      list = list.filter(o => chip?.statuses.includes(o.status));
+    }
     if (ui.urgentOnly) list = list.filter(o => o.urgent);
     if (isAdmin && ui.origin !== 'all') list = list.filter(o => o.origin === ui.origin);
     if (isAdmin && ui.fitter !== 'all') list = list.filter(o => o.fitter === ui.fitter);
@@ -39,9 +54,8 @@ export function fittingView(me) {
   }
   const counts = () => {
     const all = store.ordersFor(me.code);
-    const c = { active: 0, delivered: 0 };
-    FIT_FLOW.forEach(s => { c[s] = 0; });
-    for (const o of all) { c[o.status]++; if (o.status !== 'delivered') c.active++; }
+    const c = { active: all.filter(o => o.status !== 'delivered').length };
+    for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => d.statuses.includes(o.status)).length;
     return c;
   };
 
@@ -107,6 +121,7 @@ export function fittingView(me) {
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       const title = o.customer || 'No customer name';
+      const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${o.urgent ? 'row-urgent' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
         <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' ? 'disabled' : ''}><i></i></label>
@@ -116,9 +131,9 @@ export function fittingView(me) {
             ${o.urgent ? urgentTag() : ''}
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span></div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o)}</div>
+        <div class="row-journey">${journey(o)}${fromStock ? stockTag() : ''}</div>
         <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
@@ -190,6 +205,7 @@ export function fittingView(me) {
           <div><span>Fitting centre</span><b>${o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}${isSelfFit(o) ? ' <span class="muted">· in-house</span>' : ''}` : '<span class="muted">Not assigned yet</span>'}</b></div>
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
+        ${stockLensHTML(store.lensRequestForOrder(o.id))}
         <div class="dw-actions">
           ${needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
@@ -205,6 +221,31 @@ export function fittingView(me) {
             </div>`).join('')}
         </div>
       </div>`;
+  }
+
+  // The lenses a lens request took off the shelf for this job — what the bench
+  // will be cutting, so the fitter never has to go and look it up.
+  function stockLensHTML(r) {
+    if (!r) return '';
+    return `
+      <h3 class="tl-h">${icons.lens} Stock lens</h3>
+      <div class="dw-status-row">
+        ${pill(LENSREQ_STATUS, r.status)}
+        <span class="fulfil-chip ${r.fulfilment}">${esc(FULFILMENT[r.fulfilment]?.chip ?? '')}</span>
+        <span class="dw-when">${esc(r.ref)}</span>
+      </div>
+      <table class="lines">
+        <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th></tr></thead>
+        <tbody>
+          ${r.lines.map(l => `
+            <tr>
+              <td><b>${esc(l.type)} ${esc(l.index)}</b>${l.coating && l.coating !== 'None' ? `<div class="line-note">${esc(l.coating)}</div>` : ''}</td>
+              <td class="pwr">${fmtPwr(l.sph)}</td>
+              <td class="pwr">${fmtPwr(l.cyl)}</td>
+              <td class="num"><b>${l.qty}</b> <span class="muted">pcs</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
   }
 
   function openDrawer(id) {
@@ -274,7 +315,7 @@ export function fittingView(me) {
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <p class="muted">${me.role === 'fitting'
-          ? 'It sits as Pending until the lenses arrive. Then use “Send to fitter” — pick your own centre to keep it here and skip the transit.'
+          ? 'It reads “Waiting for Lenses” until they arrive. Then use “Send to fitter” — pick your own centre to keep it here and skip the transit.'
           : "You'll pick which fitting centre to send it to after it's logged."}</p>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
