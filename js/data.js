@@ -111,6 +111,11 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
+// While MGM has yet to confirm the lenses, nobody moves the job: the action is
+// withheld and the row says who it is waiting on.
+const LENS_WAIT = { label: 'Waiting Lens Confirmation', color: 'amber', action: null, actor: 'lens' };
+export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
+
 // What one order's pill and button say. A frame on the road names the place it
 // is heading for rather than the role, so a branch reads where its own frame
 // is. `long` spells the place out; the compact form uses the code, which is
@@ -118,6 +123,15 @@ const SELF_STATUS = {
 export function fitStep(o, { long = false } = {}) {
   const base = (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
+  // An order a lens request opened cannot start until MGM answers it. After a
+  // yes, a frame that travels says so and may go; one fitted here goes back to
+  // plain waiting for the lenses, which are now on their way.
+  if (o.status === 'pending' && o.lensRequest) {
+    const ans = o.lensRequest.status;
+    if (ans === 'requested') return { ...base, ...LENS_WAIT };
+    if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
+    if (ans === 'confirmed' && !onShortRoad(o)) return { ...base, label: 'Lens Confirmed', color: 'green' };
+  }
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
   if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
   return base;
@@ -132,8 +146,13 @@ export const nextFitStatus = o => {
 // Which location acts on an order in its current status.
 export function fitActor(order) {
   const a = fitStep(order).actor;
-  return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter : null;
+  return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter : a === 'lens' ? LENS_OWNER : null;
 }
+
+// Whether an order is this location's to move now. A self-fit job still
+// waiting on its lenses can be started, but it is not asking for anything yet.
+export const needsAction = (o, code) =>
+  canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o));
 
 // ── Stock request state machine ──
 // Redesigned: a branch places a request, the warehouse fulfils it. No review.
@@ -253,7 +272,7 @@ export function canSeeOrder(o, code) {
   return me?.role === 'admin' || o.origin === code || o.fitter === code;
 }
 export function canAdvanceOrder(o, code) {
-  if (o.status === 'delivered') return false;
+  if (o.status === 'delivered' || awaitingLens(o)) return false;
   const me = loc(code);
   return me?.role === 'admin' || fitActor(o) === code;
 }

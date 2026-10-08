@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, canAdvanceOrder, isLensOwner } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner } from './data.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
@@ -208,7 +208,7 @@ function currentModule() {
 
 function badgeCounts(me) {
   const s = store.state;
-  const fitting = s.orders.filter(o => o.status !== 'delivered' && canSeeOrder(o, me.code) && canAdvanceOrder(o, me.code) && !(o.status === 'pending' && o.fitter)).length;
+  const fitting = s.orders.filter(o => canSeeOrder(o, me.code) && needsAction(o, me.code)).length;
   const stock = me.role === 'admin'
     ? s.requests.filter(r => r.status === 'placed').length
     : s.requests.filter(r => canSeeRequest(r, me.code) && r.status === 'placed').length;

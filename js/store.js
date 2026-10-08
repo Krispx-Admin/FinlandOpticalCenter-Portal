@@ -37,7 +37,18 @@ function notify(event) { subs.forEach(fn => fn(event)); }
 // A local write: the rows are already refreshed, so just tell the UI.
 function commit(event) { notify(event ? { ...event, remote: false } : null); }
 
-async function pull(keys) { Object.assign(state, await db.reload(keys)); }
+async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLensRequests(); }
+
+// An order opened by a lens request waits on MGM's answer to it, so each order
+// carries that answer: { status, fulfilment, ref }, or null. Orders and lens
+// requests reload separately, so this runs after either comes back.
+function linkLensRequests() {
+  const byOrder = new Map(state.lensRequests.filter(r => r.orderId).map(r => [r.orderId, r]));
+  for (const o of state.orders) {
+    const r = byOrder.get(o.id);
+    o.lensRequest = r ? { status: r.status, fulfilment: r.fulfilment, ref: r.ref } : null;
+  }
+}
 
 // Postgres errors are precise but not written for shop staff. Translate the
 // handful that are actually reachable and pass anything else through.
@@ -102,6 +113,7 @@ export const store = {
   async load() {
     db.forgetLocalCopy();
     Object.assign(state, await db.loadAll());
+    linkLensRequests();
     loaded = true;
     unwatch?.();
     unwatch = db.watch(async (keys, notices) => {
@@ -393,10 +405,9 @@ export const store = {
   // the part that can fail; doing this as three calls from here would leave a
   // lens request with no job behind it the first time someone retyped a bill
   // number. The function also decides the fitter, so a branch cannot name
-  // itself one, and takes the lenses off the shelf in the same transaction —
-  // there is no confirming step for the holding branch any more.
+  // itself one. The order waits on MGM's confirmation before it can move.
   createLensRequest({ lines, billNo, customer, fulfilment }, by) {
-    return run(['lensRequests', 'orders', 'lensStock'], async () => {
+    return run(['lensRequests', 'orders'], async () => {
       const row = ok(await supabase.rpc('create_lens_request', {
         p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines,
       }));

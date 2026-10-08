@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, fmtPwr,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
@@ -18,7 +18,9 @@ for (const s of FIT_FLOW.filter(s => s !== 'delivered')) {
 CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] });
 
 // Orders a lens request opened wear this under their journey, and in the list
-// subtitle when the journey column is hidden on a narrow screen.
+// subtitle when the journey column is hidden on a narrow screen. Under the
+// journey it hangs below it rather than taking room, so the journey stays
+// centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
@@ -60,7 +62,7 @@ export function fittingView(me) {
   };
 
   // ── journey mini-diagram ──
-  function journey(o, big = false) {
+  function journey(o, big = false, tail = '') {
     const stage = FIT_FLOW.indexOf(o.status); // 0..5
     const seg1 = stage >= 2 ? 'done' : stage === 1 ? 'moving' : '';
     const seg2 = stage >= 5 ? 'done' : stage === 4 ? 'moving' : '';
@@ -79,6 +81,7 @@ export function fittingView(me) {
       <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
         ${node(o.fitter, o.status === 'delivered' ? 'ready' : 'done', fitterName)}
         <span class="j-inhouse">${o.status === 'delivered' ? 'Fitted in-house' : 'In-house — no transit'}</span>
+        ${tail}
       </div>`;
     return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
@@ -87,6 +90,7 @@ export function fittingView(me) {
         ${node(fitterCode, fitterCls, fitterName)}
         <i class="j-seg ${seg2}"></i>
         ${node(o.origin, stage >= 5 ? 'done' : '', 'Back at branch')}
+        ${tail}
       </div>`;
   }
 
@@ -94,7 +98,7 @@ export function fittingView(me) {
   function statsHTML() {
     const all = store.ordersFor(me.code);
     const active = all.filter(o => o.status !== 'delivered');
-    const mine = active.filter(o => canAdvanceOrder(o, me.code) && !(o.status === 'pending' && o.fitter));
+    const mine = active.filter(o => needsAction(o, me.code));
     const week = all.filter(o => o.status === 'delivered' && Date.now() - o.updatedAt < 7 * 864e5);
     const t = (n, lbl, cls = '') => `
       <div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
@@ -133,7 +137,7 @@ export function fittingView(me) {
           </div>
           <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o)}${fromStock ? stockTag() : ''}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
         <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true }).label })}</div>
         <div class="row-act" data-stop>
           ${action}

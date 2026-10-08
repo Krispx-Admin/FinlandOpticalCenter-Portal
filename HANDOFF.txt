@@ -165,6 +165,20 @@ SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale
   current status is on SELF_FLOW, so legacy self-fit orders mid-long-road
   finish the long way.
 
+ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
+  store.linkLensRequests() puts o.lensRequest = {status, fulfilment, ref} on
+  each order after every load/pull; fitStep() reads it while status = pending:
+    request 'requested' -> "Waiting Lens Confirmation" (amber), NO action,
+                           row says "waiting on MGM" (actor 'lens' -> LENS_OWNER);
+                           canAdvanceOrder() is false, even for the warehouse
+    'confirmed', frame goes over (long road) -> "Lens Confirmed" (green) +
+                           Send to fitter
+    'confirmed', lenses come here (self-fit) -> "Waiting for Lenses" + Start
+                           fitting
+    'declined'          -> "Lens Declined" (red); the normal action stays
+  needsAction(o, code) (data.js) drives the nav badge and "Need your action":
+  any advanceable order except a self-fit job still pending.
+
 Send to fitter: picker modal of FITTERS; if all selected orders came from one
 fitting centre, that centre leads the list ("Keep here — no transit").
 Rows are click-to-select; bulk bar advances all selected when they share the
@@ -202,17 +216,13 @@ DB transaction (create_lens_request):
                 only fitting centres/admin may choose this (checked in DB)
 Bill number + customer name required on the request (they become the order).
 
-AUTO-DEDUCT (schema-08, asked for 2026-10-08): MGM no longer confirms.
-create_lens_request locks each shelf row, refuses the WHOLE request if any
-line is short ("Only N left of … — refresh and try again"), deducts, and
-inserts the request already 'confirmed'. Line specs are copied from the shelf
-row, not from the browser. One lens_request_event per request.
-Legacy: confirm_lens_request + the Confirm/Decline UI remain for any request
-still 'requested' (placed before schema-08). MGM's lens list now defaults to
-the "All" chip.
+MGM CONFIRMS (confirm_lens_request: deducts with row locks, ships what is
+there and logs "Short on: …") or DECLINES with a reason. An automatic-deduct
+version (schema-08) was written and then dropped at the user's request on
+2026-10-08 — it was never applied. Don't bring it back unasked.
 
-STOCK LENS TAG: a fitting order opened by a lens request (lens_requests.order_id)
-shows a "Stock Lens" tag under its journey in the list (and in the row
+STOCK LENS NOTE: a fitting order opened by a lens request (lens_requests.order_id)
+shows "Stock Lens" under its journey in the list (and in the row
 subtitle below 1180px), and its drawer has a "Stock lens" section: request
 status, fulfilment chip, LR ref, and the lines (type, index, coating, SPH, CYL,
 qty). Lookup: store.lensRequestForOrder(orderId). No DB change needed.
@@ -268,18 +278,7 @@ Migrations are applied by hand, in order. Each file has a header with
                                  uses those columns either way) <<<
   schema-07-lens-request-fulfilment.sql  lens_requests.customer/fulfilment/
                              order_id; lens_owner_code(); create_lens_request()
-  schema-08-lens-auto-deduct.sql  create_lens_request deducts the shelf and
-                             records the request as confirmed
-                             and, at the end, auto-confirms (and deducts) any
-                             request still 'requested'. On 2026-10-08 that was
-                             one: LR-1012 (MOUJ, bill 22, 1 x SV 1.60 AR
-                             -2.50/-0.50, shelf 6).
-                             >>> NOT YET APPLIED as of 2026-10-08 — the user must
-                                 run it in the Supabase SQL editor. The app works
-                                 before and after it (old confirm flow until then). <<<
-                             Once it is applied, MGM's confirm/decline UI never
-                             shows (nothing is 'requested'); it can then be
-                             removed from lens.js / store.js / app.js badge.
+  (No schema-08: the auto-deduct migration was dropped unapplied.)
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -490,10 +489,11 @@ Rules:
   amber #fbbf24, lens teal #2dd4bf), max 4, pointer-events none.
   Journey diagram: code pins joined by segments; done = navy, fitter node
   turns green when ready, moving segment animates blue.
-  Stock Lens tag (.stock-tag): text only (no icon, per user), brand-soft fill,
-  navy text, 1px #cdd8e8 border, 5px radius, 9.5px bold; CENTRED under the
-  journey (display:table; margin:5px auto 0). Under a one-node in-house
-  journey it sits left instead.
+  Stock Lens note (.stock-tag): tiny ITALIC text, NO box, no icon (8.5px,
+  600, navy). Absolutely positioned inside the .journey (top:100%), centred
+  under it, so it never pushes the journey off the row's vertical centre — the
+  user asked for exactly that. In-house journeys are inline-flex in rows so
+  it centres under the node + words.
   Fitting Log status pills are smaller than elsewhere (10px, padding 2px 7px,
   5px dot) and, above 1180px, CENTRED between the two worst cases: the end of
   the widest journey (QURFEC → MOUJ → QURFEC = 237px) and the start of the
@@ -502,6 +502,8 @@ Rules:
   (100cqw − 490px) / 2.4, see the comment above the @media (min-width:1181px)
   block in styles.css. RE-MEASURE those two constants if pins, buttons,
   action labels or location codes change (measure with headless Edge).
+  Widest PILL is now "Waiting Lens Confirmation" (~150px at 10px); it fits the
+  gap down to ~1220px wide with ~10px either side.
   The pill uses `translate`, not `transform`, so pillFlash still plays.
   The JOURNEY KEEPS ITS ORIGINAL SIZE (pins 10px, gap 8px, segments min 22px):
   the user rejected both shorter segments (hid the in-transit animation) and
@@ -569,12 +571,9 @@ Rules:
     shelf down…" sits above the claims line (misplaced; the real handling is
     the lens_request_events special case in watch()).
   - CSS classes used but undefined: `.sm` on plain .muted text, `.modal-foot`.
-  - Badge / "Need your action" counts exclude pending orders that already have
-    a fitter (i.e. self-fit jobs waiting on lenses) — intentional, they're
-    waiting on lenses, not on anyone.
+  - Badge / "Need your action" (needsAction) leave out self-fit jobs still
+    pending — they're waiting on lenses, not on anyone.
   - Error toasts reuse tone 'stock' (amber dot) — there is no dedicated error tone.
-  - No "decline" or undo for an auto-deducted lens request: if MGM can't
-    actually supply it, the count has to be corrected on the shelf by hand.
 
  HOW TO TEST UI WITHOUT SIGNING IN: node is NOT installed on this machine.
   Copy js/ css/ img/ to the scratchpad, add a test.html that imports
@@ -600,6 +599,12 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-08  Auto-deduct dropped (schema-08 deleted, never applied): MGM
+             confirms again. Lens-request orders read Waiting Lens Confirmation
+             (no action) -> Lens Confirmed + Send to fitter, or -> Waiting for
+             Lenses for in-house; Lens Declined if declined. Stock Lens is now
+             tiny italic text hung under the journey, which stays centred.
+             needsAction() added. Tour/SCRIPT/README confirm steps restored.
  2026-10-08  Fitting Log pills smaller again (10px) and centred between the
              widest journey's end and the widest action's start (CSS, cqw).
  2026-10-08  Smaller-pins change reverted: pipeline back to original size;

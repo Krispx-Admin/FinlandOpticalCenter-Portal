@@ -80,7 +80,7 @@ Card: *"A fitting centre — it cuts lenses on its own bench."*
 | Taps **Receive the lenses**; types **Maryam Al Kindi** and a bill number; **Send request** | — |
 | Zoom: the "Lenses come here" tag | Marked "Lenses come here" |
 | Fitting Log: spotlight on the order that opened by itself | The job is already in Al Mouj's fitting log. *In-house — the frame never leaves the building* |
-| Opens it: one-node journey, then the timeline | It reads "Waiting for Lenses" until they arrive |
+| Opens it: one-node journey, then the timeline | It reads "Waiting Lens Confirmation" until Muscat Grand Mall confirms |
 
 ## Chapter 3: Muscat Grand Mall, fitting centre and lens holder (about 3 min)
 
@@ -107,8 +107,8 @@ Card: *"Fits lenses for other branches and for itself — and keeps the lens she
 | On screen | Caption |
 |---|---|
 | Lens Stock: the incoming requests | Lens Stock — every branch's lens requests arrive here |
-| Opens Al Mouj's; zoom on its tag, then on its timeline | Al Mouj will cut these itself, so the lenses travel · Nothing to confirm. *The lenses came off the shelf the moment Al Mouj asked* |
-| Opens Seeb's; zoom on its tag | Seeb's frame is coming here, so these stay on this bench |
+| Opens Al Mouj's; zoom on its tag, then on **Send lenses to Al Mouj**; presses it | Al Mouj will cut these itself, so the lenses travel · One press sends them and takes them off the shelf |
+| Opens Seeb's; zoom on its tag; **Confirm & deduct stock** | Seeb's frame is coming here, so these stay on this bench |
 
 **The shelf**
 

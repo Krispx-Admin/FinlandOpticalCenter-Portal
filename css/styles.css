@@ -460,17 +460,19 @@ svg { width: 18px; height: 18px; flex: none; }
 .journey-big.journey-self .j-inhouse { font-size: 12.5px; }
 .journey-big { margin: 16px 0 4px; gap: 8px; }
 
-/* An order a lens request opened: the lenses come off the shelf, and the tag
-   sits centred under the journey so the bench knows before opening it. The
-   journey fills its cell, so centring in the cell centres under the road.
-   A one-node in-house journey has no road to centre on; it keeps to the left. */
+/* An order a lens request opened: a whisper of italic text centred under the
+   journey. It hangs below the journey rather than standing in the flow, so
+   the journey stays centred in the row exactly as it is in every other.
+   A long-road journey fills its cell, so centred means under the road; an
+   in-house one shrinks to its node and words, and centres under those. */
+.row-journey .journey { position: relative; }
+.row-journey .journey-self { display: inline-flex; }
 .stock-tag {
-  display: table; margin: 5px auto 0;
-  padding: 1px 7px; border-radius: 5px;
-  background: var(--brand-soft); color: var(--brand); border: 1px solid #cdd8e8;
-  font-size: 9.5px; font-weight: 700; letter-spacing: .03em; line-height: 1.5; white-space: nowrap;
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 3px;
+  text-align: center; white-space: nowrap; pointer-events: none;
+  font-size: 8.5px; font-style: italic; font-weight: 600; line-height: 1;
+  letter-spacing: .03em; color: var(--brand);
 }
-.journey-self + .stock-tag { margin-left: 0; }
 /* the copy in the subtitle only shows once the journey column is hidden */
 .stock-tag-sub { display: none; }
 .journey-big .j-pin { font-size: 12px; padding: 4px 11px; }
@@ -919,7 +921,7 @@ table.rx-edit input:focus { background: var(--brand-soft); box-shadow: inset 0 0
 @media (max-width: 1180px) {
   .row { grid-template-columns: 30px minmax(200px,1.6fr) 185px 170px; }
   .row-journey { display: none; }
-  .stock-tag-sub { display: inline-block; margin: 0; }
+  .stock-tag-sub { display: inline; position: static; margin: 0; font-size: 10px; }
   #s-list .row, #l-list .row, #c-list .row { grid-template-columns: minmax(200px,1.6fr) minmax(110px,.7fr) 160px 70px 170px; }
 }
 @media (max-width: 900px) {
