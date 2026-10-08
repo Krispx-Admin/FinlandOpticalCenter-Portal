@@ -1,0 +1,558 @@
+================================================================================
+  FOC PORTAL — HANDOFF GUIDE FOR THE NEXT CHAT
+  Finland Optical Center (Oman) · internal operations portal · https://foc-portal.org
+================================================================================
+
+  Last updated : 2026-10-08
+  Repo HEAD    : 6739256 "Add a presenter mode and the tour for a recorded tutorial"
+  Owner        : Omar Alsaid (git user). The person who asks for changes.
+
+  READ THIS FIRST, THEN THE CODE. This file is a living document:
+    - After every change to the portal, update the sections it touches and add
+      a line to the CHANGE LOG at the bottom (newest first).
+    - Remove anything that stops being true. A wrong line here is worse than a
+      missing one.
+    - Never put secrets in this file (sign-in codes, tokens, service keys).
+
+================================================================================
+ 1. WHAT THE PORTAL IS
+================================================================================
+
+A real-time operations board for a multi-branch optical retail chain in Oman.
+Retail branches, lens-fitting centres, eye clinics and one central warehouse
+all sign in to the same site and look at the same live data (Supabase /
+Postgres + realtime).
+
+Five modules (sidebar order):
+  1. Fitting Log        — a frame's physical journey branch -> fitting centre -> branch
+  2. Stock Requests     — branch asks the warehouse for stock (admin sees it as
+                          "Warehouse Queue" with a warehouse icon)
+  3. Lens Stock         — MGM holds the loose-lens shelf; everyone else shops it
+  4. Insurance Claims   — printable A4 claim receipt (products, Rx grid, payment)
+  5. Settings (admin)   — request categories, brand groups, branch sign-in codes
+
+Plus a hidden PRESENTER MODE (?present in the URL) used to record the staff
+tutorial video. See section 10.
+
+================================================================================
+ 2. TECH STACK & HOW TO RUN
+================================================================================
+
+- ZERO BUILD STEP. Plain index.html + one CSS file + native ES modules.
+  No framework, no bundler, no package.json, no npm deps in the repo.
+- Supabase JS v2 loaded from CDN in js/auth.js:
+    https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm
+- Run locally:  npx serve -l 8000 .     (or  python -m http.server 8000)
+                then open http://localhost:8000
+- Syntax-check a module:  node --check js/fitting.js
+- Earlier chats verified UI changes with throwaway Puppeteer scripts
+  (smoke.mjs etc.) kept OUTSIDE the repo. None are committed.
+- Git remote: https://github.com/Krispx-Admin/FinlandOpticalCenter-Portal.git
+  Branch: main. Live at https://foc-portal.org (static hosting, most likely
+  GitHub Pages with a custom domain — NOT verified; gh CLI is not logged in).
+- Timezone of commits: +0400 (Oman).
+
+================================================================================
+ 3. FILE MAP
+================================================================================
+
+index.html               shell: #app, #toasts, favicon (inline SVG glasses, stroke #133056)
+css/styles.css           the whole design system (~900 lines). Claim receipt CSS
+                         lives in js/claims.js (RECEIPT_CSS), not here.
+js/supabase-config.js    SUPABASE_URL, anon key (public by design), emailFor(code)
+js/auth.js               supabase client, signIn/signOut/currentBranch/onAuthChange,
+                         setBranchCode + branchAccess RPCs (warehouse only)
+js/data.js               STATIC DOMAIN: locations, roles, catalogue defaults, status
+                         machines, fulfilment options, Rx grid shape, permissions,
+                         formatters (fmtPwr, money, lensLabel…)
+js/db.js                 row <-> app mapping, collection loads, single-row DOCS,
+                         realtime subscription (channel 'focp-live')
+js/store.js              in-memory cache + ALL mutations (run() wrapper),
+                         error translation (explain()), optimistic settings edits
+js/ui.js                 esc(), relTime, fmtDT, icons map, pills, toast(),
+                         openLayer()/closeLayer() (one modal OR drawer at a time)
+js/app.js                login screen, loading/error screens, shell + sidebar,
+                         hash routing (#/fitting etc.), nav badges, live toasts,
+                         presenter-mode loader
+js/fitting.js            Module 1   js/stock.js   Module 2   js/lens.js  Module 4
+js/claims.js             Module 5 (+ RECEIPT_CSS, receiptHTML, printClaim)
+js/settings.js           Settings (admin)
+js/present.js            presenter mode engine (cursor, ripple, spotlight, captions)
+js/tour.js               the tutorial as data: 7 chapters
+img/                     4 logo PNGs (see section 7)
+supabase/*.sql           schema + migrations (see section 5)
+tutorial/HANDOFF.md      how an agent drives Chrome to record the tutorial
+tutorial/SCRIPT.md       human-readable tutorial script (mirror of js/tour.js —
+                         change one, change the other)
+tutorial/demo-cleanup.sql removes everything a tutorial take created (DEMO- bills)
+README.md                overview — NOTE: its Database table stops at schema-03
+                         and its Layout omits present.js / tour.js / tutorial/.
+
+================================================================================
+ 4. THE DOMAIN MODEL
+================================================================================
+
+4.1 USERS ARE LOCATIONS, NOT PEOPLE
+-----------------------------------
+13 locations, each one Supabase Auth account. Sign-in = pick location card,
+type its 6-digit code. Email is derived: `${code.toLowerCase()}@finlandoptical.om`
+and the 6-digit code IS the account password (bcrypt). The JWT carries
+app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it.
+
+  Code    Name                 Role      Notes
+  ------  -------------------  --------  ----------------------------------
+  SCC     Seeb City Centre     retail
+  AV      Avenues Mall         retail
+  QCC     Qurum City Centre    retail
+  SAL     Salalah Shop         retail    renamed from SLS (schema-04)
+  SUR     Sur                  retail
+  MOUJ    Al Mouj              fitting   was retail in schema.sql seed; fixed in schema-02
+  MOO     Mall of Oman         fitting
+  MGM     Muscat Grand Mall    fitting   HOLDS THE LENS SHELF (LENS_OWNER)
+  QURFEC  Qurum FEC            clinic    FEC = FOC Eye Clinic
+  SALFEC  Salalah FEC          clinic
+  SOHFEC  Sohar FEC            clinic
+  NIZFEC  Nizwa FEC            clinic
+  WH      Warehouse (admin)    admin     sees everything, owns Settings
+
+!! The location list exists TWICE: LOCATIONS in js/data.js AND the branches
+   table. Adding/renaming a location means changing both, plus the auth user
+   (email, app_metadata.branch_code, auth.identities email) — see schema-04 for
+   how a rename was done in one transaction.
+!! LENS_OWNER = 'MGM' is hard-coded in data.js; the DB uses
+   branches.holds_lens_stock. Keep them in step.
+
+ROLES (data.js): retail "Retail branch", fitting "Fitting centre",
+clinic "Clinic", admin "Warehouse · Admin".
+
+Visibility (enforced by RLS, mirrored by canSee* in data.js as a 2nd layer):
+  - orders: origin branch, assigned fitter, admin
+  - stock requests: own branch, admin
+  - lens stock: everyone reads; MGM or admin writes
+  - lens requests: asking branch, MGM, admin
+  - claims: own branch, admin
+  - settings / lens_catalogue: everyone reads; admin (settings) or
+    MGM+admin (lens_catalogue) write
+
+4.2 FITTING LOG (orders)
+------------------------
+order.ref = the branch's own BILL NUMBER from the paper bill book (unique per
+branch, not globally — index orders_ref_per_branch). Never auto-suggest it
+(that was removed on purpose). Customer name is REQUIRED (trimmed).
+
+LONG ROAD (FIT_FLOW):
+  pending -> to_fitter -> at_fitter -> ready -> returning -> delivered
+  status     label            pill color  action button      who acts
+  pending    Pending          slate       Send to fitter     origin
+  to_fitter  In transit to X  blue        Confirm arrival    fitter
+  at_fitter  At fitter        purple      Mark ready         fitter
+  ready      Ready            green       Send to branch     fitter
+  returning  Returning to X   teal        Confirm delivery   origin
+  delivered  Delivered        done(grey)  —                  —
+  (fitStep(o) names the place: "In transit to MGM", "Returning to SCC";
+   long:true gives full names for drawer/hover.)
+
+SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale):
+  pending -> at_fitter -> delivered, labels Pending / In fitting / Done,
+  actions "Start fitting" / "Mark as done". No transit, journey diagram shows
+  one node + "In-house — no transit". onShortRoad(o) is only true if the
+  current status is on SELF_FLOW, so legacy self-fit orders mid-long-road
+  finish the long way.
+
+Send to fitter: picker modal of FITTERS; if all selected orders came from one
+fitting centre, that centre leads the list ("Keep here — no transit").
+Rows are click-to-select; bulk bar advances all selected when they share the
+same next action. Urgent flag (red left border, pulsing zap pill, sorted first).
+Every change writes an order_events row (the human sentence shown in the
+timeline AND used as the realtime toast).
+
+4.3 STOCK REQUESTS
+------------------
+Statuses: placed (blue) -> completed (green). No review step.
+Branch composes lines: category / brand / audience / qty / note.
+Per-category rules come from Settings: needsBrand, needsAudience, needsQty,
+unit ('pcs' | 'box'), brandGroup. Category/brand/audience are COPIED onto
+lines so old requests stay readable after settings change.
+Warehouse: Print pick sheet (new window, browser print) -> fulfil -> Complete
+(RPC complete_stock_request, admin only, atomic).
+Refs SR-1001… from DB sequence.
+
+4.4 LENS STOCK
+--------------
+MGM keeps the shelf (rows: type, index, coating, SPH, CYL, qty; unique per
+spec). Others browse a card grid, build a basket (cart, per-visit only),
+"Review & request". Lens types/indices/coatings lists live in lens_catalogue
+(edited by MGM or WH via the cog on the shelf tab; defaults in data.js).
+A value in use on the shelf can't be removed; "None" coating can't be removed;
+a list can't be emptied. LOW_LENS_STOCK = 4 (amber).
+
+Lens request statuses: requested "Awaiting MGM" (amber) / confirmed (green) /
+declined (red, with reason).
+
+FULFILMENT (schema-07) — every lens request also OPENS A FITTING ORDER, in one
+DB transaction (create_lens_request):
+  send_frames  "Send the frame over"  -> order fitter = MGM, long road
+  receive_lens "Receive the lenses"   -> order fitter = requester (self-fit);
+                only fitting centres/admin may choose this (checked in DB)
+Bill number + customer name required on the request (they become the order).
+Confirm (RPC confirm_lens_request) deducts stock atomically with row locks;
+ships what's available and logs "Short on: …" if short. MGM's confirm button
+reads "Send lenses to <branch>" for receive_lens, "Confirm & deduct stock"
+otherwise.
+
+4.5 INSURANCE CLAIMS
+--------------------
+Fields: date, branch, bill no, customer (required), products (name + price,
+OMR with 3 decimals — 1 rial = 1000 baisa), Rx grid, payment cash|card.
+Refs IC-3001… from DB sequence. Total = sum of items (client computes;
+DB trigger also maintains claims.total).
+Rx grid: rows D (Distance) and N (Near); OD and OS each SPH · CYL · AXIS · V.A.;
+one ADD per eye across the bottom. 9 columns, colgroup + table-layout:fixed
+so SPH never gets squeezed. IPD and segment height were REMOVED on purpose
+(not on insurance claims); legacy columns ipd/sh_od/sh_os are ignored.
+Rx values are TEXT (opticians write PL, 6/6, N5…).
+Old flat {od, os} rx shapes are folded into the D row by normaliseRx().
+Preview modal and printed A4 use the SAME markup + RECEIPT_CSS (what you see
+is what prints). Edit = delete+reinsert items and rx rows.
+
+4.6 SETTINGS (admin only)
+-------------------------
+- Categories: drag to reorder; flag chips Brand / Audience / Quantity;
+  "Counted" pcs|box; "Brands from" brand group.
+- Brand groups: rename inline, drag groups, drag brands between groups
+  (same brand may sit in several groups).
+- Branch access: set any location's 6-digit code via RPC set_branch_code
+  (rejects weak codes like 123456, 000000, <3 distinct runs). Codes cannot
+  be read back by anyone. Shows last sign-in.
+Settings = one JSON row (app_settings id=1), written whole, optimistic UI,
+rolled back from server on refusal.
+
+================================================================================
+ 5. DATABASE (Supabase project ref: vwwiyqmhljzsnyziouqz)
+================================================================================
+
+Migrations are applied by hand, in order. Each file has a header with
+"STATUS: applied" or "NOT YET APPLIED".
+
+  schema.sql                 branches, claims(+items, prescriptions), orders(+events),
+                             lens_stock, lens_requests(+lines, events), helper fns
+                             jwt_branch() / is_admin() / is_lens_owner(),
+                             touch_updated_at trigger, claim total trigger,
+                             confirm_lens_request(), RLS, realtime, branch seed
+  branch-codes.sql           set_branch_code(), branch_access()   (warehouse only)
+  schema-02-shared.sql       sequences req_seq(1001) lens_seq(1001) claim_seq(3001);
+                             orders ref unique per branch; stock_requests(+lines,
+                             events); app_settings; complete_stock_request(); MOUJ->fitting
+  schema-03-lens-topup.sql   add_lens_stock() — ON CONFLICT top-up
+  schema-04-salalah-code.sql SLS -> SAL (branches + auth.users + auth.identities)
+  schema-05-lens-catalogue.sql lens_catalogue table; dropped lens_type CHECK
+  schema-06-drop-frame-columns.sql  drops orders.brand/model/lens
+                             >>> NOT YET APPLIED (deliberately; app no longer
+                                 uses those columns either way) <<<
+  schema-07-lens-request-fulfilment.sql  lens_requests.customer/fulfilment/
+                             order_id; lens_owner_code(); create_lens_request()
+
+Tables (public): branches, orders, order_events, stock_requests,
+stock_request_lines, stock_request_events, lens_stock, lens_requests,
+lens_request_lines, lens_request_events, claims, claim_items,
+claim_prescriptions, app_settings (1 row), lens_catalogue (1 row).
+All have RLS on. All are in the supabase_realtime publication.
+
+Column naming: DB uses *_code (origin_code, fitter_code, branch_code, by_code)
+and lens_type / lens_index (SQL-unfriendly words). The app uses origin, fitter,
+branch, type, index. ALL mapping lives in js/db.js (toOrder, toRequest, …,
+orderRow, claimRow …). lens_requests.note holds the BILL NUMBER (app: billNo).
+
+Rules followed so far:
+  - Anything that must be atomic or must not trust the browser is a
+    SECURITY DEFINER plpgsql function that checks the caller first
+    (is_admin / is_lens_owner / jwt_branch), then does the work.
+  - Refs come from sequences inside the INSERT (never client counters).
+  - Single-row JSON docs (settings, lens catalogue) start EMPTY; the app
+    falls back to the defaults in data.js — one definition of defaults.
+  - Child rows are fetched embedded (`*, order_events(*)`), one request per
+    collection.
+  - Status updates are guarded: `.eq('status', from)` so a row someone else
+    already moved is skipped, not double-advanced.
+
+Data facts known (from commit notes, not re-checked live this session):
+  ~6 real orders existed on 2026-10-06, all with empty brand/model/lens.
+
+ACCESS FOR CLAUDE: previous chats ran SQL through the Supabase Management API
+using a personal token stored at ~/.foc-supabase-token (outside the repo). In
+the 2026-10-08 session the permission system BLOCKED reading that token, so
+live DB queries need the user to explicitly allow it (or to run SQL in the
+Supabase dashboard SQL editor themselves). Do not try to work around this.
+Sign-in codes are kept by the user outside the repo — never ask to see them
+in chat unless a task truly needs a sign-in, and never commit them.
+
+================================================================================
+ 6. CODE PATTERNS — FOLLOW THESE EXACTLY
+================================================================================
+
+6.1 Module shape
+  export function xxxView(me) {          // me = { code, name, role }
+    const ui = { …filters, seen:Set, prevStatus:Map };
+    let root, drawer = null, drawerId = null;
+    …HTML builders returning template strings…
+    return { mount(container){…}, onChange(event){…}, unmount(){ closeLayer(); } };
+  }
+  Registered in MODULES in js/app.js (label, icon, make, adminLabel?, adminOnly?).
+  Screen anatomy, top to bottom:
+    header.mod-head  (h1 + p.mod-sub on left, primary .btn on right)
+    section.stats    (4 .stat tiles; .stat-brand / .stat-red / .stat-amber)
+    section.toolbar  (.searchbox + .sel dropdowns + toggle chip)
+    section.chips    (filter .chip with .chip-n count; .on = selected)
+    section.list     (.row cards)
+  Detail = right-side DRAWER (openLayer('drawer')); create/edit = MODAL
+  (openLayer('modal')). Both start with .dw-head: .dw-kicker (small caps),
+  h2, .dw-sub, and an .icon-btn [data-close] with icons.x.
+  Drawer body: status row (pill + "updated 3m ago"), facts (.kv grid or
+  table.lines), .dw-actions, then "Timeline" (.tl-h + .timeline, newest first,
+  top dot highlighted .tl-now).
+
+6.2 Rendering & events
+  - HTML via template strings. ALWAYS esc() any user/DB text.
+  - Event delegation on root / layer.el with data-* attributes
+    (data-open, data-advance, data-send-fitter, data-chip, data-close, data-del…).
+    [data-stop] marks regions whose clicks must not open/select the row.
+  - Re-render partially (refreshLists/refreshBody) and PRESERVE FOCUS/CARET of
+    the field being typed in (see lens.js refreshBody, settings.js focusKey).
+  - When a modal redraws, read typed values back into a draft first (sync()).
+  - New rows animate (.row-enter) by comparing to ui.seen; changed statuses
+    flash (.pill-flash) by comparing to ui.prevStatus; call markSeen() after.
+  - Forms that write to the DB: disable the button, show "Saving…"/"Placing…",
+    keep the form open if the store returns null (refused), restore the label.
+  - Trim inputs and put the trimmed value back before reportValidity() so
+    whitespace-only input is rejected by the browser's own validation.
+
+6.3 Store / data flow
+  - Modules read store.state synchronously (cache).
+  - Every mutation: store.run([collections], async work, describe)
+      work() writes via supabase, throws on error (ok() helper), may return SKIP
+      then the collections are reloaded, then commit(event) notifies views.
+      Errors -> toast "That did not save" + explain(e) in plain English.
+  - Event objects: { by, module, title, sub, refs:[ids], remote }.
+  - Realtime: db.watch debounces bursts (220ms), reloads touched collections,
+    and turns new *_events rows into toasts for OTHER branches only.
+  - Add new error translations in explain() in store.js.
+  - Add new tables to: SELECTS or DOCS (db.js), TABLE_COLLECTION (db.js),
+    MODULE_OF (store.js), the realtime publication (SQL), RLS (SQL).
+
+6.4 Permissions — always two layers
+  RLS / definer-function checks in SQL (the real guard) + canSee*/canAdvance*
+  in data.js (UI). The browser is never the only check.
+
+6.5 Writing style (code, UI copy, commits) — match it
+  - British spelling: centre, colour, catalogue, normalise, organise.
+  - Comments explain WHY in full plain sentences, often a short paragraph.
+    Section headers: `// ── Title ──` in JS, `-- ════` banners in SQL,
+    `/* ── Title ── */` in CSS.
+  - UI copy: plain, specific, sentence case, em dashes (—), curly quotes
+    (“ ” ’), ellipsis character (…). Name places, not roles ("In transit to
+    MGM", not "In transit to fitter"). Short helper text in .muted <p>.
+  - Toast titles name the actor + ref: "SCC placed stock request SR-1004".
+  - Commit messages: plain-English imperative title describing the outcome
+    ("Let the shelf's keeper edit its lists; …"), body = prose explaining the
+    why, "·" bullets where listing, then the Co-Authored-By trailer.
+    STANDING RULE (user, 2026-10-08): commit AND push to origin/main after
+    every change, including updates to this file. No need to ask first.
+  - Migrations: new file supabase/schema-NN-topic.sql with a banner header,
+    "STATUS: applied / NOT YET APPLIED", idempotent SQL (if not exists,
+    drop … if exists, on conflict). Update this file's section 5 after.
+
+================================================================================
+ 7. BRAND & LOGO USAGE
+================================================================================
+
+Brand colours sampled from the logo artwork:
+  Logo navy  #283c70      Logo red (the ring / "pupil")  #e4424e
+The printed receipt uses its own close equivalents: --r-navy #2b3b6b,
+--r-red #e4424f, --r-ink #15213a.
+The app UI uses a DEEPER navy, #133056 (--brand). Do not swap these: UI =
+CSS tokens; print/receipt = RECEIPT_CSS vars; logo files = artwork colours.
+
+The four files in img/:
+  foc-logo-horizontal.png   4000x2000, transparent, full colour. Logomark +
+                            Arabic "المركز الفنلندي للبصريات" over English
+                            "Finland Optical Center". Lots of built-in padding.
+      USED: top-left of login / loading / error screens (.lp-logo, 158px wide,
+            static & centred under 900px); header of the claim receipt (62mm).
+  foc-logomark.png          2000x2000, the navy "P/eye" mark with red ring.
+      USED: faded backdrop watermark, rotated -30deg — login (opacity .045,
+            min(820px,120vh)) and receipt (opacity .055, 190mm, fixed on print).
+  foc-portal-white.png      780x272, WHITE "FOC Portal" artwork with the red ring.
+      USED: sidebar top (.side-wordmark, 32px tall) on the navy gradient;
+            presenter chapter cards (58px).
+  foc-portal-mark-white.png 240x249, white mark + red ring only.
+      USED: collapsed sidebar rail under 900px (.side-mark, 30px).
+
+Rules:
+  - White logos only on navy; full-colour logos only on white/light surfaces.
+  - Never recolour, stretch or redraw the logo; never replace it with text
+    (a typed "FOCPortal" + glasses icon was replaced by the real artwork).
+  - The red ring is the only red in the brand. UI red (#dc2626) means
+    urgent / danger / declined — it is not a brand accent.
+  - Watermark use = logomark, rotated -30deg, ~4–6% opacity, pointer-events none.
+  - Favicon: inline SVG of the glasses icon, stroke #133056 (index.html).
+  - Printed receipt header: wide logo, then "INSURANCE CLAIM RECEIPT" in navy
+    letter-spaced caps with the Arabic "إيصال مطالبة تأمين" in red beneath.
+  - Images in print windows must use absolute URLs (asset() in claims.js) and
+    wait for load before print (printWhenReady).
+
+================================================================================
+ 8. DESIGN SYSTEM (css/styles.css)
+================================================================================
+
+8.1 Tokens (:root)
+  --brand #133056   --brand-dark #0c2138   --brand-mid #1c4373 (hover)
+  --brand-soft #e9eef6 (selected/hover tint)   --brand-ink #10294a (text on light)
+  --page #f4f6fa (app background)   --surface #ffffff (cards)
+  --border #e3e8f0   --border-strong #cfd8e5
+  --ink #17202b   --ink-2 #4c5a6b (secondary)   --ink-3 #8593a5 (muted/labels)
+  Status hues (always paired with a label, never colour alone):
+  --st-slate #64748b  --st-blue #2563eb  --st-purple #a21caf  --st-green #059669
+  --st-teal #0d9488   --st-amber #b45309 --st-red #dc2626     --st-done #475569
+  --radius 12px   --shadow (soft navy, 2 layers)   --shadow-lg (overlays)
+  --font system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
+  --speed .22s
+  No dark mode. Light theme only.
+
+8.2 Status pills  .pill.s-{slate|blue|purple|green|teal|amber|red|done}
+  Tinted background + border + coloured dot + text. Meaning in this app:
+    slate  pending                 blue   in transit / placed / card payment
+    purple at fitter / in fitting  green  ready / completed / confirmed / cash
+    teal   returning; fitting-centre role; "Lenses come here"; lens coatings
+    amber  awaiting (MGM, warehouse); low stock; warnings (.review-hint)
+    red    urgent / declined / out of stock / danger
+    done   delivered / done (muted grey)
+
+8.3 Role colours
+  Login .loc-code chip: retail = navy on brand-soft, fitting = teal on #e2f5f3,
+  clinic = purple on #faeafc, admin = white on navy.
+  Sidebar .me-code: fitting teal, clinic purple, admin amber #f59e0b / #3a2500.
+  .loc-chip (location code tag): navy on brand-soft, 11px bold.
+
+8.4 Type
+  Base 14px / 1.45. h1 23px, drawer h2 19px, settings h2 16px; headings weight
+  650, letter-spacing -.01em. Small-caps labels: 10.5–11px, uppercase,
+  letter-spacing .06–.1em, weight 700, --ink-3. Optical powers and codes in
+  monospace (ui-monospace, "SF Mono", Menlo, Consolas). Money with
+  font-variant-numeric: tabular-nums. Powers always signed, 2 decimals
+  (fmtPwr: +1.50, -2.25, +0.00). Money 3 decimals (money()).
+
+8.5 Components (reuse before inventing)
+  Buttons .btn + .btn-primary (navy, shadow) | .btn-ghost (white, strong
+  border) | .btn-danger | .btn-danger-text | .btn-sm ; .icon-btn 32px square.
+  Icons inline SVG in ui.js `icons` (Lucide paths, stroke 2, currentColor,
+  18px default, 15px in buttons). Add new icons there, Lucide-style.
+  Radii: cards 12, modal 16, buttons/inputs 9, small 8, chips/pills 999.
+  Focus ring: border --brand + box-shadow 0 0 0 3px rgba(19,48,86,.12).
+  Cards/rows: white, 1px --border, --shadow, hover lifts translateY(-1px).
+  Selected: --brand border + brand-soft background + 2px navy halo.
+  Checkboxes are custom (.cbx navy, .check red for urgent, .check.sm pill chip).
+  Bulk bar & cart bar: navy bars with white/translucent buttons.
+  Toasts: bottom-right, navy-dark, coloured dot (info blue #60a5fa, stock
+  amber #fbbf24, lens teal #2dd4bf), max 4, pointer-events none.
+  Journey diagram: code pins joined by segments; done = navy, fitter node
+  turns green when ready, moving segment animates blue.
+  Empty states: .empty with a faded 38px icon + one line.
+  Hint banners: .review-hint (amber), .decline-note (red).
+
+8.6 Layout
+  Shell: grid 236px navy-gradient sidebar (brand-dark -> brand) + scrolling
+  content (padding 30px 36px 60px). Sidebar: logo, nav (active item = white
+  14% bg + inset white bar), amber count badges, "Live · synced" green ping,
+  location card, Sign out.
+  Breakpoints: 1180px (journey column hides), 900px (sidebar collapses to a
+  74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
+  Login: logomark watermark, logo top-left, "Sign in / Choose your location.",
+  warehouse card centred on top, then 3 columns (retail 2-wide, fitting,
+  clinics). Must fit one screen without scrolling. No white card wrapping
+  the groups (removed on purpose — the cards float on the page).
+
+8.7 Motion
+  fadeUp on module mount/modals, rowEnter (springy) for new rows, pillFlash on
+  status change, zapPulse on urgent, livePing on the live dot, segMove on the
+  in-transit segment, drawer slides from right. prefers-reduced-motion kills
+  all of it — keep that rule.
+
+================================================================================
+ 9. PRINT OUTPUTS
+================================================================================
+  - Stock pick sheet (stock.js printRequest): plain window, inline style, no
+    logo, table with an empty "Picked" column, auto print after 300ms.
+  - Claim receipt (claims.js): A4, @page margins 12/14/13mm, logo header,
+    meta row (Date, Branch, Bill Number, Receipt No., Customer Name), Products
+    table with navy total footer, Prescription grid, Payment ticks + navy
+    Total box, two signature lines, footer note. print-color-adjust: exact.
+    Preview modal scales the 210mm sheet to fit (fitSheet).
+
+================================================================================
+ 10. PRESENTER MODE & TUTORIAL
+================================================================================
+  ?present loads js/present.js for that tab (sessionStorage flag); ?present=0
+  turns it off. Normal users never download it. window.present exposes
+  tap/type/choose/focus/caption/card/as/playAll/resume/status. Alt+P opens a
+  control panel. Sign-in codes go into present.pins() (memory only) and the
+  code fields are masked on camera.
+  js/tour.js = 7 chapters: intro, seeb (SCC), mouj (MOUJ), mgm (MGM),
+  moujDone, warehouse (WH), finale. Each take mints DEMO-xxx1..5 bill numbers.
+  tutorial/demo-cleanup.sql removes everything with a DEMO- bill plus six
+  seeded demo shelf rows (by id) and stray demo list values.
+  A finished video exists one folder up: FOC-Portal-Staff-Guide.mp4 (2026-10-06).
+  If you change UI text/selectors the tour clicks, update tour.js AND
+  SCRIPT.md or the tour breaks.
+
+================================================================================
+ 11. KNOWN GAPS / TECH DEBT (fix only when asked)
+================================================================================
+  - README Database table lists only schema.sql..03; Layout omits present.js,
+    tour.js, tutorial/.
+  - schema-06 (drop orders.brand/model/lens) not applied — irreversible, left
+    for a deliberate decision.
+  - orders.phone and orders.note are never written by the UI (drawer shows
+    them only if set).
+  - Location list duplicated (data.js LOCATIONS vs branches table);
+    LENS_OWNER hard-coded vs branches.holds_lens_stock.
+  - In db.js TABLE_COLLECTION, the comment "Confirming a request draws the
+    shelf down…" sits above the claims line (misplaced; the real handling is
+    the lens_request_events special case in watch()).
+  - CSS classes used but undefined: `.sm` on plain .muted text, `.modal-foot`.
+  - Badge / "Need your action" counts exclude pending orders that already have
+    a fitter (i.e. self-fit jobs waiting on lenses) — intentional, they're
+    waiting on lenses, not on anyone.
+  - Error toasts reuse tone 'stock' (amber dot) — there is no dedicated error tone.
+
+================================================================================
+ 12. CHECKLIST BEFORE SAYING A TASK IS DONE
+================================================================================
+  [ ] Reused existing tokens/components; no new colours outside :root.
+  [ ] esc() on every interpolated string; data-* delegation, no inline onclick.
+  [ ] Works at 1440px, 1180px, 900px and phone width; reduced motion OK.
+  [ ] DB change = new schema-NN file + RLS + realtime + db.js mapping + store.
+  [ ] Permissions enforced in SQL, mirrored in data.js.
+  [ ] Tour selectors/text still match if UI copy changed (tour.js, SCRIPT.md).
+  [ ] node --check on edited JS files; served locally and clicked through.
+  [ ] THIS FILE updated (sections touched + change log).
+  [ ] Committed and pushed to origin/main.
+
+================================================================================
+ CHANGE LOG (newest first)
+================================================================================
+ 2026-10-08  Standing rule added: commit and push to main after every change.
+ 2026-10-08  HANDOFF.txt created after a full read of the repo (all JS, CSS,
+             SQL, tutorial docs, git history to c552b96). Live DB was not
+             queried this session (token access blocked by permissions).
+ 2026-10-06  (from git) Presenter mode + tutorial tour; lens requests choose
+             fulfilment and open the fitting order (schema-07); lens catalogue
+             editable by MGM (schema-05); Rx grid rebuilt without IPD/S.H.;
+             SLS->SAL (schema-04); self-fit short road; place names in status
+             pills; bill number no longer guessed; customer name required.
+ 2026-10-05  (from git) Records moved from localStorage to Postgres; real
+             Supabase sign-in; Insurance Claims module; sign-in screen rebuilt
+             around the real logo; Portal logo in the sidebar.
+ 2026-08     (from git) Scheduler removed; per-category units + brand groups;
+             Lens Stock module.
+ 2026-07     (from git) Initial portal; fitting log + stock requests overhaul.
+================================================================================
