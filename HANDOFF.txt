@@ -270,9 +270,16 @@ Migrations are applied by hand, in order. Each file has a header with
                              order_id; lens_owner_code(); create_lens_request()
   schema-08-lens-auto-deduct.sql  create_lens_request deducts the shelf and
                              records the request as confirmed
+                             and, at the end, auto-confirms (and deducts) any
+                             request still 'requested'. On 2026-10-08 that was
+                             one: LR-1012 (MOUJ, bill 22, 1 x SV 1.60 AR
+                             -2.50/-0.50, shelf 6).
                              >>> NOT YET APPLIED as of 2026-10-08 — the user must
                                  run it in the Supabase SQL editor. The app works
                                  before and after it (old confirm flow until then). <<<
+                             Once it is applied, MGM's confirm/decline UI never
+                             shows (nothing is 'requested'); it can then be
+                             removed from lens.js / store.js / app.js badge.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -301,10 +308,14 @@ Data facts known (from commit notes, not re-checked live this session):
   ~6 real orders existed on 2026-10-06, all with empty brand/model/lens.
 
 ACCESS FOR CLAUDE: previous chats ran SQL through the Supabase Management API
-using a personal token stored at ~/.foc-supabase-token (outside the repo). In
-the 2026-10-08 session the permission system BLOCKED reading that token, so
-live DB queries need the user to explicitly allow it (or to run SQL in the
-Supabase dashboard SQL editor themselves). Do not try to work around this.
+using a personal token stored at ~/.foc-supabase-token (outside the repo).
+2026-10-08: after the user explicitly authorised it, READ-ONLY queries worked
+(POST /v1/projects/<ref>/database/query with "read_only": true). WRITES
+(applying a migration) were still BLOCKED by the permission system. So the
+user runs migrations in the Supabase dashboard SQL editor unless they add a
+permission rule. Do not try to work around a block.
+Live counts on 2026-10-08: lens_requests 7 confirmed + 1 requested; orders
+3 pending, 2 at_fitter, 1 ready, 1 returning, 9 delivered; 7 shelf rows.
 Sign-in codes are kept by the user outside the repo — never ask to see them
 in chat unless a task truly needs a sign-in, and never commit them.
 
@@ -479,8 +490,10 @@ Rules:
   amber #fbbf24, lens teal #2dd4bf), max 4, pointer-events none.
   Journey diagram: code pins joined by segments; done = navy, fitter node
   turns green when ready, moving segment animates blue.
-  Stock Lens tag (.stock-tag): brand-soft fill, navy text, 1px #cdd8e8 border,
-  6px radius, 10.5px bold, lens icon; sits under the journey (margin-top 7px).
+  Stock Lens tag (.stock-tag): text only (no icon, per user), brand-soft fill,
+  navy text, 1px #cdd8e8 border, 5px radius, 9.5px bold; CENTRED under the
+  journey (display:table; margin:5px auto 0). Under a one-node in-house
+  journey it sits left instead.
   Fitting Log status pills sit 20px into their column (24px at ≤1360px) so
   they never touch the journey — the journey column itself never moves.
   Empty states: .empty with a faded 38px icon + one line.
@@ -581,6 +594,9 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-08  Stock Lens tag: icon removed, smaller, centred under the
+             journey. schema-08 extended to auto-confirm leftover requests;
+             applying it from Claude was blocked — still NOT APPLIED.
  2026-10-08  Fitting statuses renamed (Waiting for Lenses / Waiting to be
              Fitted / Ready / Returning to X / Delivered), shared chip; Fitting
              Log pills spaced off the journey; Stock Lens tag + lens list on

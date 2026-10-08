@@ -19,7 +19,7 @@ CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] }
 
 // Orders a lens request opened wear this under their journey, and in the list
 // subtitle when the journey column is hidden on a narrow screen.
-const stockTag = (cls = '') => `<span class="stock-tag ${cls}">${icons.lens}Stock Lens</span>`;
+const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
 

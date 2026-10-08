@@ -14,9 +14,11 @@
 --  deduction and fitting order in one transaction. The spec on each line is
 --  copied from the shelf row, not from what the browser sent.
 --
---  confirm_lens_request stays, so a request placed before this ran can still
---  be confirmed or declined by hand. The app works either side of this file:
---  until it runs, requests still arrive as "Awaiting MGM".
+--  Anything still waiting on MGM when this ran is confirmed at the end of the
+--  file, the same way, so no request is left needing a button that is gone.
+--  confirm_lens_request is left in place. The app still offers MGM its
+--  confirm button for a request that is 'requested', which after this file
+--  runs is none of them — so the button simply never appears.
 -- ════════════════════════════════════════════════════════════════════════════
 
 create or replace function public.create_lens_request(
@@ -116,3 +118,34 @@ end $$;
 
 revoke all on function public.create_lens_request(text, text, text, jsonb) from public;
 grant execute on function public.create_lens_request(text, text, text, jsonb) to authenticated;
+
+-- ── Requests still waiting on MGM: confirm them now, the same way ───────────
+-- These were placed before the shelf came down by itself, so their lenses are
+-- still counted on it. Take them off — or as many as there are, as the old
+-- confirm did — and close each request. Idempotent: once nothing is
+-- 'requested', this does nothing.
+do $$
+declare
+  r     public.lens_requests;
+  l     record;
+  give  int;
+  sent  int;
+begin
+  for r in select * from public.lens_requests where status = 'requested' order by created_at for update loop
+    sent := 0;
+    for l in select * from public.lens_request_lines where request_id = r.id order by stock_id loop
+      select least(qty, l.qty) into give from public.lens_stock where id = l.stock_id for update;
+      give := coalesce(give, 0);
+      if give > 0 then
+        update public.lens_stock set qty = qty - give, updated_at = now() where id = l.stock_id;
+        sent := sent + give;
+      end if;
+    end loop;
+
+    update public.lens_requests set status = 'confirmed', updated_at = now() where id = r.id;
+
+    insert into public.lens_request_events (request_id, by_code, text)
+    values (r.id, public.lens_owner_code(),
+            format('Confirmed automatically — %s pcs taken off the shelf', sent));
+  end loop;
+end $$;
