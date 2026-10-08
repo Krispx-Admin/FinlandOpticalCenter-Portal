@@ -355,6 +355,10 @@ svg { width: 18px; height: 18px; flex: none; }
 /* The padding keeps clear water between the pill and the end of the journey
    beside it. It moves only the pill: the journey column keeps its place. */
 #f-list .row-status { padding-left: 20px; }
+/* The Fitting Log's status pills run a size smaller than elsewhere, so they
+   stay clear of the journey beside them without the journey giving way. */
+#f-list .row-status .pill { font-size: 11px; padding: 3px 8px; gap: 5px; }
+#f-list .row-status .pill .dot { width: 6px; height: 6px; }
 .row-status .pill { max-width: 100%; }
 .pill-t { overflow: hidden; text-overflow: ellipsis; }
 .row-act { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
@@ -430,13 +434,6 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .journey-big.journey-self .j-inhouse { font-size: 12.5px; }
 .journey-big { margin: 16px 0 4px; gap: 8px; }
-
-/* In the list the pins are smaller, so three location codes leave a real
-   stretch of road between them — enough to see the in-transit animation on
-   it at any width the column is shown. The drawer keeps the large pins. */
-.row-journey .journey { gap: 5px; }
-.row-journey .j-pin { font-size: 9px; padding: 1px 5px; letter-spacing: .02em; }
-.row-journey .j-seg { min-width: 26px; }
 
 /* An order a lens request opened: the lenses come off the shelf, and the tag
    sits centred under the journey so the bench knows before opening it. The

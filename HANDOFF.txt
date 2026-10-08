@@ -496,10 +496,11 @@ Rules:
   journey it sits left instead.
   Fitting Log status pills sit 20px into their column (24px at ≤1360px) so
   they never touch the journey — the journey column itself never moves.
-  List journeys use SMALL pins (9px, padding 1px 5px, gap 5px) and segments
-  min 26px, so the road and the in-transit animation always show. The user
-  disliked squeezed segments — never shrink segments to make things fit; shrink
-  pins or move the pill instead. The drawer's journey-big keeps large pins.
+  Fitting Log status pills are a size smaller than elsewhere (11px, padding
+  3px 8px, 6px dot) — the user's choice for keeping them clear of the journey.
+  The JOURNEY KEEPS ITS ORIGINAL SIZE (pins 10px, gap 8px, segments min 22px):
+  the user rejected both shorter segments (hid the in-transit animation) and
+  smaller pins. To make room, shrink/move the pill, never the pipeline.
   Empty states: .empty with a faded 38px icon + one line.
   Hint banners: .review-hint (amber), .decline-note (red).
 
@@ -598,9 +599,10 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
- 2026-10-08  to_fitter back to "In transit to X" (blue, own chip); list
-             journey pins made smaller, segments min 26px so the in-transit
-             animation shows; the mid-width segment squeeze was removed.
+ 2026-10-08  Smaller-pins change reverted: pipeline back to original size;
+             Fitting Log status pills made smaller instead (what was meant).
+ 2026-10-08  to_fitter back to "In transit to X" (blue, own chip); the
+             mid-width segment squeeze was removed.
  2026-10-08  Stock Lens tag: icon removed, smaller, centred under the
              journey. schema-08 extended to auto-confirm leftover requests;
              applying it from Claude was blocked — still NOT APPLIED.
