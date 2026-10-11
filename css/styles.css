@@ -227,12 +227,34 @@ svg { width: 18px; height: 18px; flex: none; }
 .demo-note code { background: var(--brand-soft); color: var(--brand); padding: 1px 6px; border-radius: 5px; font-weight: 700; }
 
 /* ── Shell ─────────────────────────────────────────────────────────────── */
-.shell { display: grid; grid-template-columns: 236px 1fr; height: 100%; }
+.shell { display: grid; grid-template-columns: 236px 1fr; height: 100%; transition: grid-template-columns var(--speed); }
 .side {
   background: linear-gradient(180deg, var(--brand-dark), var(--brand));
   color: #fff; display: flex; flex-direction: column; padding: 20px 14px;
 }
-.side-logo { display: flex; align-items: center; padding: 2px 8px 17px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.side-logo { display: flex; align-items: center; gap: 10px; padding: 2px 8px 17px 2px; border-bottom: 1px solid rgba(255,255,255,.12); }
+/* the ☰ that folds the menu to its icon rail and back */
+.side-toggle {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 34px; height: 34px; border: none; border-radius: 9px;
+  background: transparent; color: rgba(255,255,255,.72);
+  transition: background var(--speed), color var(--speed);
+}
+.side-toggle:hover { background: rgba(255,255,255,.1); color: #fff; }
+.side-toggle svg { width: 20px; height: 20px; }
+.side { overflow: hidden; }
+
+/* Folded: the same icon rail a narrow screen gets, by choice */
+.shell.collapsed { grid-template-columns: 74px 1fr; }
+.shell.collapsed .side { padding: 16px 9px; }
+.shell.collapsed .nav-item span, .shell.collapsed .me-meta, .shell.collapsed .live-ind,
+.shell.collapsed .side-link span, .shell.collapsed .side-wordmark { display: none; }
+.shell.collapsed .side-logo { flex-direction: column; gap: 12px; padding: 2px 0 15px; }
+.shell.collapsed .side-mark { display: block; height: 30px; }
+.shell.collapsed .nav-item { justify-content: center; }
+.shell.collapsed .nav-badge { position: absolute; margin: -18px 0 0 22px; }
+.shell.collapsed .me-card { justify-content: center; padding: 6px; background: none; }
+.shell.collapsed .side-link { justify-content: center; }
 .side-logo img { height: 32px; width: auto; }
 /* the mark alone is for the collapsed rail — see the 900px query */
 .side-mark { display: none; }
@@ -551,6 +573,9 @@ svg { width: 18px; height: 18px; flex: none; }
 .form { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
 .form label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .form .opt { color: var(--ink-3); font-weight: 500; }
+/* a hint under a field, in both languages when the customer's papers are */
+.field-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 14px;
+  font-size: 11.5px; font-weight: 500; color: var(--st-amber); }
 .form input:not([type=checkbox]), .form select {
   border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 12px;
   outline: none; background: var(--surface); font-size: 13.5px; font-weight: 500; color: var(--ink);
@@ -986,6 +1011,7 @@ table.rx-edit input:focus { background: var(--brand-soft); box-shadow: inset 0 0
   .side { padding: 16px 9px; }
   .nav-item span, .me-meta, .live-ind, .side-link span { display: none; }
   .side-logo { justify-content: center; padding: 2px 0 15px; }
+  .side-toggle { display: none; }
   .side-wordmark { display: none; }
   .side-mark { display: block; height: 30px; }
   .nav-item { justify-content: center; }

@@ -257,6 +257,18 @@ qty). Lookup: store.lensRequestForOrder(orderId). No DB change needed.
 
 4.5 INSURANCE CLAIMS
 --------------------
+(2026-10-11, user) The printed sheet is an INVOICE ("Invoice" / "فاتورة").
+Header: English registration on the LEFT of the logo, Arabic on the RIGHT
+(.rc-head-row grid): "CR. 1032797 / P.O. Box: 3742 / Postal Code 112, Muscat /
+Sultanate of Oman" and "س.ت: 1032797 / ص.ب: 3742 / الرمز البريدي: 112، مسقط /
+سلطنة عُمان". Meta = 2 rows of 4: Date, Branch, Bill Number, Invoice No. |
+Customer Name (2 cols), Member ID, Insurance. Form: Insurance company (select
+from app_settings.insurers, required when the list isn't empty), Member ID
+(required), Full name (required) with an amber English + Arabic note under it
+(.field-note) that it must match the insurance card exactly. The Claims page
+has NO stat tiles (user removed "Claim receipts / Raised / Claimed / Paid by
+card"). Module title "Insurance Claims", button "New claim", "Print invoice".
+
 Fields: date, branch, bill no, customer (required), products (name + price,
 OMR with 3 decimals — 1 rial = 1000 baisa), Rx grid, payment cash|card.
 Refs IC-3001… from DB sequence. Total = sum of items (client computes;
@@ -317,12 +329,30 @@ Who sees what:
     weeks when more than one; default = this week, else the next one.
   - Public #/view-schedule: same viewer, no sign-in (anon may run
     schedule_view). User accepted that names + shifts + notes are public.
-  - The editor bridge never writes until the saved state has been read; a
-    failed read leaves it read-only (so built-in defaults can't overwrite).
+  - ROSTER IN TABLES (user, 2026-10-11: "I don't want it within the code"):
+    schedule_employees (id, name, optom, type, weekend_days text[], priority
+    text[] in order, position) and schedule_branches (code, name, city,
+    needs_optom, keep, split, days jsonb, position). The scheduler saves them
+    through save_schedule_roster(employees, branches) — one transaction,
+    deletes what's gone, refuses an empty roster. schedule_state keeps only
+    leave, special dates, part-timer days, pins, presets, week_start.
+  - scheduler.html holds NO staff or branches: its Dv/Oi lists were replaced
+    by FBD("branches"/"employees"), read from window.focSched.defaults =
+    schedule_defaults (the roster as it was on 2026-10-11) — that's what its
+    "Reset to defaults" restores. Opened on its own it starts empty.
+  - js/schedule.js fetches everything BEFORE creating the iframe (the bundle
+    reads defaults at load). If the fetch fails the frame is not opened at
+    all. Until schema-12 runs it reads/writes the old JSON columns instead.
+  - VIEWER FILTERS (user, 2026-10-11): branches/public get "All employees"
+    and "All branches" dropdowns above the frame. filterGrid() marks rows and
+    chips data-foc-hide inside the iframe (style injected, bundle untouched);
+    a MutationObserver re-applies after the scheduler renders. A person filter
+    keeps only their branches and hides "short N"; the note says when they
+    aren't on the week / at that branch.
   - Scheduler branch codes are its own list; Al Mouj is MOUJ like the portal
     (renamed from WAVE). SAL there = Salalah Gardens Mall.
-  - The scheduler's own "Reset to defaults" now resets the SHARED roster in
-    the database (its behaviour, unchanged; it asks for confirmation).
+  - The scheduler's own "Reset to defaults" resets the SHARED roster to
+    schedule_defaults (it asks for confirmation).
 
 4.6 SETTINGS (admin only)
 -------------------------
@@ -330,6 +360,9 @@ Who sees what:
   "Counted" pcs|box; "Brands from" brand group.
 - Brand groups: rename inline, drag groups, drag brands between groups
   (same brand may sit in several groups).
+- Insurance companies: the claim form's list (app_settings.insurers, pills
+  with ×, add form). Disabled with a note until schema-13 adds the column;
+  db.js reads app_settings with '*' and only writes insurers when present.
 - Branch access: set any location's 6-digit code via RPC set_branch_code
   (rejects weak codes like 123456, 000000, <3 distinct runs). Codes cannot
   be read back by anyone. Shows last sign-in.
@@ -387,18 +420,29 @@ Migrations are applied by hand, in order. Each file has a header with
                              publish_schedule_week(date); schedule_view() now
                              returns an ARRAY of published unfinished weeks
                              (frontend also accepts the old single object).
-                             >>> NOT YET APPLIED as of 2026-10-11 — user to run,
-                                 then reload the portal (an open old tab would
-                                 save WAVE back). <<<
+                             APPLIED by the user 2026-10-11 (confirmed live).
                              Presets' stored days were NOT date-fixed (there
                              were none); weeks saved before the fix keep leave
                              placed on the shifted days until regenerated.
+  schema-12-schedule-roster-tables.sql  schedule_employees, schedule_branches,
+                             schedule_defaults (+RLS can_schedule, touch
+                             trigger); copies the JSON roster in, COUNTS it,
+                             then drops schedule_state.employees/branches;
+                             save_schedule_roster(jsonb, jsonb).
+                             Dry-run 2026-10-11: 26 employees / 12 branches
+                             convert exactly.
+                             >>> NOT YET APPLIED as of 2026-10-11 — user to run. <<<
+  schema-13-claim-invoice-fields.sql  claims.member_id, claims.insurer,
+                             app_settings.insurers jsonb.
+                             >>> NOT YET APPLIED as of 2026-10-11 — user to run.
+                                 Until then a claim with a member ID won't save. <<<
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
 lens_request_lines, lens_request_events, claims, claim_items,
 claim_prescriptions, app_settings (1 row), lens_catalogue (1 row),
-schedule_state (1 row), schedule_weeks. All have RLS on. All but the two
+schedule_state (1 row), schedule_weeks, schedule_employees,
+schedule_branches, schedule_defaults (1 row). All have RLS on. None of the
 schedule tables are in the supabase_realtime publication.
 
 Column naming: DB uses *_code (origin_code, fitter_code, branch_code, by_code)
@@ -632,9 +676,13 @@ Rules:
 
 8.6 Layout
   Shell: grid 236px navy-gradient sidebar (brand-dark -> brand) + scrolling
-  content (padding 30px 36px 60px). Sidebar: logo, nav (active item = white
-  14% bg + inset white bar), amber count badges, "Live · synced" green ping,
-  location card, Sign out.
+  content (padding 30px 36px 60px). Sidebar: ☰ toggle + logo, nav (active
+  item = white 14% bg + inset white bar), amber count badges, "Live · synced"
+  green ping, location card, Sign out.
+  COLLAPSIBLE (user, 2026-10-11): the ☰ (.side-toggle, icons.menu) folds the
+  sidebar to the 74px icon rail (.shell.collapsed — same look as the ≤900px
+  rail; nav items get title tooltips). Remembered in localStorage
+  'focp.side.collapsed'. Hidden ≤900px, where the rail is forced.
   Breakpoints: 1181px+ (Fitting Log pills centred by formula),
   1180px (journey column hides), 900px (sidebar collapses to a
   74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
@@ -694,6 +742,9 @@ Rules:
   - Badge / "Need your action" (needsAction) leave out self-fit jobs still
     pending — they're waiting on lenses, not on anyone.
   - Error toasts reuse tone 'stock' (amber dot) — there is no dedicated error tone.
+  - The tutorial tour fills Member ID but has no step to pick an insurance
+    company; once the office adds companies, the claim save in the tour needs
+    a ['choose', '#f-ins', '<company>'] step.
 
  HOW TO TEST UI WITHOUT SIGNING IN: node is NOT installed on this machine.
   Copy js/ css/ img/ to the scratchpad, add a test.html that imports
@@ -719,6 +770,13 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Roster moved into schedule_employees / schedule_branches /
+             schedule_defaults (schema-12, NOT YET APPLIED); scheduler.html has
+             no staff list any more. Branch/public schedule filters by
+             employee and branch. Collapsible sidebar (☰). Claims: printed
+             sheet is an Invoice with bilingual CR/address, Member ID, insurer
+             (Settings → Insurance companies), name-must-match note; stat tiles
+             removed (schema-13, NOT YET APPLIED). schema-11 confirmed applied.
  2026-10-11  Publish: editors' weeks are drafts until Publish; branches and
              the public see published, unfinished weeks (schema-11, NOT YET
              APPLIED). Scheduler: week arrows, local-time date fix, WAVE ->

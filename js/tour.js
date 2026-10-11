@@ -154,11 +154,12 @@ const seeb = [
   ['reset'],
 
   // ── insurance claims ──
-  ['caption', 'Insurance Claims', 'A printable receipt for the customer’s insurer'],
+  ['caption', 'Insurance Claims', 'A printable invoice for the customer’s insurer'],
   nav('claims'),
   beat(900),
-  ['tap', 'New claim receipt'],
+  ['tap', 'New claim'],
   ['type', '#f-bill', '{seebClaim}'],
+  ['type', '#f-member', 'DEMO-MEMBER-1'],
   ['type', '#f-cust', 'Salim Al Rawahi'],
   ['caption', 'What they bought, and the price in rials'],
   ['type', '[data-it="name"][data-i="0"]', 'Ray-Ban RB5154 frame'],
@@ -407,7 +408,7 @@ const warehouse = [
   beat(1400),
   ['tap', '.drawer [data-close]'],
 
-  ['caption', 'Every branch’s and clinic’s claim receipts, in one list'],
+  ['caption', 'Every branch’s and clinic’s claims, in one list'],
   nav('claims'),
   beat(900),
   ['focus', '#c-list'],

@@ -559,6 +559,20 @@ export const store = {
     return saveSettings({ module: 'settings', title: `${brand} → ${toGroup}` });
   },
 
+  // ── Insurance companies: the list the claim form offers ──
+  addInsurer(name) {
+    name = String(name).trim();
+    const list = state.settings.insurers ?? (state.settings.insurers = []);
+    if (!name || list.some(n => n.toLowerCase() === name.toLowerCase())) return Promise.resolve(null);
+    list.push(name);
+    return saveSettings({ module: 'settings', title: `${name} added to the insurance companies` });
+  },
+
+  removeInsurer(name) {
+    state.settings.insurers = (state.settings.insurers ?? []).filter(n => n !== name);
+    return saveSettings({ module: 'settings', title: `${name} removed from the insurance companies` });
+  },
+
   addCategory({ name, needsBrand = true, needsAudience = true, needsQty = true, unit = 'pcs', brandGroup }) {
     name = String(name).trim();
     if (!name || state.settings.categories.some(c => c.name === name)) return Promise.resolve(null);

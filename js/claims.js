@@ -1,4 +1,4 @@
-// ── Module 5: Insurance Claim Receipts — compose, preview, print ──
+// ── Module 5: Insurance Claims — compose, preview, print the invoice ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
   RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly,
@@ -26,7 +26,7 @@ const setPath = (obj, path, val) => {
 };
 const payLabel = p => PAYMENT_TYPES.find(x => x.value === p)?.label ?? 'Cash';
 
-// ── The receipt sheet ──────────────────────────────────────────────────────
+// ── The invoice sheet ──────────────────────────────────────────────────────
 // One stylesheet and one markup builder serve both the on-screen preview and
 // the printed page, so the preview cannot drift from what comes out.
 export const RECEIPT_CSS = `
@@ -51,7 +51,14 @@ export const RECEIPT_CSS = `
 .rc-body { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 272mm; }
 
 .rc-head { text-align: center; padding-bottom: 3.5mm; border-bottom: 2px solid var(--r-navy); }
-.rc-head img { width: 62mm; height: auto; display: block; margin: 0 auto; }
+/* The company's registration and address: English on the left of the logo,
+   Arabic on the right, each reading from its own edge of the page. */
+.rc-head-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 5mm; }
+.rc-head img { width: 56mm; height: auto; display: block; margin: 0 auto; }
+.rc-co { font-size: 7.6pt; line-height: 1.5; color: var(--r-navy); font-weight: 600; }
+.rc-co span { display: block; }
+.rc-co-en { text-align: left; }
+.rc-co-ar { text-align: right; direction: rtl; font-size: 8pt; }
 .rc-title {
   margin-top: 2.5mm; font-size: 12.5pt; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--r-navy);
@@ -59,12 +66,13 @@ export const RECEIPT_CSS = `
 .rc-title span { display: block; font-size: 7pt; letter-spacing: .16em; color: var(--r-red); margin-top: .8mm; }
 
 .rc-meta {
-  display: grid; grid-template-columns: .95fr 1.1fr .9fr .85fr 1.5fr;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3.5mm; margin: 4.5mm 0 5mm;
 }
 .rc-meta > div { border-bottom: 1px solid var(--r-line); padding-bottom: 1.6mm; min-width: 0; }
 .rc-meta dt { font-size: 6.8pt; letter-spacing: .09em; text-transform: uppercase; color: var(--r-muted); font-weight: 700; margin: 0; }
 .rc-meta dd { margin: 1mm 0 0; font-size: 9.5pt; font-weight: 600; overflow-wrap: anywhere; }
+.rc-meta .rc-wide { grid-column: span 2; }
 
 .rc-sec {
   font-size: 7.5pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
@@ -175,16 +183,32 @@ export function receiptHTML(c) {
   <div class="rc-mark"><img src="${LOGO_MARK}" alt=""></div>
   <div class="rc-body">
     <header class="rc-head">
-      <img src="${LOGO_WIDE}" alt="Finland Optical Center">
-      <div class="rc-title">Insurance Claim Receipt<span>&#1573;&#1610;&#1589;&#1575;&#1604; &#1605;&#1591;&#1575;&#1604;&#1576;&#1577; &#1578;&#1571;&#1605;&#1610;&#1606;</span></div>
+      <div class="rc-head-row">
+        <div class="rc-co rc-co-en">
+          <span>CR. 1032797</span>
+          <span>P.O. Box: 3742</span>
+          <span>Postal Code 112, Muscat</span>
+          <span>Sultanate of Oman</span>
+        </div>
+        <img src="${LOGO_WIDE}" alt="Finland Optical Center">
+        <div class="rc-co rc-co-ar" lang="ar">
+          <span>س.ت: 1032797</span>
+          <span>ص.ب: 3742</span>
+          <span>الرمز البريدي: 112، مسقط</span>
+          <span>سلطنة عُمان</span>
+        </div>
+      </div>
+      <div class="rc-title">Invoice<span lang="ar">فاتورة</span></div>
     </header>
 
     <dl class="rc-meta">
       <div><dt>Date</dt><dd>${esc(fmtDay(c.date))}</dd></div>
       <div><dt>Branch</dt><dd>${esc(locName(c.branch))}</dd></div>
       <div><dt>Bill Number</dt><dd>${esc(c.billNo || '—')}</dd></div>
-      <div><dt>Receipt No.</dt><dd>${esc(c.ref)}</dd></div>
-      <div><dt>Customer Name</dt><dd>${esc(c.customer || '—')}</dd></div>
+      <div><dt>Invoice No.</dt><dd>${esc(c.ref)}</dd></div>
+      <div class="rc-wide"><dt>Customer Name</dt><dd>${esc(c.customer || '—')}</dd></div>
+      <div><dt>Member ID</dt><dd>${esc(c.memberId || '—')}</dd></div>
+      <div><dt>Insurance</dt><dd>${esc(c.insurer || '—')}</dd></div>
     </dl>
 
     <h3 class="rc-sec">Products</h3>
@@ -226,7 +250,7 @@ export function receiptHTML(c) {
 
 function receiptDoc(c) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>${esc(c.ref)} — Insurance Claim Receipt</title>
+<title>${esc(c.ref)} — Invoice</title>
 <style>
   html, body { margin: 0; padding: 0; background: #e9edf3; }
   .receipt { margin: 0 auto; box-shadow: 0 2px 18px rgba(0,0,0,.14); }
@@ -288,26 +312,15 @@ export function claimsView(me) {
     if (isAdmin && ui.branch !== 'all') list = list.filter(c => c.branch === ui.branch);
     if (ui.q) {
       const q = ui.q.toLowerCase();
-      list = list.filter(c => [c.ref, c.customer, c.billNo, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
+      list = list.filter(c => [c.ref, c.customer, c.billNo, c.memberId, c.insurer, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
         .some(v => String(v ?? '').toLowerCase().includes(q)));
     }
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  function statsHTML() {
-    const all = store.claimsFor(me.code);
-    const month = all.filter(c => Date.now() - c.createdAt < 30 * 864e5);
-    const sum = l => money(l.reduce((t, c) => t + claimTotal(c), 0));
-    const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
-    return t(all.length, 'Claim receipts')
-      + t(month.length, 'Raised · 30d', 'stat-brand')
-      + t(sum(month), `Claimed · 30d (${CURRENCY})`, 'stat-brand')
-      + t(all.filter(c => c.payment === 'card').length, 'Paid by card');
-  }
-
   function rowsHTML() {
     const list = visible();
-    if (!list.length) return `<div class="empty">${icons.receipt}<p>No claim receipts yet — create one to print.</p></div>`;
+    if (!list.length) return `<div class="empty">${icons.receipt}<p>No claims yet — create one to print its invoice.</p></div>`;
     return list.map(c => {
       const n = (c.items ?? []).length;
       return `
@@ -317,7 +330,7 @@ export function claimsView(me) {
             <span class="row-cust">${esc(c.customer || '—')}</span>
             ${isAdmin ? locChip(c.branch) : ''}
           </div>
-          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))} · Bill ${esc(c.billNo || '—')} · ${n} item${n === 1 ? '' : 's'}</span></div>
+          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))}${c.insurer ? ` · ${esc(c.insurer)}` : ''} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
         </div>
         <div class="row-units"><b>${money(claimTotal(c))}</b> ${CURRENCY}</div>
         <div class="row-status"><span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span></div>
@@ -335,15 +348,15 @@ export function claimsView(me) {
     if (!c) return;
     layer = openLayer('modal', () => {
       const cur = store.claim(id);
-      if (!cur) return `<div class="pad">This receipt no longer exists.</div>`;
+      if (!cur) return `<div class="pad">This claim no longer exists.</div>`;
       return `
       <div class="dw-head">
-        <div><div class="dw-kicker">Claim receipt</div><h2>${esc(cur.ref)} · ${esc(cur.customer || '—')}</h2></div>
+        <div><div class="dw-kicker">Invoice</div><h2>${esc(cur.ref)} · ${esc(cur.customer || '—')}</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="rc-stage"><div class="rc-scale">${receiptHTML(cur)}</div></div>
       <div class="modal-foot rc-actions">
-        <button class="btn btn-primary" data-do-print>${icons.printer} Print receipt</button>
+        <button class="btn btn-primary" data-do-print>${icons.printer} Print invoice</button>
         ${viewOnly ? '' : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
         <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
         <button class="btn btn-ghost" data-close>Close</button>
@@ -360,7 +373,7 @@ export function claimsView(me) {
       if (e.target.closest('[data-edit]')) { layer.close(); return composer(store.claim(id)); }
       if (e.target.closest('[data-del]')) {
         const cur = store.claim(id);
-        if (!cur || !confirm(`Delete claim receipt ${cur.ref}? This cannot be undone.`)) return;
+        if (!cur || !confirm(`Delete claim ${cur.ref}? This cannot be undone.`)) return;
         store.removeClaim(id, me.code);
         layer.close();
       }
@@ -384,16 +397,21 @@ export function claimsView(me) {
     const draft = existing
       ? {
         date: existing.date, branch: existing.branch, billNo: existing.billNo,
-        customer: existing.customer, payment: existing.payment,
+        customer: existing.customer, memberId: existing.memberId ?? '', insurer: existing.insurer ?? '',
+        payment: existing.payment,
         items: existing.items.map(i => ({ ...i })),
         rx: JSON.parse(JSON.stringify(normaliseRx(existing.rx))),
       }
       : {
         date: today(), branch: isAdmin ? BRANCHES[0].code : me.code, billNo: '', customer: '',
-        payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
+        memberId: '', insurer: '', payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
       };
 
     const total = () => draft.items.reduce((t, i) => t + (Number(i.price) || 0), 0);
+    // The insurers the office has set up, and this claim's own if it has since
+    // been taken off the list, so editing never silently changes it.
+    const insurers = store.settings.insurers ?? [];
+    const insurerOptions = draft.insurer && !insurers.includes(draft.insurer) ? [...insurers, draft.insurer] : insurers;
 
     const itemRow = (it, i) => `
       <div class="ci-row">
@@ -404,7 +422,7 @@ export function claimsView(me) {
 
     layer = openLayer('modal', () => `
       <div class="dw-head">
-        <div><div class="dw-kicker">${existing ? 'Edit claim' : 'New claim'}</div><h2>Insurance claim receipt</h2></div>
+        <div><div class="dw-kicker">${existing ? 'Edit claim' : 'New claim'}</div><h2>Insurance claim</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
@@ -417,8 +435,21 @@ export function claimsView(me) {
           </label>
         </div>
         <div class="grid2">
+          <label>Insurance company
+            <select id="f-ins">
+              <option value="">${insurers.length ? 'Choose the insurance company…' : 'None set up yet — ask the office'}</option>
+              ${insurerOptions.map(n => `<option ${draft.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
+        </div>
+        <label>Full name<input id="f-cust" placeholder="Full name" value="${esc(draft.customer)}">
+          <span class="field-note">Must be exactly the name on the insurance card.
+            <span lang="ar" dir="rtl">يجب أن يكون الاسم مطابقاً تماماً للاسم المكتوب في بطاقة التأمين.</span></span>
+        </label>
+        <div class="grid2">
           <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
-          <label>Customer name<input id="f-cust" placeholder="Full name" value="${esc(draft.customer)}"></label>
+          <span></span>
         </div>
 
         <div class="fieldset">
@@ -472,7 +503,7 @@ export function claimsView(me) {
 
         <div class="form-foot">
           <button class="btn btn-ghost" data-close>Cancel</button>
-          <button class="btn btn-primary" data-save>${icons.check} ${existing ? 'Save changes' : 'Create receipt'}</button>
+          <button class="btn btn-primary" data-save>${icons.check} ${existing ? 'Save changes' : 'Create invoice'}</button>
         </div>
       </div>`, { onClose: () => { layer = null; } });
 
@@ -482,6 +513,8 @@ export function claimsView(me) {
       draft.branch = el.querySelector('#f-branch').value;
       draft.billNo = el.querySelector('#f-bill').value;
       draft.customer = el.querySelector('#f-cust').value;
+      draft.memberId = el.querySelector('#f-member').value;
+      draft.insurer = el.querySelector('#f-ins').value;
       draft.payment = el.querySelector('#f-pay').value;
     };
     const showTotal = () => { el.querySelector('#f-total').textContent = `${money(total())} ${CURRENCY}`; };
@@ -509,9 +542,11 @@ export function claimsView(me) {
       if (e.target.closest('[data-save]')) {
         sync();
         const items = draft.items.filter(i => (i.name || '').trim() || Number(i.price));
-        if (!draft.customer.trim()) return toast({ title: 'Customer name is required', tone: 'stock' });
+        if (insurers.length && !draft.insurer) return toast({ title: 'Choose the insurance company', tone: 'stock' });
+        if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
+        if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
-        const fields = { ...draft, customer: draft.customer.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
+        const fields = { ...draft, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
         const save = e.target.closest('[data-save]');
         save.disabled = true;
         const was = save.innerHTML;
@@ -532,14 +567,13 @@ export function claimsView(me) {
       <style>${RECEIPT_CSS}</style>
       <header class="mod-head">
         <div>
-          <h1>Insurance Claim Receipts</h1>
-          <p class="mod-sub">Raise a printable claim receipt with products, prescription and payment</p>
+          <h1>Insurance Claims</h1>
+          <p class="mod-sub">Raise a printable invoice for the insurer, with products, prescription and payment</p>
         </div>
-        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} New claim receipt</button>`}
+        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} New claim</button>`}
       </header>
-      <section class="stats" id="c-stats">${statsHTML()}</section>
       <section class="toolbar">
-        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search receipt, customer, bill…" value="${esc(ui.q)}"></div>
+        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, insurer, bill…" value="${esc(ui.q)}"></div>
         ${isAdmin ? `<select class="sel" id="c-branch"><option value="all">All branches</option>${
           BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')
         }</select>` : ''}
@@ -551,9 +585,7 @@ export function claimsView(me) {
   function refresh() {
     const a = document.activeElement;
     const keep = a?.id === 'c-q' ? a.selectionStart : null;
-    const s = root.querySelector('#c-stats');
     const l = root.querySelector('#c-list');
-    if (s) s.innerHTML = statsHTML();
     if (l) l.innerHTML = rowsHTML();
     if (keep != null) {
       const f = root.querySelector('#c-q');

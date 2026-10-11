@@ -64,10 +64,10 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 
 | On screen | Caption |
 |---|---|
-| Taps **New claim receipt**; bill number, **Salim Al Rawahi** | Insurance Claims. *A printable receipt for the customer's insurer* |
+| Taps **New claim**; member ID, full name **Salim Al Rawahi**, bill number | Insurance Claims. *A printable invoice for the customer's insurer* |
 | Two products with prices; zoom on the total | What they bought, and the price in rials · The total adds itself up |
 | Zoom: the prescription grid; both eyes typed in, plus Add | The prescription — distance and near, for each eye |
-| Payment: Card; taps **Create receipt**; the A4 receipt appears | Ready to print and sign. *Clinics raise their claims exactly the same way* |
+| Payment: Card; taps **Create invoice**; the A4 invoice appears | Ready to print and sign. *Clinics raise their claims exactly the same way* |
 
 ## Chapter 2: Al Mouj, a fitting centre (about 1½ min)
 
@@ -135,7 +135,7 @@ Card: *"Sees every branch, fulfils stock requests and runs the settings."*
 |---|---|
 | Fitting Log for the whole network; zoom on the branch filter | The office sees every frame across the network · Narrow it to one branch, or to one fitting centre |
 | Queue: opens Seeb's request; **Mark completed** | The request queue — Seeb's request is waiting · Mark completed when it ships — Seeb sees it straight away |
-| Insurance Claims list | Every branch's and clinic's claim receipts, in one list |
+| Insurance Claims list | Every branch's and clinic's claims, in one list |
 | Settings: categories, brand groups; adds then removes the brand "Demo Optics" | Settings — what branches can request · Brand groups — which brands each category offers · Every branch's request form offers it at once |
 | Zoom: Branch access. Nothing is typed | Branch access — set or change any location's code. *Codes are never shown, only replaced* |
 

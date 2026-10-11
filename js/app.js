@@ -251,14 +251,21 @@ function badgeCounts(me) {
   return { fitting, stock, lens };
 }
 
+// The sidebar folds to its icon rail and back. Remembered per browser — a
+// convenience, so a blocked or empty storage just means it starts open.
+const SIDE_KEY = 'focp.side.collapsed';
+const sideCollapsed = () => { try { return localStorage.getItem(SIDE_KEY) === '1'; } catch { return false; } };
+const rememberSide = on => { try { localStorage.setItem(SIDE_KEY, on ? '1' : '0'); } catch { /* fine */ } };
+
 function renderShell() {
   teardownShell();
   const me = store.session;
   const mod = currentModule();
   app.innerHTML = `
-    <div class="shell">
+    <div class="shell ${sideCollapsed() ? 'collapsed' : ''}">
       <nav class="side">
         <div class="side-logo">
+          <button class="side-toggle" id="side-toggle" title="Fold the menu" aria-label="Fold the menu">${icons.menu}</button>
           <img class="side-wordmark" src="img/foc-portal-white.png" alt="FOC Portal">
           <img class="side-mark" src="img/foc-portal-mark-white.png" alt="FOC Portal">
         </div>
@@ -281,6 +288,12 @@ function renderShell() {
     </div>`;
 
   renderNav(me, mod);
+  app.querySelector('#side-toggle').addEventListener('click', () => {
+    const shell = app.querySelector('.shell');
+    const on = !shell.classList.contains('collapsed');
+    shell.classList.toggle('collapsed', on);
+    rememberSide(on);
+  });
   app.querySelector('#signout').addEventListener('click', () => {
     auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
   });
@@ -309,7 +322,7 @@ function renderNav(me, active) {
     const label = (me.role === 'admin' || readOnly(me.role)) && m.adminLabel ? m.adminLabel : m.label;
     const icon = icons[me.role === 'admin' && m.adminIcon ? m.adminIcon : m.icon];
     return `
-      <a class="nav-item ${active === key ? 'on' : ''}" href="#/${key}">
+      <a class="nav-item ${active === key ? 'on' : ''}" href="#/${key}" title="${esc(label)}">
         ${icon}<span>${label}</span>
         ${b[key] ? `<em class="nav-badge">${b[key]}</em>` : ''}
       </a>`;

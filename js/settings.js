@@ -79,7 +79,15 @@ export function settingsView(me) {
     }).join('');
   }
 
-  // Reads through a database function that checks the caller is the warehouse,
+  function insurersHTML() {
+    if (!store.settings.hasInsurers) return `<p class="muted sm">Waiting on the database update (schema-13) before companies can be added.</p>`;
+    const list = store.settings.insurers ?? [];
+    if (!list.length) return `<div class="empty">${icons.receipt}<p>No insurance companies yet — add the first below.</p></div>`;
+    return `<div class="set-brands">${list.map(n => `
+      <span class="set-brand" style="cursor:default">${esc(n)}<button class="brand-x" data-del-ins="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`;
+  }
+
+  // Reads through a database function that checks the caller is the office,
   // so a branch calling it directly gets nothing back.
   async function loadAccess() {
     const host = root.querySelector('#set-access');
@@ -162,6 +170,19 @@ export function settingsView(me) {
 
       <section class="set-card">
         <div class="set-card-head">
+          <h2>${icons.receipt} Insurance companies</h2>
+          <p class="muted">The list a branch picks from on every insurance claim. Taking one off the
+             list leaves the claims already made for it as they are.</p>
+        </div>
+        <div id="set-ins">${insurersHTML()}</div>
+        <form class="set-add" id="add-ins">
+          <input name="name" placeholder="New insurance company" required ${store.settings.hasInsurers ? '' : 'disabled'}>
+          <button class="btn btn-primary btn-sm" type="submit" ${store.settings.hasInsurers ? '' : 'disabled'}>${icons.plus} Add company</button>
+        </form>
+      </section>
+
+      <section class="set-card">
+        <div class="set-card-head">
           <h2>${icons.logout} Branch access</h2>
           <p class="muted">Set the 6-digit code each branch signs in with. Codes are stored
              hashed on the server — nobody, including you, can read an existing one, so
@@ -197,8 +218,10 @@ export function settingsView(me) {
 
     const c = root.querySelector('#set-cats');
     const g = root.querySelector('#set-groups');
+    const ins = root.querySelector('#set-ins');
     if (c) c.innerHTML = categoriesHTML();
     if (g) g.innerHTML = groupsHTML();
+    if (ins) ins.innerHTML = insurersHTML();
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
     const sel = root.querySelector('#add-cat select[name="brandGroup"]');
@@ -233,6 +256,8 @@ export function settingsView(me) {
         });
       } else if (f.id === 'add-group') {
         store.addBrandGroup(val('name'));
+      } else if (f.id === 'add-ins') {
+        store.addInsurer(val('name'));
       } else if (f.dataset.addBrand) {
         store.addBrand(f.dataset.addBrand, val('name'));
       } else if (f.dataset.set) {
@@ -251,6 +276,8 @@ export function settingsView(me) {
     });
 
     root.addEventListener('click', e => {
+      const di = e.target.closest('[data-del-ins]');
+      if (di) return store.removeInsurer(di.dataset.delIns);
       const dc = e.target.closest('[data-del-cat]');
       if (dc) return store.removeCategory(dc.dataset.delCat);
       const dg = e.target.closest('[data-del-group]');
