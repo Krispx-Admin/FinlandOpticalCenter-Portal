@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --  12 · The roster in tables of its own, and nothing of it left in the code
---  STATUS: NOT YET APPLIED — run it in the Supabase SQL editor, all at once
+--  STATUS: applied 2026-10-11 (by Claude, at the user's request)
 --
 --  The scheduler's staff and branches were one JSON document inside
 --  schedule_state, and a copy of the starting roster was written into

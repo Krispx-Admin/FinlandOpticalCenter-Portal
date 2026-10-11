@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --  13 · An insurance claim records the member ID and the insurance company
---  STATUS: NOT YET APPLIED — run it in the Supabase SQL editor
+--  STATUS: applied 2026-10-11 (by Claude, at the user's request)
 --
 --  The printed sheet is now an Invoice, and it carries the customer's member
 --  ID and the insurance company the claim is for. The company is picked from a
