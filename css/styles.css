@@ -783,7 +783,11 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 }
 .set-back:hover { background: var(--brand-soft); }
 .set-back svg { width: 15px; height: 15px; transform: rotate(180deg); }
-.set-page-head + .set-card .set-card-head h2 { display: none; }
+/* a page of one section: the page title already names it */
+.set-single .set-card-head h2 { display: none; }
+.set-group { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--ink-3); margin: 10px 0 0 4px; }
+.set-group:first-child { margin-top: 0; }
 @media (max-width: 640px) { .set-entry-sum { display: none; } }
 
 /* Settings › Tabs — one row per sidebar tab with an on/off switch */

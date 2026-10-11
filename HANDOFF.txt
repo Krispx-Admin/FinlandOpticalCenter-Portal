@@ -410,10 +410,17 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 
 4.6 SETTINGS (admin only)
 -------------------------
-Opens on a LIST (settings.js PAGES: Tabs, Categories, Brand groups, Direct
-Insurance — insurers, Branch access) — icon, title, one-line description, a
-live summary ("2 under maintenance", "5 categories") and a chevron. Clicking
-one shows only that section (SECTIONS[key]) under "‹ All settings" + its title.
+Opens on a LIST (settings.js PAGES), grouped (user, 2026-10-11):
+  GENERAL  — Tabs (on/off), Branch access
+  BY TAB   — Stock Requests (Categories + Brand groups on one page),
+             Direct Insurance (Insurers)
+  One page per sidebar tab that HAS settings; Fitting Log, Lens Stock,
+  Insurance Claims and Schedule have none yet — add a PAGES entry (group
+  'By tab', the tab's icon/title, sections: [...]) when they do.
+Each entry: icon, title, one-line description, live summary ("2 under
+maintenance", "5 categories · 3 brand groups"), chevron. Clicking one shows its
+sections (SECTIONS[key] for each of page.sections) under "‹ All settings" + the
+page title; a one-section page hides the card's own h2 (.set-single).
 `page` is in-memory only (starts on the list each visit). wire() runs once at
 mount; refresh() redraws whichever parts exist; loadAccess() runs when Branch
 access is opened.
@@ -866,6 +873,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Settings list grouped General / By tab; Categories + Brand groups
+             merged into one "Stock Requests" page; insurers page is "Direct
+             Insurance".
  2026-10-11  Portal drawn at 90% on desktops (user tried 80%, chose 90%; kept):
              top of styles.css: @media (min-width:1200px) { html { zoom:.9 } }
              + --vh = 1vh/.9, so screen-height sizes (invoice preview, schedule

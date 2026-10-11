@@ -148,22 +148,22 @@ export function settingsView(me) {
   // Which one is open is only this screen's state — it starts on the list.
   let page = null;
   const count = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+  // Grouped: what applies to the whole portal, then one page per sidebar tab
+  // that has something to set — named and drawn like the tab itself. A page
+  // may hold several sections (Stock Requests: categories and brand groups).
   const PAGES = [
-    { key: 'tabs',   icon: 'menu',   title: 'Tabs',
+    { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'],
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
-    { key: 'cats',   icon: 'tag',    title: 'Categories',
-      desc: 'What branches can request, the fields each needs, how it is counted',
-      sum: () => count(store.settings.categories.length, 'category', 'categories') },
-    { key: 'groups', icon: 'box',    title: 'Brand groups',
-      desc: 'The lists of brands each category offers',
-      sum: () => count(groups().length, 'group') },
-    { key: 'ins',    icon: 'shield', title: 'Direct Insurance — insurers',
-      desc: 'The insurers a branch picks from for an insurance customer',
-      sum: () => count((store.settings.insurers ?? []).length, 'insurer') },
-    { key: 'access', icon: 'logout', title: 'Branch access',
+    { key: 'access', group: 'General', icon: 'logout', title: 'Branch access', sections: ['access'],
       desc: 'The 6-digit code each branch signs in with',
       sum: () => '' },
+    { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'],
+      desc: 'Categories — the fields each needs, how it is counted — and the brand groups they offer',
+      sum: () => `${count(store.settings.categories.length, 'category', 'categories')} · ${count(groups().length, 'brand group')}` },
+    { key: 'direct', group: 'By tab',  icon: 'shield', title: 'Direct Insurance', sections: ['ins'],
+      desc: 'The insurers a branch picks from for an insurance customer',
+      sum: () => count((store.settings.insurers ?? []).length, 'insurer') },
   ];
 
   const SECTIONS = {
@@ -208,7 +208,7 @@ export function settingsView(me) {
     ins: () => `
       <section class="set-card">
         <div class="set-card-head">
-          <h2>${icons.shield} Direct Insurance — insurers</h2>
+          <h2>${icons.shield} Insurers</h2>
           <p class="muted">The insurers a branch picks from when it records an insurance customer.
              Taking one off leaves the customers already recorded with it as they are.</p>
         </div>
@@ -231,13 +231,16 @@ export function settingsView(me) {
   };
 
   function listHTML() {
-    return `<div class="set-index">${PAGES.map(pg => `
+    const heads = [...new Set(PAGES.map(pg => pg.group))];
+    return `<div class="set-index">${heads.map(h => `
+      <h2 class="set-group">${esc(h)}</h2>
+      ${PAGES.filter(pg => pg.group === h).map(pg => `
       <button class="set-entry" data-page="${pg.key}">
         <span class="set-entry-ico">${icons[pg.icon]}</span>
         <span class="set-entry-txt"><b>${esc(pg.title)}</b><span>${esc(pg.desc)}</span></span>
         <span class="set-entry-sum">${esc(pg.sum())}</span>
         ${icons.chevronRight}
-      </button>`).join('')}</div>`;
+      </button>`).join('')}`).join('')}</div>`;
   }
 
   function render() {
@@ -249,7 +252,7 @@ export function settingsView(me) {
           <h1>${esc(pg.title)}</h1>
         </div>
       </header>
-      ${SECTIONS[pg.key]()}` : `
+      <div class="${pg.sections.length === 1 ? 'set-single' : ''}">${pg.sections.map(s => SECTIONS[s]()).join('')}</div>` : `
       <header class="mod-head">
         <div>
           <h1>Settings</h1>
@@ -257,7 +260,7 @@ export function settingsView(me) {
         </div>
       </header>
       ${listHTML()}`;
-    if (page === 'access') loadAccess();
+    if (pg?.sections.includes('access')) loadAccess();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group
