@@ -283,7 +283,7 @@ Branch dropdown. Same for Direct Insurance.
 
 Fields: date, branch, bill no, customer (required), products (name + price,
 OMR with 3 decimals — 1 rial = 1000 baisa), Rx grid, payment cash|card.
-Refs IC-3001… from DB sequence. Total = sum of items (client computes;
+Refs INV-3001… from DB sequence claim_seq (was IC- until schema-15; Direct Insurance = DI-…). Total = sum of items (client computes;
 DB trigger also maintains claims.total).
 Rx grid: rows D (Distance) and N (Near); OD and OS each SPH · CYL · AXIS · V.A.;
 one ADD per eye across the bottom. 9 columns, colgroup + table-layout:fixed
@@ -476,6 +476,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              employee_name; trigger claims_ref_kind (DI- refs);
                              insurers seeded OQIC/LIVA/Mednet; staff_list() RPC
                              for authenticated. APPLIED 2026-10-11 by Claude.
+  schema-15-invoice-numbers.sql  claims.ref default 'INV-'||nextval(claim_seq);
+                             IC-3003..3005 renamed INV-…; claims_ref_kind turns
+                             INV-/IC- into DI- for direct. APPLIED 2026-10-11.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -817,6 +820,7 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Claim numbers IC- -> INV- (schema-15, applied; 3 existing renamed).
  2026-10-11  Sidebar wordmark on trial: foc-portal-white-v2.png (bigger PORTAL);
              the old one is kept to switch back.
  2026-10-11  Claims + Direct Insurance: branch is fixed to the signed-in branch

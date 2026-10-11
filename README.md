@@ -98,8 +98,9 @@ Applied in order:
 | `supabase/schema-12-schedule-roster-tables.sql` | the roster in `schedule_employees` / `schedule_branches`, its defaults in `schedule_defaults`, saved by `save_schedule_roster()` — none of it in the code |
 | `supabase/schema-13-claim-invoice-fields.sql` | `claims.member_id`, `claims.insurer`, `app_settings.insurers` |
 | `supabase/schema-14-direct-insurance.sql` | `claims.kind`, the salesperson columns, DI- numbering, the insurers seeded, `staff_list()` |
+| `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
-Reference numbers (`SR-…`, `LR-…`, `IC-…`) are allocated by Postgres sequences
+Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences
 as part of the insert, so two branches acting at the same instant cannot be
 given the same one. A fitting order's reference is the branch's own bill
 number and is unique per branch, not globally.
