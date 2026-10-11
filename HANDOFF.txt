@@ -853,6 +853,9 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Invoice preview fits the whole A4 page on screen: the modal is
+             the screen's height (header + buttons fixed), fitSheet scales the
+             sheet by min(width, height), re-fits on window resize.
  2026-10-11  Settings › Tabs: the office switches sidebar tabs off; branches
              see them greyed, "— under maintenance" in italics, unopenable
              (moved off live); the office can still open them. schema-17.

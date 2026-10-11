@@ -981,12 +981,20 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* ── Insurance claim receipts ────────────────────────────────────────────── */
 /* A4 preview: the sheet is a fixed 210mm, scaled by JS to fit the modal. */
 /* .modal sets width:min(760px,100%), so widening needs width — not max-width. */
-.modal.modal-sheet { width: min(900px, 100%); max-width: none; padding-bottom: 0; }
+/* The preview fills the screen's height, header and buttons always in view,
+   and the page is scaled (fitSheet) so the whole of it shows in between. */
+.layer-overlay.is-modal:has(.modal-sheet) { padding: 3vh 16px; align-items: center; }
+.modal.modal-sheet {
+  width: min(900px, 100%); max-width: none; padding-bottom: 0;
+  height: 94vh; height: calc(100dvh - 6vh); display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-sheet .dw-head, .modal-sheet .rc-actions { flex: none; }
 .rc-stage {
   background: var(--page); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-  padding: 16px; max-height: 68vh; overflow: auto; scrollbar-gutter: stable;
+  padding: 16px; flex: 1 1 auto; min-height: 0; overflow: hidden;
 }
-.rc-scale { transform-origin: top left; }
+.rc-scale { margin: 0 auto; overflow: hidden; }
+.rc-scale .receipt { transform-origin: top left; }
 .rc-stage .receipt { box-shadow: 0 2px 16px rgba(19,48,86,.16); }
 .rc-actions { padding: 14px 24px 18px; justify-content: flex-start; flex-wrap: wrap; }
 .rc-actions .btn:last-child { margin-left: auto; }

@@ -560,11 +560,14 @@ export function claimsView(me, kind = 'claim') {
         <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
         <button class="btn btn-ghost" data-close>Close</button>
       </div>`;
-    }, { onClose: () => { layer = null; } });
+    }, { onClose: () => { layer = null; window.removeEventListener('resize', refit); } });
     layer.el.classList.add('modal-sheet');
+    const el = layer.el;
+    const refit = () => fitSheet(el);
+    window.addEventListener('resize', refit);
     fitSheet(layer.el);
     layer.el.querySelectorAll('.receipt img').forEach(img => {
-      if (!img.complete) img.addEventListener('load', () => fitSheet(layer.el), { once: true });
+      if (!img.complete) img.addEventListener('load', refit, { once: true });
     });
     layer.el.addEventListener('click', e => {
       if (e.target.closest('[data-close]')) return layer.close();
@@ -579,15 +582,19 @@ export function claimsView(me, kind = 'claim') {
     });
   }
 
-  // The sheet is a fixed 210mm wide, so scale it down to whatever room the
-  // modal actually has rather than letting it overflow.
+  // The sheet is a fixed A4, so scale it down until the whole page fits the
+  // room the modal has — width and height — and can be seen at a glance.
   function fitSheet(el) {
     const stage = el.querySelector('.rc-stage');
     const scale = el.querySelector('.rc-scale');
     const sheet = scale?.querySelector('.receipt');
     if (!stage || !sheet) return;
-    const s = Math.min(1, (stage.clientWidth - 2) / sheet.offsetWidth);
-    scale.style.transform = `scale(${s})`;
+    const cs = getComputedStyle(stage);
+    const w = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const s = Math.min(1, w / sheet.offsetWidth, h / sheet.offsetHeight);
+    sheet.style.transform = `scale(${s})`;
+    scale.style.width = `${sheet.offsetWidth * s}px`;
     scale.style.height = `${sheet.offsetHeight * s}px`;
   }
 
