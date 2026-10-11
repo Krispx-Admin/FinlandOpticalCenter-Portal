@@ -41,7 +41,7 @@ export async function signIn(branchCode, code) {
   const branch = branchOf(data.user);
   if (!branch) {
     await supabase.auth.signOut();
-    return { error: 'This account is not linked to a branch. Contact the warehouse.' };
+    return { error: 'This account is not linked to a branch. Contact the office.' };
   }
   return { branch };
 }
@@ -59,7 +59,7 @@ export function onAuthChange(fn) {
   return () => data?.subscription?.unsubscribe();
 }
 
-// ── Warehouse-only: set a branch's code ──
+// ── Office-only: set a branch's code ──
 // Enforced in the database, not here — this call simply fails for anyone else.
 export async function setBranchCode(branchCode, newCode) {
   const { error } = await supabase.rpc('set_branch_code', { p_branch: branchCode, p_code: newCode });

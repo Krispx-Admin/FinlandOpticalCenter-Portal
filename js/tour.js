@@ -9,7 +9,7 @@
 // of the intro, so a retake never collides with an earlier take's orders.
 //
 // Before the first take: the address carries ?present, nobody is signed in,
-// present.pins() holds the codes for SCC, MOUJ, MGM and WH, and the lens shelf
+// present.pins() holds the codes for SCC, MOUJ, MGM and OFC, and the lens shelf
 // carries the demo lines the script shops for (SPH -2.50 and SPH -4.00).
 
 const nav = m => ['tap', `a.nav-item[href="#/${m}"]`];
@@ -17,20 +17,20 @@ const beat = (ms = 2200) => ['wait', ms];
 
 const intro = [
   ['newTake'],
-  ['card', 'FOC Portal', 'One place for every branch, fitting centre, clinic and the warehouse', 'How it works'],
+  ['card', 'FOC Portal', 'One place for every branch, fitting centre, clinic and the office', 'How it works'],
   beat(3400),
   ['card'],
   ['caption', 'Every location signs in from the same page'],
   beat(1800),
   ['focus', '.lp-wh'],
-  ['caption', 'The warehouse sits on top…'],
+  ['caption', 'The office sits on top…'],
   beat(1800),
   ['focus', '.lp-cols'],
   ['caption', '…with every branch, fitting centre and clinic below it', 'Pick your own location to begin'],
   beat(2600),
   ['reset'],
   ['tap', '[data-loc="SCC"]'],
-  ['caption', 'Then enter your location’s six-digit code', 'Each location has its own — the warehouse can change any of them'],
+  ['caption', 'Then enter your location’s six-digit code', 'Each location has its own — the office can change any of them'],
   ['focus', '.pin-card', { zoom: 1.5 }],
   ['typePin', 'SCC'],
   beat(500),
@@ -93,7 +93,7 @@ const seeb = [
   ['tap', '.drawer [data-close]'],
 
   // ── stock requests ──
-  ['caption', 'Stock Requests', 'Order stock from the warehouse'],
+  ['caption', 'Stock Requests', 'Order stock from the office'],
   nav('stock'),
   beat(900),
   ['tap', 'New stock request'],
@@ -112,7 +112,7 @@ const seeb = [
   ['reset'],
   ['tap', '.modal [data-send]'],
   beat(1200),
-  ['caption', 'Placed — it lands in the warehouse’s queue at once'],
+  ['caption', 'Placed — it lands in the office’s queue at once'],
   ['focus', '#s-list .row'],
   beat(2200),
   ['reset'],
@@ -382,12 +382,12 @@ const moujDone = [
   ['reset'],
   ['tap', '[data-chip="active"]'],
   ['caption'],
-  ['card', 'Next: the Warehouse', 'Sees every branch, fulfils stock requests and runs the settings', 'Chapter 5'],
+  ['card', 'Next: the Office', 'Sees every branch, fulfils stock requests and runs the settings', 'Chapter 5'],
 ];
 
 const warehouse = [
-  ['as', 'WH', { title: 'The Warehouse', sub: 'Sees every branch, fulfils stock requests and runs the settings', kicker: 'Chapter 5 · Warehouse' }],
-  ['caption', 'The warehouse sees every frame across the network'],
+  ['as', 'OFC', { title: 'The Office', sub: 'Sees every branch, fulfils stock requests and runs the settings', kicker: 'Chapter 5 · Office' }],
+  ['caption', 'The office sees every frame across the network'],
   ['focus', '#f-list'],
   beat(2200),
   ['focus', '#f-origin', { zoom: 1.8 }],

@@ -1,7 +1,7 @@
 // ── Module 4: Lens Stock — MGM keeps the shelf, every branch shops from it ──
 import {
   LENS_OWNER, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
-  LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull,
+  LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer } from './ui.js';
@@ -28,11 +28,12 @@ const LENS_LISTS = [
 
 export function lensView(me) {
   const isOwner = isLensOwner(me.code);
-  const isAdmin = me.role === 'admin';
+  // The office and the schedule editor look on; neither shops the shelf.
+  const isAdmin = seesAll(me.role);
   const canShop = !isOwner && !isAdmin;
   // The branch that keeps the lenses decides what may go on the shelf. The
-  // warehouse can too — it is the same pair the database lets write.
-  const canEditLists = isOwner || isAdmin;
+  // office can too — it is the same pair the database lets write.
+  const canEditLists = isOwner || me.role === 'admin';
 
   const ui = {
     tab: canShop ? 'shop' : 'queue',
@@ -521,7 +522,7 @@ export function lensView(me) {
     for (const r of store.state.lensRequests) { ui.seen.add(r.id); ui.prevStatus.set(r.id, r.status); }
   }
 
-  // ── what the shelf may hold (owner or warehouse) ──
+  // ── what the shelf may hold (owner or office) ──
   function catalogueModal() {
     const layer = openLayer('modal', () => `
       <div class="dw-head">

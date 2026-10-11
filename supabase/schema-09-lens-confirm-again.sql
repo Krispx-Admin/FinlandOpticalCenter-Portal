@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --  09 · Muscat Grand Mall confirms stock lenses again
---  STATUS: NOT YET APPLIED — run it in the Supabase SQL editor
+--  STATUS: applied 2026-10-08 (by hand, in the SQL editor)
 --
 --  schema-08 had a lens request take its lenses off the shelf the moment it
 --  was placed. The branches would rather MGM look first: a request waits as

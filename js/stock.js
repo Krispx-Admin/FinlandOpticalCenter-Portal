@@ -1,5 +1,5 @@
-// ── Module 2: Stock Requests — branch composer + warehouse fulfilment queue ──
-import { REQ_STATUS, AUDIENCES, BRANCHES, locName } from './data.js';
+// ── Module 2: Stock Requests — branch composer + office fulfilment queue ──
+import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, toast } from './ui.js';
 
@@ -19,9 +19,11 @@ function unitsBreakdown(lines) {
 }
 
 export function stockView(me) {
+  // The office fulfils; the schedule editor sees the same queue, hands off.
   const isAdmin = me.role === 'admin';
+  const overseer = seesAll(me.role);
   const ui = {
-    chip: isAdmin ? 'placed' : 'all', q: '', branch: 'all',
+    chip: overseer ? 'placed' : 'all', q: '', branch: 'all',
     seen: new Set(store.state.requests.map(r => r.id)),
     prevStatus: new Map(store.state.requests.map(r => [r.id, r.status])),
   };
@@ -30,7 +32,7 @@ export function stockView(me) {
   function visible() {
     let list = store.requestsFor(me.code);
     if (ui.chip !== 'all') list = list.filter(r => r.status === ui.chip);
-    if (isAdmin && ui.branch !== 'all') list = list.filter(r => r.branch === ui.branch);
+    if (overseer && ui.branch !== 'all') list = list.filter(r => r.branch === ui.branch);
     if (ui.q) {
       const q = ui.q.toLowerCase();
       list = list.filter(r => [r.ref, r.branch, locName(r.branch), ...r.lines.map(l => `${l.category} ${l.brand ?? ''}`)]
@@ -51,13 +53,13 @@ export function stockView(me) {
     const all = store.requestsFor(me.code);
     const c = counts();
     const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
-    if (isAdmin) {
+    if (overseer) {
       const week = all.filter(r => r.status === 'completed' && Date.now() - r.updatedAt < 7 * 864e5).length;
       const openUnits = all.filter(r => r.status === 'placed').reduce((s, r) => s + units(r), 0);
       return t(c.placed, 'To fulfil', 'stat-amber') + t(openUnits, 'Units to pick', 'stat-brand') + t(week, 'Completed · 7d') + t(c.all, 'All requests');
     }
     const mine = all.filter(r => r.status === 'placed');
-    return t(c.placed, 'Awaiting warehouse', 'stat-amber') + t(mine.reduce((s, r) => s + units(r), 0), 'Units requested', 'stat-brand') + t(c.completed, 'Completed') + t(c.all, 'All requests');
+    return t(c.placed, 'Awaiting office', 'stat-amber') + t(mine.reduce((s, r) => s + units(r), 0), 'Units requested', 'stat-brand') + t(c.completed, 'Completed') + t(c.all, 'All requests');
   }
 
   function lineSummary(r) {
@@ -79,7 +81,7 @@ export function stockView(me) {
       <div class="row ${isNew ? 'row-enter' : ''}" data-open="${r.id}">
         <div class="row-main">
           <div class="row-title"><b>${esc(r.ref)}</b>
-            ${isAdmin ? `<span class="row-cust">${locChip(r.branch)} ${esc(locName(r.branch))}</span>` : ''}
+            ${overseer ? `<span class="row-cust">${locChip(r.branch)} ${esc(locName(r.branch))}</span>` : ''}
           </div>
           <div class="row-sub">${lineSummary(r)}</div>
         </div>
@@ -133,7 +135,7 @@ export function stockView(me) {
         <div>
           <div class="dw-kicker">Stock request</div>
           <h2>${esc(r.ref)}</h2>
-          <div class="dw-sub">${locChip(r.branch)} ${esc(locName(r.branch))} → Warehouse${r.note ? ` · “${esc(r.note)}”` : ''}</div>
+          <div class="dw-sub">${locChip(r.branch)} ${esc(locName(r.branch))} → Office${r.note ? ` · “${esc(r.note)}”` : ''}</div>
         </div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
@@ -193,7 +195,7 @@ export function stockView(me) {
         @media print{body{padding:0;}}
       </style></head><body>
       <h1>Stock Request — ${esc(r.ref)}</h1>
-      <div class="meta"><b>${esc(locName(r.branch))}</b> (${esc(r.branch)}) → Warehouse · Placed ${esc(fmtDT(r.createdAt))}${r.note ? ` · Note: ${esc(r.note)}` : ''}</div>
+      <div class="meta"><b>${esc(locName(r.branch))}</b> (${esc(r.branch)}) → Office · Placed ${esc(fmtDT(r.createdAt))}${r.note ? ` · Note: ${esc(r.note)}` : ''}</div>
       <table>
         <thead><tr><th>Category</th><th>Brand</th><th>Audience</th><th class="num">Qty</th><th>Picked</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -212,7 +214,7 @@ export function stockView(me) {
   function composerModal() {
     const cats = store.settings.categories;
     if (!cats.length) {
-      return toast({ title: 'No request categories configured', sub: 'Ask the warehouse to add one in Settings.', tone: 'stock' });
+      return toast({ title: 'No request categories configured', sub: 'Ask the office to add one in Settings.', tone: 'stock' });
     }
     const catByName = name => cats.find(c => c.name === name) ?? cats[0];
     // Resolved live rather than snapshotted, so a settings change in another tab
@@ -252,7 +254,7 @@ export function stockView(me) {
 
     const layer = openLayer('modal', () => `
       <div class="dw-head">
-        <div><div class="dw-kicker">New stock request</div><h2>Request inventory from the warehouse</h2></div>
+        <div><div class="dw-kicker">New stock request</div><h2>Request inventory from the office</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
@@ -354,15 +356,15 @@ export function stockView(me) {
     root.innerHTML = `
       <header class="mod-head">
         <div>
-          <h1>${isAdmin ? 'Warehouse — Request Queue' : 'Stock Requests'}</h1>
-          <p class="mod-sub">${isAdmin ? 'Print each request, fulfil it, then mark it completed' : 'Request inventory from the central warehouse and track it here'}</p>
+          <h1>${overseer ? 'Office — Request Queue' : 'Stock Requests'}</h1>
+          <p class="mod-sub">${isAdmin ? 'Print each request, fulfil it, then mark it completed' : overseer ? 'Every stock request across the network' : 'Request inventory from the office and track it here'}</p>
         </div>
-        ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New stock request</button>` : ''}
+        ${!overseer ? `<button class="btn btn-primary" data-new>${icons.plus} New stock request</button>` : ''}
       </header>
       <section class="stats" id="s-stats">${statsHTML()}</section>
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="s-q" placeholder="Search ref, branch, category…" value="${esc(ui.q)}"></div>
-        ${isAdmin ? `<select class="sel" id="s-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
+        ${overseer ? `<select class="sel" id="s-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
       </section>
       <section class="chips" id="s-chips">${chipsHTML()}</section>
       <section class="list" id="s-list">${rowsHTML()}</section>`;

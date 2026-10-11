@@ -17,12 +17,12 @@ plays. Change one, change the other.
 
 | On screen | Caption |
 |---|---|
-| Title card: **FOC Portal**. "One place for every branch, fitting centre, clinic and the warehouse" | — |
+| Title card: **FOC Portal**. "One place for every branch, fitting centre, clinic and the office" | — |
 | Sign-in page | Every location signs in from the same page |
-| Zoom: the Warehouse panel | The warehouse sits on top… |
+| Zoom: the Office panel | The office sits on top… |
 | Zoom: the three columns of locations | …with every branch, fitting centre and clinic below it. *Pick your own location to begin* |
 | Cursor taps **Seeb City Centre** | — |
-| Zoom: the code box. The code is typed, but shows only as dots | Then enter your location's six-digit code. *Each location has its own — the warehouse can change any of them* |
+| Zoom: the code box. The code is typed, but shows only as dots | Then enter your location's six-digit code. *Each location has its own — the office can change any of them* |
 | Taps **Sign in** and the portal opens | — |
 
 ## Chapter 1: Seeb City Centre, a retail branch (about 3½ min)
@@ -45,9 +45,9 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 
 | On screen | Caption |
 |---|---|
-| Taps **New stock request**; picks Sunglasses · Ray-Ban · Women · 6 | Stock Requests. *Order stock from the warehouse* · One line per item: category, then brand, who it's for and how many |
+| Taps **New stock request**; picks Sunglasses · Ray-Ban · Women · 6 | Stock Requests. *Order stock from the office* · One line per item: category, then brand, who it's for and how many |
 | Taps **Add line**; Cleaning kits · 4; note "Weekend promotion" | Add as many lines as you need |
-| Taps **Place request**; spotlight on the new row | Placed — it lands in the warehouse's queue at once |
+| Taps **Place request**; spotlight on the new row | Placed — it lands in the office's queue at once |
 
 **Lens Stock**
 
@@ -127,13 +127,13 @@ Card: *"The lenses have arrived from Muscat Grand Mall."*
 |---|---|
 | **Start fitting** → **Mark as done**; shown under Completed | The lenses are in — start fitting · In fitting · Done — ready for Maryam to collect |
 
-## Chapter 5: the Warehouse (about 1½ min)
+## Chapter 5: the Office (about 1½ min)
 
 Card: *"Sees every branch, fulfils stock requests and runs the settings."*
 
 | On screen | Caption |
 |---|---|
-| Fitting Log for the whole network; zoom on the branch filter | The warehouse sees every frame across the network · Narrow it to one branch, or to one fitting centre |
+| Fitting Log for the whole network; zoom on the branch filter | The office sees every frame across the network · Narrow it to one branch, or to one fitting centre |
 | Queue: opens Seeb's request; **Mark completed** | The request queue — Seeb's request is waiting · Mark completed when it ships — Seeb sees it straight away |
 | Insurance Claims list | Every branch's and clinic's claim receipts, in one list |
 | Settings: categories, brand groups; adds then removes the brand "Demo Optics" | Settings — what branches can request · Brand groups — which brands each category offers · Every branch's request form offers it at once |
@@ -150,4 +150,4 @@ Card: *"Sees every branch, fulfils stock requests and runs the settings."*
 
 ### Who is covered
 
-Retail branches (Seeb), fitting centres (Al Mouj, and Muscat Grand Mall as a fitter), the lens holder (Muscat Grand Mall), and the warehouse. Clinics aren't given their own chapter. Their working screen is Insurance Claims, which the Seeb chapter shows step by step and the captions point out.
+Retail branches (Seeb), fitting centres (Al Mouj, and Muscat Grand Mall as a fitter), the lens holder (Muscat Grand Mall), and the office. Clinics aren't given their own chapter. Their working screen is Insurance Claims, which the Seeb chapter shows step by step and the captions point out.

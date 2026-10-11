@@ -17,21 +17,29 @@ export const LOCATIONS = [
   { code: 'SALFEC', name: 'Salalah FEC',      role: 'clinic' },
   { code: 'SOHFEC', name: 'Sohar FEC',        role: 'clinic' },
   { code: 'NIZFEC', name: 'Nizwa FEC',        role: 'clinic' },
-  // Warehouse / admin
-  { code: 'WH',   name: 'Warehouse (admin)',  role: 'admin' },
+  // The office runs the network; Ghiath reads all of it and writes the rota.
+  { code: 'OFC',    name: 'Office',           role: 'admin' },
+  { code: 'GHIATH', name: 'Ghiath',           role: 'scheduler' },
 ];
 
 export const ROLES = {
   retail:  { label: 'Retail branch',  hue: 'blue'  },
   fitting: { label: 'Fitting centre', hue: 'teal'  },
   clinic:  { label: 'Clinic',         hue: 'purple' },
-  admin:   { label: 'Warehouse · Admin', hue: 'navy' },
+  admin:   { label: 'Office · Admin', hue: 'navy' },
+  scheduler: { label: 'Schedule editor', hue: 'blue' },
 };
 
 export const loc = code => LOCATIONS.find(l => l.code === code);
 export const locName = code => loc(code)?.name ?? code;
 export const FITTERS = LOCATIONS.filter(l => l.role === 'fitting');
-export const BRANCHES = LOCATIONS.filter(l => l.role !== 'admin');
+export const BRANCHES = LOCATIONS.filter(l => ['retail', 'fitting', 'clinic'].includes(l.role));
+
+// Who looks at the whole network. The office runs it; the schedule editor
+// reads every module but changes nothing outside the schedule.
+export const seesAll = role => role === 'admin' || role === 'scheduler';
+export const readOnly = role => role === 'scheduler';
+export const canEditSchedule = role => role === 'admin' || role === 'scheduler';
 
 // ── Catalogue ──
 export const BRANDS = [
@@ -155,7 +163,7 @@ export const needsAction = (o, code) =>
   canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o));
 
 // ── Stock request state machine ──
-// Redesigned: a branch places a request, the warehouse fulfils it. No review.
+// Redesigned: a branch places a request, the office fulfils it. No review.
 export const REQ_FLOW = ['placed', 'completed'];
 export const REQ_STATUS = {
   placed:    { label: 'Placed',    color: 'blue'  },
@@ -268,8 +276,7 @@ export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.pr
 
 // ── Permissions ──
 export function canSeeOrder(o, code) {
-  const me = loc(code);
-  return me?.role === 'admin' || o.origin === code || o.fitter === code;
+  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code;
 }
 export function canAdvanceOrder(o, code) {
   if (o.status === 'delivered' || awaitingLens(o)) return false;
@@ -277,15 +284,15 @@ export function canAdvanceOrder(o, code) {
   return me?.role === 'admin' || fitActor(o) === code;
 }
 export function canSeeRequest(r, code) {
-  return loc(code)?.role === 'admin' || r.branch === code;
+  return seesAll(loc(code)?.role) || r.branch === code;
 }
-// A branch sees the claims it raised; the warehouse oversees all of them.
+// A branch sees the claims it raised; the office oversees all of them.
 export function canSeeClaim(c, code) {
-  return loc(code)?.role === 'admin' || c.branch === code;
+  return seesAll(loc(code)?.role) || c.branch === code;
 }
-// Only the holding branch edits the shelf count; the warehouse may look on.
+// Only the holding branch edits the shelf count; the office may look on.
 export const isLensOwner = code => code === LENS_OWNER;
 export function canSeeLensRequest(r, code) {
-  return isLensOwner(code) || loc(code)?.role === 'admin' || r.branch === code;
+  return isLensOwner(code) || seesAll(loc(code)?.role) || r.branch === code;
 }
 

@@ -460,7 +460,7 @@ function buildPanel() {
   panel.className = 'pz-panel';
   panel.innerHTML = `
     <div class="pz-head"><b>Presenter</b><span>Alt+P hides this</span></div>
-    <div class="pz-codes">${['SCC', 'MOUJ', 'MGM', 'WH'].map(c => `
+    <div class="pz-codes">${['SCC', 'MOUJ', 'MGM', 'OFC'].map(c => `
       <label>${c}<input type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-pin="${c}"></label>`).join('')}
     </div>
     <div class="pz-row">

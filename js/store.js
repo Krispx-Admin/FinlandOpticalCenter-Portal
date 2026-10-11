@@ -57,7 +57,7 @@ function explain(e) {
   if (/orders_ref_per_branch|duplicate key.*orders/i.test(m)) return 'That bill number is already logged at your branch.';
   if (/row-level security|violates row-level/i.test(m)) return 'Your branch is not allowed to do that.';
   if (/only the lens-holding branch/i.test(m)) return `Only ${locName(LENS_OWNER)} can change the lens shelf.`;
-  if (/only the warehouse/i.test(m)) return 'Only the warehouse can do that.';
+  if (/only the warehouse|only the office/i.test(m)) return 'Only the office can do that.';
   if (/already (confirmed|declined|completed)/i.test(m)) return 'Someone already answered that one.';
   if (/Failed to fetch|NetworkError|network/i.test(m)) return 'No connection to the server. Check the internet and try again.';
   return m.replace(/^.*?:\s*/, '');

@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly } from './data.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
@@ -8,6 +8,7 @@ import { stockView } from './stock.js';
 import { lensView } from './lens.js';
 import { claimsView } from './claims.js';
 import { settingsView } from './settings.js';
+import { scheduleView, mountScheduleViewer } from './schedule.js';
 
 const app = document.getElementById('app');
 let view = null;          // active module view
@@ -18,18 +19,18 @@ let clockTimer = null;
 // ─────────────────────────── LOGIN ───────────────────────────
 function renderLogin(preselect = null) {
   teardownShell();
-  // The warehouse sits on its own wide panel above the rest; the other three
-  // run side by side so every location is on screen at once.
+  // The office and Ghiath sit on their own panel above the rest; the other
+  // three run side by side so every location is on screen at once.
   const columns = [
     { wide: true, groups: [['Retail branches', 'retail']] },
     { groups: [['Fitting centres', 'fitting']] },
     { groups: [['Clinics', 'clinic']] },
   ];
-  const groupHTML = ([title, role], extra = '') => `
+  const groupHTML = ([title, roles], extra = '') => `
     <div class="lp-group ${extra}">
       <h3>${title}</h3>
       <div class="lp-grid">
-        ${LOCATIONS.filter(l => l.role === role).map(l => `
+        ${LOCATIONS.filter(l => [].concat(roles).includes(l.role)).map(l => `
           <button class="loc-card role-${l.role}" data-loc="${l.code}">
             <span class="loc-code">${l.code}</span>
             <span class="loc-name">${esc(l.name)}</span>
@@ -40,6 +41,7 @@ function renderLogin(preselect = null) {
   <div class="login">
     <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
     <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
+    <a class="btn btn-ghost lp-view" href="#/view-schedule">${icons.calendar} View schedule</a>
     <main class="login-panel">
       <div class="lp-inner">
         <section class="lp-step" id="step-pick">
@@ -47,7 +49,7 @@ function renderLogin(preselect = null) {
             <h2>Sign in</h2>
             <p class="lp-sub">Choose your location.</p>
           </header>
-          ${groupHTML(['Warehouse', 'admin'], 'lp-wh')}
+          ${groupHTML(['Office', ['admin', 'scheduler']], 'lp-wh')}
           <div class="lp-cols">
             ${columns.map(c => `
               <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
@@ -120,7 +122,7 @@ function wirePin(code) {
 
     if (branch) {
       store.session = branch;
-      location.hash = '#/fitting';
+      location.hash = homeOf(branch);
       enterShell();
       return;
     }
@@ -131,6 +133,29 @@ function wirePin(code) {
     form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
     input.select();
   });
+}
+
+// ─────────────────────────── PUBLIC SCHEDULE ───────────────────────────
+// This week's rota for anyone with the address, so staff can check their
+// shifts without a code. It reads one database function that hands out the
+// running week and nothing else.
+const isPublicRoute = () => location.hash === '#/view-schedule';
+
+function renderPublicSchedule() {
+  teardownShell();
+  app.innerHTML = `
+  <div class="pub">
+    <header class="pub-head">
+      <img class="pub-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
+      <div class="pub-title">
+        <h1>Staff schedule</h1>
+        <p class="mod-sub" id="pub-sub">This week</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="#/">Sign in ${icons.arrowRight}</a>
+    </header>
+    <main class="pub-body" id="pub-stage"></main>
+  </div>`;
+  mountScheduleViewer(app.querySelector('#pub-stage'), app.querySelector('#pub-sub'));
 }
 
 // ─────────────────────────── LOADING ───────────────────────────
@@ -190,11 +215,15 @@ async function enterShell() {
 // ─────────────────────────── SHELL ───────────────────────────
 const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
-  stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Warehouse Queue', adminIcon: 'warehouse' },
+  stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
   lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
   claims:   { label: 'Insurance Claims', icon: 'receipt', make: claimsView },
+  schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
   settings: { label: 'Settings', icon: 'settings', make: settingsView, adminOnly: true },
 };
+
+// Where a location lands after signing in: Ghiath's work is the schedule.
+const homeOf = me => (me?.role === 'scheduler' ? '#/schedule' : '#/fitting');
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
@@ -203,10 +232,13 @@ function moduleAllowed(key, me) {
 
 function currentModule() {
   const key = (location.hash.match(/#\/(\w+)/) ?? [])[1];
-  return moduleAllowed(key, store.session) ? key : 'fitting';
+  if (moduleAllowed(key, store.session)) return key;
+  return homeOf(store.session).slice(2);
 }
 
 function badgeCounts(me) {
+  // The schedule editor reads everything and is asked to do none of it.
+  if (readOnly(me.role)) return {};
   const s = store.state;
   const fitting = s.orders.filter(o => canSeeOrder(o, me.code) && needsAction(o, me.code)).length;
   const stock = me.role === 'admin'
@@ -274,7 +306,7 @@ function renderNav(me, active) {
   if (!nav) return;
   const b = badgeCounts(me);
   nav.innerHTML = Object.entries(MODULES).filter(([key]) => moduleAllowed(key, me)).map(([key, m]) => {
-    const label = me.role === 'admin' && m.adminLabel ? m.adminLabel : m.label;
+    const label = (me.role === 'admin' || readOnly(me.role)) && m.adminLabel ? m.adminLabel : m.label;
     const icon = icons[me.role === 'admin' && m.adminIcon ? m.adminIcon : m.icon];
     return `
       <a class="nav-item ${active === key ? 'on' : ''}" href="#/${key}">
@@ -309,7 +341,14 @@ function teardownShell() {
 
 // Re-route inside the shell on hash change without a full shell rebuild.
 window.addEventListener('hashchange', () => {
-  if (store.session && app.querySelector('.shell') && currentModule() !== mountedKey) mountModule(currentModule());
+  if (!store.session) {
+    if (isPublicRoute()) renderPublicSchedule();
+    else if (app.querySelector('.pub')) renderLogin();
+    return;
+  }
+  // Signed in already: the schedule is in the portal itself.
+  if (isPublicRoute()) { location.hash = '#/schedule'; return; }
+  if (app.querySelector('.shell') && currentModule() !== mountedKey) mountModule(currentModule());
 });
 
 // ── presenter mode ──
@@ -340,7 +379,7 @@ async function switchBranch(code, pin) {
     throw new Error(error || 'sign-in refused');
   }
   store.session = branch;
-  location.hash = '#/fitting';
+  location.hash = homeOf(branch);
   await enterShell();
   return branch;
 }
@@ -356,7 +395,11 @@ async function switchBranch(code, pin) {
   }
   renderLoading('Checking your session…');
   store.session = await auth.currentBranch();
-  if (store.session) await enterShell(); else renderLogin();
+  if (store.session) {
+    if (isPublicRoute()) location.hash = '#/schedule';
+    await enterShell();
+  } else if (isPublicRoute()) renderPublicSchedule();
+  else renderLogin();
 
   // Follow the user out if they sign out in another tab, or their session expires.
   auth.onAuthChange((branch, event) => {

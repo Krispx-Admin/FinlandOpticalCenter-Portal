@@ -23,7 +23,7 @@ About 10–11 minutes in seven chapters, played in this order:
 | `mouj` | MOUJ: Al Mouj, fitting centre | lens request choosing "Receive the lenses"; the fitting order that opens by itself |
 | `mgm` | MGM: Muscat Grand Mall, fitting centre and lens holder | receiving Seeb's frame; an in-house job; answering both lens requests; the shelf and its cog |
 | `moujDone` | MOUJ | start fitting → done |
-| `warehouse` | WH: Warehouse | network-wide view; completing Seeb's stock request; claims; settings |
+| `warehouse` | OFC: Office | network-wide view; completing Seeb's stock request; claims; settings |
 | `finale` | SCC | confirming delivery of the frame from chapter 1 |
 
 The sign-in appears once. Every later switch happens behind a chapter card,
@@ -31,7 +31,7 @@ so no sign-in form or code appears on camera again.
 
 ## Before you start: get these from the user
 
-1. **The six-digit sign-in codes for SCC, MOUJ, MGM and WH.** Never repeat them
+1. **The six-digit sign-in codes for SCC, MOUJ, MGM and OFC.** Never repeat them
    in chat, never put them in a caption, and never type them into a visible
    field. They only go into `present.pins()` or the panel's password fields.
 2. **Who is recording.** Normally the user records with Windows Snipping Tool
@@ -49,9 +49,9 @@ so no sign-in form or code appears on camera again.
    sidebar, so the sign-in page with the location buttons is showing.
 4. Run in the page:
    ```js
-   present.pins({ SCC: '······', MOUJ: '······', MGM: '······', WH: '······' })
+   present.pins({ SCC: '······', MOUJ: '······', MGM: '······', OFC: '······' })
    ```
-   It returns `['SCC','MOUJ','MGM','WH']`, which lists the codes it holds, never
+   It returns `['SCC','MOUJ','MGM','OFC']`, which lists the codes it holds, never
    their values. Codes live in memory only, so **after any page reload, set them
    again.**
 5. Check `present.chapters()` returns the seven chapters above.

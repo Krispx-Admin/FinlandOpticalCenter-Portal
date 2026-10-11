@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
@@ -34,7 +34,9 @@ export function fittingView(me) {
     prevStatus: new Map(store.state.orders.map(o => [o.id, o.status])),
   };
   let root, drawer = null, drawerId = null;
-  const isAdmin = me.role === 'admin';
+  // The office and the schedule editor see every frame; only the office acts.
+  const isAdmin = seesAll(me.role);
+  const viewOnly = readOnly(me.role);
 
   // ── data ──
   function visible() {
@@ -128,7 +130,7 @@ export function fittingView(me) {
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${o.urgent ? 'row-urgent' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
-        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' ? 'disabled' : ''}><i></i></label>
+        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
@@ -213,7 +215,7 @@ export function fittingView(me) {
         <div class="dw-actions">
           ${needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
-          ${o.status !== 'delivered' ? `<button class="btn btn-ghost" data-urgent="${o.id}">${icons.zap} ${o.urgent ? 'Remove urgent flag' : 'Flag urgent'}</button>` : ''}
+          ${o.status !== 'delivered' && !viewOnly ? `<button class="btn btn-ghost" data-urgent="${o.id}">${icons.zap} ${o.urgent ? 'Remove urgent flag' : 'Flag urgent'}</button>` : ''}
         </div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
@@ -366,7 +368,7 @@ export function fittingView(me) {
           <h1>Fitting Log</h1>
           <p class="mod-sub">${isAdmin ? 'Every frame travelling across the network' : 'Frames travelling between your branch and the fitting centres'}</p>
         </div>
-        ${me.role !== 'admin' ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>` : ''}
+        ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>` : ''}
       </header>
       <section class="stats" id="f-stats">${statsHTML()}</section>
       <section class="toolbar">
@@ -398,7 +400,7 @@ export function fittingView(me) {
 
   function toggleSelect(id) {
     const o = store.order(id);
-    if (!o || o.status === 'delivered') return;
+    if (!o || o.status === 'delivered' || viewOnly) return;
     if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
     refreshLists();
   }

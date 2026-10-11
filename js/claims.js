@@ -1,7 +1,7 @@
 // ── Module 5: Insurance Claim Receipts — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal,
+  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
@@ -276,7 +276,10 @@ export function printClaim(c) {
 
 // ── Module view ────────────────────────────────────────────────────────────
 export function claimsView(me) {
-  const isAdmin = me.role === 'admin';
+  // The office and the schedule editor see every branch's claims; the
+  // schedule editor may open and print them but not raise, edit or delete.
+  const isAdmin = seesAll(me.role);
+  const viewOnly = readOnly(me.role);
   const ui = { q: '', branch: 'all' };
   let root, layer = null;
 
@@ -341,8 +344,8 @@ export function claimsView(me) {
       <div class="rc-stage"><div class="rc-scale">${receiptHTML(cur)}</div></div>
       <div class="modal-foot rc-actions">
         <button class="btn btn-primary" data-do-print>${icons.printer} Print receipt</button>
-        <button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
-        <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>
+        ${viewOnly ? '' : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
+        <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
         <button class="btn btn-ghost" data-close>Close</button>
       </div>`;
     }, { onClose: () => { layer = null; } });
@@ -532,7 +535,7 @@ export function claimsView(me) {
           <h1>Insurance Claim Receipts</h1>
           <p class="mod-sub">Raise a printable claim receipt with products, prescription and payment</p>
         </div>
-        <button class="btn btn-primary" data-new>${icons.plus} New claim receipt</button>
+        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} New claim receipt</button>`}
       </header>
       <section class="stats" id="c-stats">${statsHTML()}</section>
       <section class="toolbar">

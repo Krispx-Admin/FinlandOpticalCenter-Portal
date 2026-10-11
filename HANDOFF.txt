@@ -23,13 +23,18 @@ Retail branches, lens-fitting centres, eye clinics and one central warehouse
 all sign in to the same site and look at the same live data (Supabase /
 Postgres + realtime).
 
-Five modules (sidebar order):
+Six modules (sidebar order):
   1. Fitting Log        — a frame's physical journey branch -> fitting centre -> branch
-  2. Stock Requests     — branch asks the warehouse for stock (admin sees it as
-                          "Warehouse Queue" with a warehouse icon)
+  2. Stock Requests     — branch asks the office for stock (office and Ghiath see
+                          it as "Office Queue" with a warehouse icon)
   3. Lens Stock         — MGM holds the loose-lens shelf; everyone else shops it
   4. Insurance Claims   — printable A4 claim receipt (products, Rx grid, payment)
-  5. Settings (admin)   — request categories, brand groups, branch sign-in codes
+  5. Schedule           — the staff scheduler (scheduler.html), unchanged, inside
+                          the portal; data in Postgres. See 4.7.
+  6. Settings (admin)   — request categories, brand groups, branch sign-in codes
+
+Plus a PUBLIC "View schedule" page (#/view-schedule, button top-right of the
+sign-in screen) that needs no code: this week's rota for any staff member.
 
 Plus a hidden PRESENTER MODE (?present in the URL) used to record the staff
 tutorial video. See section 10.
@@ -78,6 +83,11 @@ js/app.js                login screen, loading/error screens, shell + sidebar,
 js/fitting.js            Module 1   js/stock.js   Module 2   js/lens.js  Module 4
 js/claims.js             Module 5 (+ RECEIPT_CSS, receiptHTML, printClaim)
 js/settings.js           Settings (admin)
+js/schedule.js           Schedule module: hosts scheduler.html in an iframe and
+                         gives it window.focSched (load/save/loadWeek/saveWeek)
+scheduler.html           THE USER'S STAFF SCHEDULER, a minified React bundle.
+                         DO NOT change its design or behaviour (user, 2026-10-11).
+                         Only three additions, all invisible — see 4.7.
 js/present.js            presenter mode engine (cursor, ripple, spotlight, captions)
 js/tour.js               the tutorial as data: 7 chapters
 img/                     4 logo PNGs (see section 7)
@@ -95,7 +105,7 @@ README.md                overview + migration table — NOTE: its Layout omits
 
 4.1 USERS ARE LOCATIONS, NOT PEOPLE
 -----------------------------------
-13 locations, each one Supabase Auth account. Sign-in = pick location card,
+14 locations, each one Supabase Auth account. Sign-in = pick location card,
 type its 6-digit code. Email is derived: `${code.toLowerCase()}@finlandoptical.om`
 and the 6-digit code IS the account password (bcrypt). The JWT carries
 app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it.
@@ -114,7 +124,10 @@ app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it
   SALFEC  Salalah FEC          clinic
   SOHFEC  Sohar FEC            clinic
   NIZFEC  Nizwa FEC            clinic
-  WH      Warehouse (admin)    admin     sees everything, owns Settings
+  OFC     Office               admin     sees everything, owns Settings. Was
+                                         WH "Warehouse (admin)" until schema-10.
+  GHIATH  Ghiath               scheduler a person, not a place: reads every
+                                         module, changes ONLY the schedule
 
 !! The location list exists TWICE: LOCATIONS in js/data.js AND the branches
    table. Adding/renaming a location means changing both, plus the auth user
@@ -124,7 +137,15 @@ app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it
    branches.holds_lens_stock. Keep them in step.
 
 ROLES (data.js): retail "Retail branch", fitting "Fitting centre",
-clinic "Clinic", admin "Warehouse · Admin".
+clinic "Clinic", admin "Office · Admin", scheduler "Schedule editor".
+Helpers (data.js): seesAll(role) = admin|scheduler (visibility);
+readOnly(role) = scheduler; canEditSchedule(role) = admin|scheduler.
+BRANCHES = retail+fitting+clinic only. In modules, `isAdmin` for VIEWING was
+switched to seesAll; every create/edit/advance/confirm/complete stays
+admin-or-owner only, and readOnly hides urgent flag, selection, claim
+New/Edit/Delete. Badges are empty for the scheduler; he lands on #/schedule.
+The user said to call the warehouse "Office" everywhere it names the account
+(login, sidebar, "Office Queue", "→ Office", toasts).
 
 Visibility (enforced by RLS, mirrored by canSee* in data.js as a 2nd layer):
   - orders: origin branch, assigned fitter, admin
@@ -134,6 +155,10 @@ Visibility (enforced by RLS, mirrored by canSee* in data.js as a 2nd layer):
   - claims: own branch, admin
   - settings / lens_catalogue: everyone reads; admin (settings) or
     MGM+admin (lens_catalogue) write
+  - the scheduler (Ghiath) gets extra SELECT-only policies (<table>_scheduler_read)
+    on claims, orders, stock and lens requests and all their children
+  - schedule_state / schedule_weeks: admin + scheduler only (can_schedule());
+    everyone else, incl. anon, only via schedule_view()
 
 4.2 FITTING LOG (orders)
 ------------------------
@@ -243,6 +268,44 @@ Old flat {od, os} rx shapes are folded into the D row by normaliseRx().
 Preview modal and printed A4 use the SAME markup + RECEIPT_CSS (what you see
 is what prints). Edit = delete+reinsert items and rx rows.
 
+4.7 SCHEDULE (added 2026-10-11)
+--------------------
+The user's own staff scheduler (React bundle, teal/Space Grotesk design — its
+OWN look, not the portal's) runs UNCHANGED in an iframe. The user explicitly
+said not to change its functionality or design. Source copy: Desktop
+"finland-optical-scheduler with X2.html". The three byte-exact additions:
+  1. storage: Zv()/Lv() (its load/save, was localStorage "foc_state_v2") call
+     window.parent.focSched.load()/save() when framed; standalone unchanged.
+  2. two React effects after its save effect: when the week (v) changes,
+     focSched.loadWeek(v) puts that week's saved schedule back (or clears the
+     grid if none); when the result (z) changes, focSched.saveWeek(z, staff,
+     branches). Its own variables: l branches, a employees, v weekStart,
+     z/m result, M loaded.
+  3. a <style> block keyed on html.foc-view: in viewer mode it hides .tabs,
+     .hd-reset, .presets, .ptpanel, .manualhint, .sickbar, .empty and every
+     .bar child except "Export by employee". Notes stay.
+  When editing the bundle, edit BYTES (read_bytes/write_bytes) — text-mode
+  Python on Windows rewrote its line endings once.
+Who sees what:
+  - OFC + GHIATH: full editor. Roster/branches/leave/special dates/part-timer
+    days/pins/presets = schedule_state (1 row, jsonb columns). Each week's
+    generated/edited result = schedule_weeks (PK week_start) with a snapshot of
+    names (id, name, optom, first priority) and branches. Pick a week's Saturday
+    in the scheduler to reopen it. First open with an empty row seeds the
+    built-in roster (26 employees, 12 branches) into the database.
+  - Every branch: Schedule section, read-only, CURRENT WEEK ONLY (user's
+    choice) via schedule_view() — the saved week whose 7 days include today in
+    Asia/Muscat. Ghiath usually builds NEXT week; branches see it from its
+    Saturday.
+  - Public #/view-schedule: same viewer, no sign-in (anon may run
+    schedule_view). User accepted that names + shifts + notes are public.
+  - The editor bridge never writes until the saved state has been read; a
+    failed read leaves it read-only (so built-in defaults can't overwrite).
+  - Scheduler branch codes are its own (WAVE = Al Mouj Mall, SAL = Salalah
+    Gardens Mall) and need not match portal codes.
+  - The scheduler's own "Reset to defaults" now resets the SHARED roster in
+    the database (its behaviour, unchanged; it asks for confirmation).
+
 4.6 SETTINGS (admin only)
 -------------------------
 - Categories: drag to reorder; flag chips Brand / Audience / Quantity;
@@ -267,7 +330,7 @@ Migrations are applied by hand, in order. Each file has a header with
                              jwt_branch() / is_admin() / is_lens_owner(),
                              touch_updated_at trigger, claim total trigger,
                              confirm_lens_request(), RLS, realtime, branch seed
-  branch-codes.sql           set_branch_code(), branch_access()   (warehouse only)
+  branch-codes.sql           set_branch_code(), branch_access()   (office only)
   schema-02-shared.sql       sequences req_seq(1001) lens_seq(1001) claim_seq(3001);
                              orders ref unique per branch; stock_requests(+lines,
                              events); app_settings; complete_stock_request(); MOUJ->fitting
@@ -286,15 +349,27 @@ Migrations are applied by hand, in order. Each file has a header with
                              MOUJ test bills: 22, teh, MJJJJ, fewf, fe).
   schema-09-lens-confirm-again.sql  restores schema-07's create_lens_request
                              (request left 'requested', shelf untouched).
-                             >>> NOT YET APPLIED as of 2026-10-08 — user to run
-                                 it in the Supabase SQL editor. Until then new
-                                 requests still confirm themselves. <<<
+                             APPLIED by the user 2026-10-08 (confirmed live
+                             2026-10-11). MGM confirms again.
+  schema-10-office-ghiath-schedule.sql  WH -> OFC "Office" (9 FK columns moved,
+                             touch triggers held off, auth email + identity);
+                             role 'scheduler' + GHIATH branch + his auth user
+                             (random password; office sets his code);
+                             is_scheduler(), can_schedule(); SELECT-only policies
+                             for the scheduler; schedule_state, schedule_weeks
+                             (+touch_schedule trigger: updated_at/updated_by);
+                             schedule_view() granted to anon.
+                             >>> NOT YET APPLIED as of 2026-10-11 — user to run.
+                                 Until then the office can't sign in with the
+                                 new site (it asks for ofc@...) and Schedule shows
+                                 an error. <<<
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
 lens_request_lines, lens_request_events, claims, claim_items,
-claim_prescriptions, app_settings (1 row), lens_catalogue (1 row).
-All have RLS on. All are in the supabase_realtime publication.
+claim_prescriptions, app_settings (1 row), lens_catalogue (1 row),
+schedule_state (1 row), schedule_weeks. All have RLS on. All but the two
+schedule tables are in the supabase_realtime publication.
 
 Column naming: DB uses *_code (origin_code, fitter_code, branch_code, by_code)
 and lens_type / lens_index (SQL-unfriendly words). The app uses origin, fitter,
@@ -473,7 +548,8 @@ Rules:
 8.3 Role colours
   Login .loc-code chip: retail = navy on brand-soft, fitting = teal on #e2f5f3,
   clinic = purple on #faeafc, admin = white on navy.
-  Sidebar .me-code: fitting teal, clinic purple, admin amber #f59e0b / #3a2500.
+  Sidebar .me-code: fitting teal, clinic purple, admin amber #f59e0b / #3a2500,
+  scheduler blue rgba(37,99,235,.6). Login chip: scheduler = white on --st-blue.
   .loc-chip (location code tag): navy on brand-soft, 11px bold.
 
 8.4 Type
@@ -532,8 +608,9 @@ Rules:
   Breakpoints: 1181px+ (Fitting Log pills centred by formula),
   1180px (journey column hides), 900px (sidebar collapses to a
   74px icon rail with the mark logo; lists and forms stack), 720px, 620px.
-  Login: logomark watermark, logo top-left, "Sign in / Choose your location.",
-  warehouse card centred on top, then 3 columns (retail 2-wide, fitting,
+  Login: logomark watermark, logo top-left, "View schedule" button top-right,
+  "Sign in / Choose your location.", OFFICE panel on top with two cards
+  (Office, Ghiath) side by side, then 3 columns (retail 2-wide, fitting,
   clinics). Must fit one screen without scrolling. No white card wrapping
   the groups (removed on purpose — the cards float on the page).
 
@@ -612,6 +689,13 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Schedule module: the user's scheduler.html runs unchanged in an
+             iframe, data in Postgres (schedule_state, schedule_weeks), every
+             week saved; branches + public "View schedule" (no code) see the
+             current week only. Warehouse renamed Office, code WH -> OFC.
+             Ghiath (GHIATH, role scheduler): reads everything, edits only
+             the schedule. schema-10 written, NOT YET APPLIED. schema-09
+             confirmed applied.
  2026-10-08  User had run schema-08 by hand; schema-08 restored to the repo
              as applied and schema-09 added to restore MGM's confirmation
              (NOT YET APPLIED). Stock Lens note centred on the middle pin and
