@@ -559,6 +559,13 @@ export const store = {
     return saveSettings({ module: 'settings', title: `${brand} → ${toGroup}` });
   },
 
+  // ── Tabs switched off for maintenance ──
+  setTabOff(key, off, label = key) {
+    const list = (state.settings.disabledTabs ?? []).filter(k => k !== key);
+    state.settings.disabledTabs = off ? [...list, key] : list;
+    return saveSettings({ module: 'settings', title: `${label} ${off ? 'switched off — under maintenance' : 'switched back on'}` });
+  },
+
   // ── Insurers: the list Direct Insurance offers ──
   addInsurer(name) {
     name = String(name).trim();

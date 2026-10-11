@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS } from './data.js';
+import { UNITS, TABS, tabOff } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime } from './ui.js';
@@ -79,6 +79,21 @@ export function settingsView(me) {
     }).join('');
   }
 
+  // One switch per sidebar tab. Off = greyed for the branches, "under maintenance".
+  function tabsHTML() {
+    const ready = store.settings.hasDisabledTabs !== false;
+    return `<div class="tab-list">${TABS.map(t => {
+      const off = tabOff(store.settings, t.key);
+      return `
+      <label class="tab-row ${off ? 'is-off' : ''}">
+        <span class="tab-ico">${icons[t.icon]}</span>
+        <span class="tab-name"><b>${esc(t.label)}</b>${t.note ? `<span class="muted"> · ${esc(t.note)}</span>` : ''}</span>
+        <span class="tab-state">${off ? '<i>Under maintenance</i>' : 'On'}</span>
+        <span class="sw"><input type="checkbox" data-tab="${t.key}" data-tab-label="${esc(t.label)}" ${off ? '' : 'checked'} ${ready ? '' : 'disabled'}><i></i></span>
+      </label>`;
+    }).join('')}</div>`;
+  }
+
   function insurersHTML() {
     const list = store.settings.insurers ?? [];
     if (!list.length) return `<div class="empty">${icons.receipt}<p>No insurers yet — add the first below.</p></div>`;
@@ -137,6 +152,15 @@ export function settingsView(me) {
           <p class="mod-sub">Control what branches can request — categories, how they're counted, and which brands each one offers</p>
         </div>
       </header>
+
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.menu} Tabs</h2>
+          <p class="muted">Switch a tab off while it is being worked on. The branches see it greyed out,
+             marked <i>under maintenance</i>, and cannot open it; you still can. It changes for everyone at once.</p>
+        </div>
+        <div id="set-tabs">${tabsHTML()}</div>
+      </section>
 
       <section class="set-card">
         <div class="set-card-head">
@@ -221,6 +245,8 @@ export function settingsView(me) {
     if (g) g.innerHTML = groupsHTML();
     const ins = root.querySelector('#set-ins');
     if (ins) ins.innerHTML = insurersHTML();
+    const tabs = root.querySelector('#set-tabs');
+    if (tabs) tabs.innerHTML = tabsHTML();
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
     const sel = root.querySelector('#add-cat select[name="brandGroup"]');
@@ -268,6 +294,7 @@ export function settingsView(me) {
 
     root.addEventListener('change', e => {
       const d = e.target.dataset;
+      if (d.tab) return store.setTabOff(d.tab, !e.target.checked, d.tabLabel);
       if (d.flag) return store.updateCategory(d.cat, { [d.flag]: e.target.checked });
       if (d.catUnit) return store.updateCategory(d.catUnit, { unit: e.target.value });
       if (d.catGroup) return store.updateCategory(d.catGroup, { brandGroup: e.target.value });

@@ -33,8 +33,8 @@ Seven modules (sidebar order):
                           office & Ghiath get a "paid by insurance" dashboard. 4.8
   6. Schedule           — the staff scheduler (scheduler.html), unchanged, inside
                           the portal; data in Postgres. See 4.7.
-  7. Settings (admin)   — request categories, brand groups, Direct Insurance
-                          insurers, branch sign-in codes
+  7. Settings (admin)   — tabs on/off (maintenance), request categories, brand
+                          groups, Direct Insurance insurers, branch sign-in codes
 
 Plus a PUBLIC "View schedule" page (#/view-schedule, button top-right of the
 sign-in screen) that needs no code: the PUBLISHED weeks that haven't finished.
@@ -409,6 +409,17 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 
 4.6 SETTINGS (admin only)
 -------------------------
+- Tabs (first card, added 2026-10-11): one row + on/off switch per sidebar tab
+  (data.js TABS: fitting, stock, lens, claims, direct, schedule — Settings is
+  never switchable). Off = key in app_settings.disabled_tabs (jsonb, schema-17),
+  store.setTabOff(key, off, label). Effect (app.js isOff/moduleOpen):
+    branches + Ghiath: the nav item is a greyed <span class="nav-item nav-off">
+      with "— under maintenance" in italics under the name; cannot open it.
+      currentModule() routes a closed tab to home, else the first open tab,
+      else a built-in "Under maintenance" page (OFF_KEY). The subscribe
+      handler re-routes live, so a tab switched off while someone is on it
+      moves them at once (realtime on app_settings). Badges hidden on off tabs.
+    office: same grey + note, but still a link — the office can go in.
 - Categories: drag to reorder; flag chips Brand / Audience / Quantity;
   "Counted" pcs|box; "Brands from" brand group.
 - Brand groups: rename inline, drag groups, drag brands between groups
@@ -498,6 +509,8 @@ Migrations are applied by hand, in order. Each file has a header with
                              IC-3003..3005 renamed INV-…; claims_ref_kind turns
                              INV-/IC- into DI- for direct. APPLIED 2026-10-11.
   schema-16-lenses-delivered.sql  orders_status_check gains 'lenses_in'.
+                             APPLIED 2026-10-11 by Claude.
+  schema-17-tab-maintenance.sql  app_settings.disabled_tabs jsonb default '[]'.
                              APPLIED 2026-10-11 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
@@ -840,6 +853,9 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Settings › Tabs: the office switches sidebar tabs off; branches
+             see them greyed, "— under maintenance" in italics, unopenable
+             (moved off live); the office can still open them. schema-17.
  2026-10-11  Fitting Log: new step "Lenses Delivered" (lenses_in, cyan) between
              Waiting for Lenses and In transit — buttons "Lenses delivered",
              then "Send to fitter" (picker) when the driver arrives. schema-16

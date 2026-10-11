@@ -105,7 +105,11 @@ function toSettings(r) {
     : DEFAULT_CATEGORIES.map(c => ({ ...c, brandGroup: DEFAULT_BRAND_GROUP }));
   // The insurers Direct Insurance offers (schema-13/-14). `hasInsurers` says
   // the column is there to write back to.
-  return { brandGroups: groups, categories: cats, insurers: r?.insurers ?? [], hasInsurers: !!r && 'insurers' in r };
+  // The tabs the office switched off (schema-17), likewise.
+  return {
+    brandGroups: groups, categories: cats, insurers: r?.insurers ?? [], hasInsurers: !!r && 'insurers' in r,
+    disabledTabs: r?.disabled_tabs ?? [], hasDisabledTabs: !!r && 'disabled_tabs' in r,
+  };
 }
 
 // Same bargain as settings: an empty list means nobody has edited it yet, so
@@ -241,6 +245,7 @@ export async function saveSettings(settings) {
   const { error } = await supabase.from('app_settings').update({
     brand_groups: settings.brandGroups, categories: settings.categories,
     ...(settings.hasInsurers ? { insurers: settings.insurers } : {}),
+    ...(settings.hasDisabledTabs ? { disabled_tabs: settings.disabledTabs } : {}),
   }).eq('id', 1);
   if (error) throw new Error(error.message);
 }

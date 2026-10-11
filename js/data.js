@@ -65,6 +65,18 @@ export const DEFAULT_CATEGORIES = [
   { name: 'Accessories',       needsBrand: false, needsAudience: false, needsQty: true, unit: 'pcs' },
 ];
 export const AUDIENCES = ['Men', 'Women', 'Unisex', 'Kids'];
+// The sidebar tabs the office may switch off for maintenance (Settings).
+// Settings itself is never on the list — it is how they are switched back on.
+export const TABS = [
+  { key: 'fitting',  label: 'Fitting Log',      icon: 'glasses' },
+  { key: 'stock',    label: 'Stock Requests',   icon: 'box', note: 'Office Queue for the office' },
+  { key: 'lens',     label: 'Lens Stock',       icon: 'lens' },
+  { key: 'claims',   label: 'Insurance Claims', icon: 'receipt' },
+  { key: 'direct',   label: 'Direct Insurance', icon: 'shield' },
+  { key: 'schedule', label: 'Schedule',         icon: 'calendar' },
+];
+export const tabOff = (settings, key) => key !== 'settings' && (settings?.disabledTabs ?? []).includes(key);
+
 export const UNITS = [
   { value: 'pcs', label: 'per piece' },
   { value: 'box', label: 'per box' },

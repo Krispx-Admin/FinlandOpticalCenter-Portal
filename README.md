@@ -22,7 +22,7 @@ python3 -m http.server 8000     # or: npx serve
 | **Insurance Claims** | Raises a printable A4 **invoice** — the company's CR and address in English and Arabic either side of the logo — with date, branch, bill number, the customer's full name and member ID exactly as on the insurance card, a priced product list that totals itself, a full SPH/CYL/AXIS/ADD/PD prescription grid, and the payment method. The on-screen preview and the printed sheet are built from the same markup, so what you see is what prints — brand logo on the header, logomark watermarked across the page. |
 | **Direct Insurance** | Every insurance customer, recorded like a claim plus the insurer (OQIC, LIVA, Mednet — the list lives in Settings) and the salesperson, typed and picked from the schedule's roster. The list is a table; each line's arrow opens its details, where the invoice is printed. The office and Ghiath get a dashboard of what insurance paid — the total, by insurer, by branch and by employee — for today, the last 7 days or the last 30. Insurer and salesperson never appear on the printed invoice. |
 | **Schedule** | The weekly staff scheduler, unchanged, running inside the portal (`scheduler.html`). Ghiath and the office build each week and press **Publish** to release it; the roster, branches, leave, special dates and presets live in Postgres, and every week is saved so it can be reopened. Every branch sees the published weeks that haven't finished — and so does anyone, without a code, on the sign-in page's **View schedule**. |
-| **Settings** *(admin)* | Request categories: which fields each needs, pieces vs boxes, and its brand group. Brand groups: named lists of brands, drag-and-drop between them, so picking *Solutions & drops* never offers a sunglasses brand. |
+| **Settings** *(admin)* | Tabs: switch any sidebar tab off while it is worked on — branches see it greyed out, *under maintenance*, and cannot open it. Request categories: which fields each needs, pieces vs boxes, and its brand group. Brand groups: named lists of brands, drag-and-drop between them, so picking *Solutions & drops* never offers a sunglasses brand. |
 
 ## The model
 
@@ -99,6 +99,7 @@ Applied in order:
 | `supabase/schema-13-claim-invoice-fields.sql` | `claims.member_id`, `claims.insurer`, `app_settings.insurers` |
 | `supabase/schema-14-direct-insurance.sql` | `claims.kind`, the salesperson columns, DI- numbering, the insurers seeded, `staff_list()` |
 | `supabase/schema-16-lenses-delivered.sql` | the Fitting Log's `lenses_in` status |
+| `supabase/schema-17-tab-maintenance.sql` | `app_settings.disabled_tabs` — the tabs switched off for maintenance |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

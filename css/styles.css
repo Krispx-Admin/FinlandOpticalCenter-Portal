@@ -332,6 +332,13 @@ svg { width: 18px; height: 18px; flex: none; }
   font-weight: 600; font-size: 13.5px; transition: background var(--speed), color var(--speed);
 }
 .nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+/* a tab the office switched off — greyed, and it says why */
+.nav-item.nav-off { color: rgba(255,255,255,.34); }
+.nav-item.nav-off svg { opacity: .5; }
+span.nav-item.nav-off { cursor: not-allowed; }
+span.nav-item.nav-off:hover { background: none; color: rgba(255,255,255,.34); }
+a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
+.nav-off-note { font-style: italic; font-weight: 500; font-size: 11.5px; white-space: nowrap; }
 .nav-item.on { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 2px 0 0 #fff; }
 .nav-badge {
   margin-left: auto; font-style: normal; background: #f59e0b; color: #3a2500;
@@ -735,6 +742,33 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .set-add input { flex: 1 1 220px; border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 12px; outline: none; font-size: 13px; }
 .set-add input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
+
+/* Settings › Tabs — one row per sidebar tab with an on/off switch */
+.tab-list { display: flex; flex-direction: column; gap: 8px; }
+.tab-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 11px; background: var(--page);
+  transition: border-color var(--speed), background var(--speed);
+}
+.tab-row:hover { border-color: var(--border-strong); }
+.tab-ico svg { width: 17px; height: 17px; color: var(--brand); display: block; }
+.tab-name { flex: 1; min-width: 0; font-size: 13.5px; }
+.tab-state { font-size: 12px; font-weight: 600; color: var(--st-green); }
+.tab-row.is-off { background: var(--surface); }
+.tab-row.is-off .tab-ico svg, .tab-row.is-off .tab-name b { color: var(--ink-3); }
+.tab-row.is-off .tab-state { color: var(--st-amber); }
+.sw { position: relative; flex: none; width: 38px; height: 22px; }
+.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.sw i { position: absolute; inset: 0; border-radius: 999px; background: #c9d1dc; transition: background var(--speed); pointer-events: none; }
+.sw i::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform var(--speed);
+}
+.sw input:checked + i { background: var(--brand); }
+.sw input:checked + i::after { transform: translateX(16px); }
+.sw input:focus-visible + i { box-shadow: 0 0 0 3px rgba(19,48,86,.2); }
+.sw input:disabled { cursor: not-allowed; }
+.sw input:disabled + i { opacity: .5; }
 
 /* settings field toggles — pill chips */
 .check.sm {

@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff } from './data.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
@@ -231,10 +231,30 @@ function moduleAllowed(key, me) {
   return m && (!m.adminOnly || me?.role === 'admin');
 }
 
+// A tab the office switched off in Settings is closed to everyone else; the
+// office can still open it, to see to whatever needed the maintenance.
+const isOff = key => tabOff(store.state.settings, key);
+const moduleOpen = (key, me) => moduleAllowed(key, me) && (me?.role === 'admin' || !isOff(key));
+
+// When every tab this location may use is switched off, it lands here.
+const OFF_KEY = 'maintenance';
+const offView = () => ({
+  mount(el) {
+    el.innerHTML = `
+      <header class="mod-head"><div><h1>Under maintenance</h1>
+        <p class="mod-sub">The office is working on the portal — your tabs will be back shortly.</p></div></header>
+      <div class="empty">${icons.settings}<p>Nothing is open right now. This page updates by itself when a tab is switched back on.</p></div>`;
+  },
+  onChange() {}, unmount() {},
+});
+
 function currentModule() {
+  const me = store.session;
   const key = (location.hash.match(/#\/(\w+)/) ?? [])[1];
-  if (moduleAllowed(key, store.session)) return key;
-  return homeOf(store.session).slice(2);
+  if (moduleOpen(key, me)) return key;
+  const home = homeOf(me).slice(2);
+  if (moduleOpen(home, me)) return home;
+  return Object.keys(MODULES).find(k => moduleOpen(k, me)) ?? OFF_KEY;
 }
 
 function badgeCounts(me) {
@@ -301,8 +321,10 @@ function renderShell() {
   mountModule(mod);
 
   unsub = store.subscribe(event => {
-    renderNav(store.session, currentModule());
-    view?.onChange(event);
+    // A tab switched off while someone is on it moves them to one still open.
+    const next = currentModule();
+    if (next !== mountedKey) mountModule(next);
+    else { renderNav(store.session, next); view?.onChange(event); }
     if (event?.remote && event.title && event.module !== 'system') {
       const relevant =
         (event.module === 'fitting' && event.refs?.some(id => { const o = store.state.orders.find(x => x.id === id); return o && canSeeOrder(o, me.code); })) ||
@@ -322,6 +344,14 @@ function renderNav(me, active) {
   nav.innerHTML = Object.entries(MODULES).filter(([key]) => moduleAllowed(key, me)).map(([key, m]) => {
     const label = (me.role === 'admin' || readOnly(me.role)) && m.adminLabel ? m.adminLabel : m.label;
     const icon = icons[me.role === 'admin' && m.adminIcon ? m.adminIcon : m.icon];
+    // Switched off: greyed, and said so. Only the office can still go in.
+    if (isOff(key)) {
+      const inner = `${icon}<span>${label} <i class="nav-off-note">— under maintenance</i></span>`;
+      const title = `${esc(label)} — under maintenance`;
+      return me.role === 'admin'
+        ? `<a class="nav-item nav-off ${active === key ? 'on' : ''}" href="#/${key}" title="${title}">${inner}</a>`
+        : `<span class="nav-item nav-off" aria-disabled="true" title="${title}">${inner}</span>`;
+    }
     return `
       <a class="nav-item ${active === key ? 'on' : ''}" href="#/${key}" title="${esc(label)}">
         ${icon}<span>${label}</span>
@@ -336,7 +366,7 @@ function mountModule(key) {
   view?.unmount();
   closeLayer();
   const me = store.session;
-  view = MODULES[key].make(me);
+  view = key === OFF_KEY ? offView() : MODULES[key].make(me);
   // Swap in a fresh content node so listeners from the previous view die with it.
   const old = app.querySelector('#content');
   const content = old.cloneNode(false);
@@ -344,6 +374,8 @@ function mountModule(key) {
   content.classList.remove('mod-in'); void content.offsetWidth; content.classList.add('mod-in');
   view.mount(content);
   mountedKey = key;
+  // Sent elsewhere (a closed tab, say): the address says where they really are.
+  if (key !== OFF_KEY && location.hash !== `#/${key}`) history.replaceState(null, '', `#/${key}`);
   renderNav(me, key);
 }
 
