@@ -34,7 +34,7 @@ Six modules (sidebar order):
   6. Settings (admin)   — request categories, brand groups, branch sign-in codes
 
 Plus a PUBLIC "View schedule" page (#/view-schedule, button top-right of the
-sign-in screen) that needs no code: this week's rota for any staff member.
+sign-in screen) that needs no code: the PUBLISHED weeks that haven't finished.
 
 Plus a hidden PRESENTER MODE (?present in the URL) used to record the staff
 tutorial video. See section 10.
@@ -87,7 +87,9 @@ js/schedule.js           Schedule module: hosts scheduler.html in an iframe and
                          gives it window.focSched (load/save/loadWeek/saveWeek)
 scheduler.html           THE USER'S STAFF SCHEDULER, a minified React bundle.
                          DO NOT change its design or behaviour (user, 2026-10-11).
-                         Only three additions, all invisible — see 4.7.
+                         Additions listed in 4.7 (storage bridge, week
+                         save/load, viewer CSS; and at the user's request:
+                         week arrows, local-time date fix, WAVE -> MOUJ).
 js/present.js            presenter mode engine (cursor, ripple, spotlight, captions)
 js/tour.js               the tutorial as data: 7 chapters
 img/                     4 logo PNGs (see section 7)
@@ -272,8 +274,9 @@ is what prints). Edit = delete+reinsert items and rx rows.
 --------------------
 The user's own staff scheduler (React bundle, teal/Space Grotesk design — its
 OWN look, not the portal's) runs UNCHANGED in an iframe. The user explicitly
-said not to change its functionality or design. Source copy: Desktop
-"finland-optical-scheduler with X2.html". The three byte-exact additions:
+said not to change its functionality or design — change it ONLY when asked,
+and say exactly what changed. Source copy: Desktop
+"finland-optical-scheduler with X2.html". Byte-exact additions:
   1. storage: Zv()/Lv() (its load/save, was localStorage "foc_state_v2") call
      window.parent.focSched.load()/save() when framed; standalone unchanged.
   2. two React effects after its save effect: when the week (v) changes,
@@ -284,6 +287,14 @@ said not to change its functionality or design. Source copy: Desktop
   3. a <style> block keyed on html.foc-view: in viewer mode it hides .tabs,
      .hd-reset, .presets, .ptpanel, .manualhint, .sickbar, .empty and every
      .bar child except "Export by employee". Notes stay.
+  4. (asked 2026-10-11) "Week starting (Saturday)" is ‹ range › arrows that
+     move 7 days (snapping to Saturday) instead of a date box. Classes .wknav,
+     .wkarrow, .wkrange, styled in the head <style> with the scheduler's vars.
+  5. (asked) DATE BUG FIX: Vv(), xo() and Qv's day loop used
+     toISOString().slice(0,10) = UTC, which in Oman (UTC+4) is the previous day,
+     so columns were labelled a day early and leave matched the wrong day. Now
+     FD(d) formats local dates; SW(iso) snaps to Saturday.
+  6. (asked) Al Mouj's scheduler code WAVE -> MOUJ in the built-in roster.
   When editing the bundle, edit BYTES (read_bytes/write_bytes) — text-mode
   Python on Windows rewrote its line endings once.
 Who sees what:
@@ -293,16 +304,23 @@ Who sees what:
     names (id, name, optom, first priority) and branches. Pick a week's Saturday
     in the scheduler to reopen it. First open with an empty row seeds the
     built-in roster (26 employees, 12 branches) into the database.
-  - Every branch: Schedule section, read-only, CURRENT WEEK ONLY (user's
-    choice) via schedule_view() — the saved week whose 7 days include today in
-    Asia/Muscat. Ghiath usually builds NEXT week; branches see it from its
-    Saturday.
+  - PUBLISH (user, 2026-10-11): a week is the editors' draft until Ghiath or
+    the office presses Publish in the bar above the frame (#sc-bar). That calls
+    publish_schedule_week(week), which copies {week_start, result, employees,
+    branches} into schedule_weeks.published (+ published_at/_by). The bar shows
+    Not made yet / Not published / Published <time> / Changed since it was
+    published (+ "Publish changes"). Publish first flushes a pending save.
+    The bridge tracks the open week from loadWeek(iso) calls.
+  - Every branch: Schedule section, read-only, via schedule_view() = every
+    PUBLISHED week that hasn't finished (week_start > today-7, Asia/Muscat),
+    i.e. this week and upcoming; never past weeks; drafts never. Chips switch
+    weeks when more than one; default = this week, else the next one.
   - Public #/view-schedule: same viewer, no sign-in (anon may run
     schedule_view). User accepted that names + shifts + notes are public.
   - The editor bridge never writes until the saved state has been read; a
     failed read leaves it read-only (so built-in defaults can't overwrite).
-  - Scheduler branch codes are its own (WAVE = Al Mouj Mall, SAL = Salalah
-    Gardens Mall) and need not match portal codes.
+  - Scheduler branch codes are its own list; Al Mouj is MOUJ like the portal
+    (renamed from WAVE). SAL there = Salalah Gardens Mall.
   - The scheduler's own "Reset to defaults" now resets the SHARED roster in
     the database (its behaviour, unchanged; it asks for confirmation).
 
@@ -359,10 +377,22 @@ Migrations are applied by hand, in order. Each file has a header with
                              for the scheduler; schedule_state, schedule_weeks
                              (+touch_schedule trigger: updated_at/updated_by);
                              schedule_view() granted to anon.
-                             >>> NOT YET APPLIED as of 2026-10-11 — user to run.
-                                 Until then the office can't sign in with the
-                                 new site (it asks for ofc@...) and Schedule shows
-                                 an error. <<<
+                             APPLIED by the user 2026-10-11 (confirmed live:
+                             OFC exists, office opened Schedule and seeded 26
+                             employees / 12 branches, saved week 2026-10-17).
+  schema-11-schedule-publish.sql  WAVE -> MOUJ inside all schedule JSON (text
+                             replace of "WAVE" and "WAVE: "); saved days moved
+                             onto their dates (day n = week_start + n);
+                             schedule_weeks.published/_at/_by;
+                             publish_schedule_week(date); schedule_view() now
+                             returns an ARRAY of published unfinished weeks
+                             (frontend also accepts the old single object).
+                             >>> NOT YET APPLIED as of 2026-10-11 — user to run,
+                                 then reload the portal (an open old tab would
+                                 save WAVE back). <<<
+                             Presets' stored days were NOT date-fixed (there
+                             were none); weeks saved before the fix keep leave
+                             placed on the shifted days until regenerated.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -689,6 +719,10 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Publish: editors' weeks are drafts until Publish; branches and
+             the public see published, unfinished weeks (schema-11, NOT YET
+             APPLIED). Scheduler: week arrows, local-time date fix, WAVE ->
+             MOUJ (user asked for these). schema-10 confirmed applied.
  2026-10-11  Schedule module: the user's scheduler.html runs unchanged in an
              iframe, data in Postgres (schedule_state, schedule_weeks), every
              week saved; branches + public "View schedule" (no code) see the

@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --  10 · The warehouse becomes the Office (OFC); Ghiath joins; the schedule moves in
---  STATUS: NOT YET APPLIED — run it in the Supabase SQL editor, all of it at once
+--  STATUS: applied 2026-10-11 (by hand, in the SQL editor)
 --
 --  Three things, in one transaction so the portal never sees half of them:
 --

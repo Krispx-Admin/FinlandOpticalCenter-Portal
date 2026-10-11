@@ -12,12 +12,13 @@
 //                                    branches it was made from
 //   window.focSched.viewer           true for a read-only look at one week
 //
-// Ghiath and the office edit. Everyone else — every branch, and the public
-// "View schedule" page — sees the week that is running, through a database
-// function that hands out that week and nothing older.
+// Ghiath and the office edit, and a week stays theirs until one of them
+// presses Publish: that copies the week as it stands into what everyone else
+// sees. Every branch, and the public "View schedule" page, sees the published
+// weeks that have not finished yet — this week and any ahead — and none older.
 import { supabase } from './auth.js';
 import { canEditSchedule } from './data.js';
-import { esc, icons, toast } from './ui.js';
+import { esc, icons, toast, fmtDT } from './ui.js';
 
 const FRAME = 'scheduler.html';
 
@@ -41,24 +42,32 @@ const peopleFor = es => (es ?? []).map(e => ({
   id: e.id, name: e.name, optom: !!e.optom, priority: (e.priority ?? []).slice(0, 1),
 }));
 
-const day = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+// Dates are counted in local time: in Oman, UTC midnight is still yesterday.
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const plusDays = (iso, n) => {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return isoOf(d);
 };
+const day = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 export const weekLabel = iso => `${day(iso)} – ${day(plusDays(iso, 6))}`;
 
 // ── the editor's bridge ─────────────────────────────────────────────────────
 // Nothing is written until the saved state has been read. If that read fails,
 // the scheduler would start from its built-in roster — and writing that back
 // would wipe the real one — so a failed read leaves this bridge read-only.
-function editorBridge() {
+//
+// It also follows which week is open and whether that week is published, so
+// the Publish bar above the frame can say so.
+function editorBridge(onWeek) {
   let canWrite = false;
-  let last = null;                 // what the database holds, to skip echoes
-  const lastWeek = new Map();
+  let last = null;                 // the roster as the database holds it
   let timer = null;
-  const weekTimers = new Map();
+  const saved = new Map();         // iso → result JSON as the database holds it
+  const current = new Map();       // iso → result JSON as the scheduler holds it
+  const published = new Map();     // iso → { json, at }
+  const pending = new Map();       // iso → { timer, write }
+  let open = null;
   let warned = false;
   const problem = (title, sub) => {
     if (warned) return;
@@ -66,8 +75,20 @@ function editorBridge() {
     toast({ title, sub, tone: 'stock', ms: 9000 });
     setTimeout(() => { warned = false; }, 9000);
   };
+  const tell = () => onWeek?.(bridge.week());
 
-  return {
+  const writeWeek = async (iso, result, employees, branches, json) => {
+    pending.delete(iso);
+    const { error } = await supabase.from('schedule_weeks').upsert({
+      week_start: iso, result, employees: peopleFor(employees), branches: branches ?? [],
+    });
+    if (error) { problem('The week did not save', error.message); return false; }
+    saved.set(iso, json);
+    tell();
+    return true;
+  };
+
+  const bridge = {
     viewer: false,
 
     async load() {
@@ -100,10 +121,25 @@ function editorBridge() {
 
     async loadWeek(iso) {
       if (!iso) return null;
-      const { data, error } = await supabase.from('schedule_weeks')
-        .select('result').eq('week_start', iso).maybeSingle();
+      open = iso;
+      tell();
+      // `published` arrives with schema-11; before it, ask for the week alone.
+      let res = await supabase.from('schedule_weeks')
+        .select('result, published, published_at').eq('week_start', iso).maybeSingle();
+      if (res.error && /published/.test(res.error.message)) {
+        res = await supabase.from('schedule_weeks').select('result').eq('week_start', iso).maybeSingle();
+      }
+      const { data, error } = res;
       if (error) { problem('Could not load that week', error.message); return null; }
-      if (data) lastWeek.set(iso, JSON.stringify(data.result));
+      if (data) {
+        const json = JSON.stringify(data.result);
+        saved.set(iso, json);
+        current.set(iso, json);
+        if (data.published) published.set(iso, { json: JSON.stringify(data.published.result), at: data.published_at });
+      } else {
+        current.delete(iso);
+      }
+      if (open === iso) tell();
       return data?.result ?? null;
     },
 
@@ -111,22 +147,49 @@ function editorBridge() {
       const iso = result?.weekStartISO;
       if (!canWrite || !iso) return;
       const json = JSON.stringify(result);
-      if (lastWeek.get(iso) === json) return;
-      clearTimeout(weekTimers.get(iso));
-      weekTimers.set(iso, setTimeout(async () => {
-        const { error } = await supabase.from('schedule_weeks').upsert({
-          week_start: iso, result, employees: peopleFor(employees), branches: branches ?? [],
-        });
-        if (error) problem('The week did not save', error.message);
-        else lastWeek.set(iso, json);
-      }, 600));
+      current.set(iso, json);
+      tell();
+      if (saved.get(iso) === json) return;
+      clearTimeout(pending.get(iso)?.timer);
+      const write = () => writeWeek(iso, result, employees, branches, json);
+      pending.set(iso, { timer: setTimeout(write, 600), write });
+    },
+
+    // Where the open week stands, for the Publish bar.
+    week() {
+      const iso = open;
+      const has = !!(iso && current.has(iso));
+      const pub = iso ? published.get(iso) : null;
+      return { iso, has, publishedAt: pub?.at ?? null, changed: !!(pub && has && pub.json !== current.get(iso)) };
+    },
+
+    // Copy the open week, as it stands, into what everyone else sees. An edit
+    // still waiting to be written is written first, so what is published is
+    // exactly what is on screen.
+    async publish() {
+      const iso = open;
+      if (!iso || !current.has(iso)) return false;
+      const wait = pending.get(iso);
+      if (wait) {
+        clearTimeout(wait.timer);
+        if (!await wait.write()) return false;
+      }
+      const { data, error } = await supabase.rpc('publish_schedule_week', { p_week: iso });
+      if (error) {
+        toast({ title: 'The week was not published', sub: error.message.replace(/^.*?:\s*/, ''), tone: 'stock' });
+        return false;
+      }
+      published.set(iso, { json: current.get(iso), at: data ?? new Date().toISOString() });
+      tell();
+      return true;
     },
   };
+  return bridge;
 }
 
 // ── the viewer's bridge ─────────────────────────────────────────────────────
-// One week, already fetched, and nowhere to write it. The scheduler hides its
-// controls when it sees `viewer`; the database would refuse a write anyway.
+// One published week, already fetched, and nowhere to write it. The scheduler
+// hides its controls when it sees `viewer`; the database refuses writes anyway.
 function viewerBridge(week) {
   return {
     viewer: true,
@@ -145,28 +208,83 @@ function viewerBridge(week) {
 
 const frameHTML = () => `<iframe class="sched-frame" src="${FRAME}" title="Staff schedule"></iframe>`;
 
-// The running week, read-only. Used by the Schedule section for the branches
-// and by the public page, which has no sign-in at all.
+// What a week is to someone reading it today.
+function weekName(iso) {
+  const today = isoOf(new Date());
+  if (iso <= today && today < plusDays(iso, 7)) return 'This week';
+  if (iso > today && iso <= plusDays(today, 7)) return 'Next week';
+  return `Week of ${day(iso)}`;
+}
+
+// The published weeks that have not finished, read-only. Used by the Schedule
+// section for the branches and by the public page, which has no sign-in.
 export async function mountScheduleViewer(stage, subEl) {
-  stage.innerHTML = `<div class="boot sched-boot"><span class="boot-spin"></span>Loading this week’s schedule…</div>`;
+  stage.innerHTML = `<div class="boot sched-boot"><span class="boot-spin"></span>Loading the schedule…</div>`;
   const { data, error } = await supabase.rpc('schedule_view');
-  if (error || !data) {
-    if (subEl) subEl.textContent = 'This week';
+  // Before schema-11 the function returned one week, not a list.
+  const weeks = Array.isArray(data) ? data : data ? [data] : [];
+  if (error || !weeks.length) {
+    if (subEl) subEl.textContent = 'Published weeks';
     stage.innerHTML = `
       <div class="empty">${icons.calendar}
-        <p>${error ? 'The schedule could not be loaded.' : 'This week’s schedule has not been made yet.'}</p>
+        <p>${error ? 'The schedule could not be loaded.' : 'No schedule has been published yet.'}</p>
         ${error ? `<p class="muted">${esc(error.message)}</p>` : ''}
       </div>`;
     return;
   }
-  if (subEl) subEl.textContent = `This week · ${weekLabel(data.week_start)}`;
-  window.focSched = viewerBridge(data);
-  stage.innerHTML = frameHTML();
+  weeks.sort((a, b) => (a.week_start < b.week_start ? -1 : 1));
+  const today = isoOf(new Date());
+  let pick = weeks.find(w => w.week_start <= today && today < plusDays(w.week_start, 7)) ?? weeks[0];
+
+  const show = () => {
+    if (subEl) subEl.textContent = `${weekName(pick.week_start)} · ${weekLabel(pick.week_start)}`;
+    window.focSched = viewerBridge(pick);
+    stage.innerHTML = `
+      ${weeks.length > 1 ? `<section class="chips sched-weeks">${weeks.map(w => `
+        <button class="chip ${w === pick ? 'on' : ''}" data-week="${esc(w.week_start)}">
+          ${esc(weekName(w.week_start))}<span class="chip-n">${esc(weekLabel(w.week_start))}</span>
+        </button>`).join('')}</section>` : ''}
+      ${frameHTML()}`;
+  };
+  stage.onclick = e => {
+    const b = e.target.closest('[data-week]');
+    if (!b) return;
+    pick = weeks.find(w => w.week_start === b.dataset.week) ?? pick;
+    show();
+  };
+  show();
 }
 
 export function scheduleView(me) {
   const editor = canEditSchedule(me.role);
-  let root;
+  let root, bridge = null, busy = false;
+
+  // The Publish bar: which week is open, whether the branches can see it, and
+  // the one button that lets them.
+  function barHTML(w) {
+    if (!w?.iso) return '';
+    const label = `${weekName(w.iso)} · ${weekLabel(w.iso)}`;
+    let state, button;
+    if (!w.has) {
+      state = `<span class="pub-state">${icons.clock} Not made yet — generate it first</span>`;
+      button = `<button class="btn btn-primary" disabled>${icons.send} Publish</button>`;
+    } else if (!w.publishedAt) {
+      state = `<span class="pub-state warn">${icons.clock} Not published — the branches can’t see this week</span>`;
+      button = `<button class="btn btn-primary" data-publish ${busy ? 'disabled' : ''}>${icons.send} ${busy ? 'Publishing…' : 'Publish'}</button>`;
+    } else if (w.changed) {
+      state = `<span class="pub-state warn">${icons.clock} Changed since it was published ${esc(fmtDT(Date.parse(w.publishedAt)))}</span>`;
+      button = `<button class="btn btn-primary" data-publish ${busy ? 'disabled' : ''}>${icons.send} ${busy ? 'Publishing…' : 'Publish changes'}</button>`;
+    } else {
+      state = `<span class="pub-state ok">${icons.check} Published ${esc(fmtDT(Date.parse(w.publishedAt)))} — the branches see this week</span>`;
+      button = '';
+    }
+    return `<div class="pub-bar"><b>${esc(label)}</b>${state}${button}</div>`;
+  }
+
+  function paintBar(w) {
+    const host = root?.querySelector('#sc-bar');
+    if (host) host.innerHTML = barHTML(w);
+  }
 
   function render() {
     root.innerHTML = `
@@ -174,15 +292,26 @@ export function scheduleView(me) {
         <div>
           <h1>Schedule</h1>
           <p class="mod-sub" id="sc-sub">${editor
-            ? 'Every week you make is saved — pick its Saturday to go back to it. The branches see the week that is running.'
-            : 'This week'}</p>
+            ? 'Make the week, then publish it — the branches see published weeks only, from this week on.'
+            : 'Published weeks'}</p>
         </div>
+        ${editor ? '<div id="sc-bar"></div>' : ''}
       </header>
       <div class="sched-stage" id="sc-stage"></div>`;
     const stage = root.querySelector('#sc-stage');
     if (editor) {
-      window.focSched = editorBridge();
+      bridge = editorBridge(paintBar);
+      window.focSched = bridge;
       stage.innerHTML = frameHTML();
+      root.querySelector('#sc-bar').addEventListener('click', async e => {
+        if (!e.target.closest('[data-publish]') || busy) return;
+        busy = true;
+        paintBar(bridge.week());
+        const ok = await bridge.publish();
+        busy = false;
+        paintBar(bridge.week());
+        if (ok) toast({ title: 'Week published', sub: `${weekLabel(bridge.week().iso)} — every branch can see it now`, tone: 'info' });
+      });
     } else {
       mountScheduleViewer(stage, root.querySelector('#sc-sub'));
     }

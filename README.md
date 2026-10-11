@@ -20,7 +20,7 @@ python3 -m http.server 8000     # or: npx serve
 | **Stock Requests** | Branches compose category-first requests; the admin controls, per category, which fields are needed, whether it's counted in pieces or boxes, and which brand group it offers (Settings). No review step — the office prints the pick sheet, fulfils it, and marks it completed. |
 | **Lens Stock** | One fitting centre (MGM) holds the loose-lens shelf and is the only location that can edit its counts. Every other branch browses that shelf by type / index / coating / SPH / CYL, builds a basket and requests it; MGM confirms — which deducts the quantities — or declines with a reason. The request opens its fitting order, which reads Waiting Lens Confirmation until MGM answers, carries a Stock Lens note and lists the lenses. |
 | **Insurance Claims** | Raises a printable A4 claim receipt: date, branch, bill number and customer, a priced product list that totals itself, a full SPH/CYL/AXIS/ADD/PD prescription grid, and the payment method. The on-screen preview and the printed sheet are built from the same markup, so what you see is what prints — brand logo on the header, logomark watermarked across the page. |
-| **Schedule** | The weekly staff scheduler, unchanged, running inside the portal (`scheduler.html`). Ghiath and the office build each week; the roster, branches, leave, special dates and presets live in Postgres, and every week is saved so it can be reopened. Every branch sees the week that is running — and so does anyone, without a code, on the sign-in page's **View schedule**. |
+| **Schedule** | The weekly staff scheduler, unchanged, running inside the portal (`scheduler.html`). Ghiath and the office build each week and press **Publish** to release it; the roster, branches, leave, special dates and presets live in Postgres, and every week is saved so it can be reopened. Every branch sees the published weeks that haven't finished — and so does anyone, without a code, on the sign-in page's **View schedule**. |
 | **Settings** *(admin)* | Request categories: which fields each needs, pieces vs boxes, and its brand group. Brand groups: named lists of brands, drag-and-drop between them, so picking *Solutions & drops* never offers a sunglasses brand. |
 
 ## The model
@@ -93,6 +93,7 @@ Applied in order:
 | `supabase/schema-08-lens-auto-deduct.sql` | requests deducted the shelf as placed — applied, then undone by 09 |
 | `supabase/schema-09-lens-confirm-again.sql` | puts back schema-07's `create_lens_request`: MGM confirms each request |
 | `supabase/schema-10-office-ghiath-schedule.sql` | WH → OFC ("Office"); Ghiath, a read-only schedule editor; `schedule_state`, `schedule_weeks`, `schedule_view()` |
+| `supabase/schema-11-schedule-publish.sql` | `publish_schedule_week()`; `schedule_view()` returns published, unfinished weeks; Al Mouj WAVE → MOUJ; saved days onto their real dates |
 
 Reference numbers (`SR-…`, `LR-…`, `IC-…`) are allocated by Postgres sequences
 as part of the insert, so two branches acting at the same instant cannot be
