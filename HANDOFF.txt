@@ -365,9 +365,11 @@ Who sees what:
 
 4.8 DIRECT INSURANCE (added 2026-10-11)
 --------------------------------------
-Sales operators record every insurance customer: exactly the claim form
-(date, branch, member ID, bill, full name + card note, products, Rx, payment,
-printable Invoice) plus INSURER (select from app_settings.insurers — seeded
+Sales operators record every insurance customer: the claim form (date,
+branch, member ID, bill, full name + card note, products, Rx, printable
+Invoice) WITHOUT payment — no Cash/Card on the form, the list or the invoice
+(user, 2026-10-11; the invoice keeps only its Total box, .rc-pay-total; the
+payment column just holds its default) — plus INSURER (select from app_settings.insurers — seeded
 OQIC, LIVA, Mednet; office edits in Settings) and SALESPERSON (select from
 staff_list() = the schedule roster's names + branches; the branch's own people
 first in an "At <branch>" optgroup). Both required. The insurer and salesperson
@@ -807,6 +809,7 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Direct Insurance: Cash/Card removed (form, list, invoice).
  2026-10-11  Direct Insurance tab: claim form + insurer + salesperson (from the
              schedule roster), DI- numbers; office/Ghiath dashboard of what
              insurance paid — total, by insurer, branch, employee; Today/7d/30d.

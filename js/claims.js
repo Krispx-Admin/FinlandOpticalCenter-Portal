@@ -107,6 +107,7 @@ table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowra
 
 .rc-foot { margin-top: auto; padding-top: 4mm; }
 .rc-pay { display: flex; align-items: stretch; gap: 5mm; }
+.rc-pay-total { justify-content: flex-end; }
 .rc-pay-box { flex: 1; border: 1px solid var(--r-line); border-radius: 2mm; padding: 2.8mm 3.5mm; }
 .rc-ticks { display: flex; gap: 8mm; }
 .rc-tick { display: flex; align-items: center; gap: 2.5mm; font-size: 10.5pt; font-weight: 600; }
@@ -224,13 +225,13 @@ export function receiptHTML(c) {
     ${rxTableHTML(normaliseRx(c.rx))}
 
     <div class="rc-foot">
-      <div class="rc-pay">
-        <div class="rc-pay-box">
+      <div class="rc-pay ${c.kind === 'direct' ? 'rc-pay-total' : ''}">
+        ${c.kind === 'direct' ? '' : `<div class="rc-pay-box">
           <h3 class="rc-sec">Payment Method</h3>
           <div class="rc-ticks">
             ${PAYMENT_TYPES.map(p => `<span class="rc-tick ${c.payment === p.value ? 'on' : ''}"><i></i>${esc(p.label)}</span>`).join('')}
           </div>
-        </div>
+        </div>`}
         <div class="rc-total"><span>Total Amount</span><b>${money(total)}<em>${CURRENCY}</em></b></div>
       </div>
 
@@ -440,7 +441,7 @@ export function claimsView(me, kind = 'claim') {
           <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))}${direct && c.employeeName ? ` · ${esc(c.employeeName)}` : ''} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
         </div>
         <div class="row-units"><b>${money(claimTotal(c))}</b> ${CURRENCY}</div>
-        <div class="row-status"><span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span></div>
+        <div class="row-status">${direct ? '' : `<span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span>`}</div>
         <div class="row-time" title="${fmtDT(c.updatedAt)}">${relTime(c.updatedAt)}</div>
         <div class="row-act" data-stop>
           <button class="btn btn-ghost btn-sm" data-print="${c.id}">${icons.printer} Print</button>
@@ -618,11 +619,11 @@ export function claimsView(me, kind = 'claim') {
         </div>
 
         <div class="grid2">
-          <label>Payment type
+          ${direct ? '<span></span>' : `<label>Payment type
             <select id="f-pay">
               ${PAYMENT_TYPES.map(p => `<option value="${p.value}" ${draft.payment === p.value ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}
             </select>
-          </label>
+          </label>`}
           <div class="total-chip"><span>Total</span><b id="f-total">${money(total())} ${CURRENCY}</b></div>
         </div>
 
@@ -639,7 +640,7 @@ export function claimsView(me, kind = 'claim') {
       draft.billNo = el.querySelector('#f-bill').value;
       draft.customer = el.querySelector('#f-cust').value;
       draft.memberId = el.querySelector('#f-member').value;
-      draft.payment = el.querySelector('#f-pay').value;
+      if (!direct) draft.payment = el.querySelector('#f-pay').value;
       if (direct) {
         draft.insurer = el.querySelector('#f-ins').value;
         draft.employeeId = el.querySelector('#f-emp').value;
