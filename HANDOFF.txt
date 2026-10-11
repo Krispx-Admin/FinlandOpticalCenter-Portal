@@ -615,8 +615,13 @@ The four files in img/:
       USED: faded backdrop watermark, rotated -30deg — login (opacity .045,
             min(820px,120vh)) and receipt (opacity .055, 190mm, fixed on print).
   foc-portal-white.png      780x272, WHITE "FOC Portal" artwork with the red ring.
-      USED: sidebar top (.side-wordmark, 32px tall) on the navy gradient;
-            presenter chapter cards (58px).
+      USED: presenter chapter cards (58px). Was the sidebar wordmark until
+            2026-10-11 — KEPT so the sidebar can go back to it.
+  foc-portal-white-v2.png   1200x274, the same artwork with a LARGER "PORTAL"
+            (user's own file, trimmed of its empty border). ON TRIAL in the
+            sidebar (.side-wordmark, 32px tall, ~140px wide) since 2026-10-11.
+            If the user says they don't like it: set the side-wordmark src in
+            js/app.js back to img/foc-portal-white.png.
   foc-portal-mark-white.png 240x249, white mark + red ring only.
       USED: collapsed sidebar rail under 900px (.side-mark, 30px).
 
@@ -812,6 +817,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Sidebar wordmark on trial: foc-portal-white-v2.png (bigger PORTAL);
+             the old one is kept to switch back.
  2026-10-11  Claims + Direct Insurance: branch is fixed to the signed-in branch
              (dropdown only for the office).
  2026-10-11  Direct Insurance: Cash/Card removed (form, list, invoice).

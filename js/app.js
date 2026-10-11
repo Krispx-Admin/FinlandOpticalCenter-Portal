@@ -267,7 +267,7 @@ function renderShell() {
       <nav class="side">
         <div class="side-logo">
           <button class="side-toggle" id="side-toggle" title="Fold the menu" aria-label="Fold the menu">${icons.menu}</button>
-          <img class="side-wordmark" src="img/foc-portal-white.png" alt="FOC Portal">
+          <img class="side-wordmark" src="img/foc-portal-white-v2.png" alt="FOC Portal">
           <img class="side-mark" src="img/foc-portal-mark-white.png" alt="FOC Portal">
         </div>
         <div class="side-nav" id="nav"></div>
