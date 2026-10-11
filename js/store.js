@@ -463,7 +463,7 @@ export const store = {
       ok(await supabase.from('claim_items').insert(db.claimItemRows(row.id, f.items)));
       ok(await supabase.from('claim_prescriptions').insert(db.claimRxRows(row.id, f.rx)));
       return { ...row, customer: f.customer };
-    }, c => ({ by, module: 'claims', title: `${by} raised claim ${c.ref}`, sub: c.customer, refs: [c.id] }))
+    }, c => ({ by, module: 'claims', title: `${by} ${f.kind === 'direct' ? 'recorded insurance customer' : 'raised claim'} ${c.ref}`, sub: c.customer, refs: [c.id] }))
       .then(c => (c ? this.claim(c.id) : null));
   },
 
@@ -557,6 +557,20 @@ export const store = {
       b.brands.splice(Math.max(0, Math.min(b.brands.length, toIdx)), 0, brand);
     }
     return saveSettings({ module: 'settings', title: `${brand} → ${toGroup}` });
+  },
+
+  // ── Insurers: the list Direct Insurance offers ──
+  addInsurer(name) {
+    name = String(name).trim();
+    const list = state.settings.insurers ?? (state.settings.insurers = []);
+    if (!name || list.some(n => n.toLowerCase() === name.toLowerCase())) return Promise.resolve(null);
+    list.push(name);
+    return saveSettings({ module: 'settings', title: `${name} added to the insurers` });
+  },
+
+  removeInsurer(name) {
+    state.settings.insurers = (state.settings.insurers ?? []).filter(n => n !== name);
+    return saveSettings({ module: 'settings', title: `${name} removed from the insurers` });
   },
 
   addCategory({ name, needsBrand = true, needsAudience = true, needsQty = true, unit = 'pcs', brandGroup }) {

@@ -217,7 +217,8 @@ const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
   stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
   lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
-  claims:   { label: 'Insurance Claims', icon: 'receipt', make: claimsView },
+  claims:   { label: 'Insurance Claims', icon: 'receipt', make: me => claimsView(me, 'claim') },
+  direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
   settings: { label: 'Settings', icon: 'settings', make: settingsView, adminOnly: true },
 };

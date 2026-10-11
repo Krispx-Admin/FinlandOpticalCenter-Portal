@@ -23,15 +23,18 @@ Retail branches, lens-fitting centres, eye clinics and one central warehouse
 all sign in to the same site and look at the same live data (Supabase /
 Postgres + realtime).
 
-Six modules (sidebar order):
+Seven modules (sidebar order):
   1. Fitting Log        — a frame's physical journey branch -> fitting centre -> branch
   2. Stock Requests     — branch asks the office for stock (office and Ghiath see
                           it as "Office Queue" with a warehouse icon)
   3. Lens Stock         — MGM holds the loose-lens shelf; everyone else shops it
-  4. Insurance Claims   — printable A4 claim receipt (products, Rx grid, payment)
-  5. Schedule           — the staff scheduler (scheduler.html), unchanged, inside
+  4. Insurance Claims   — printable A4 invoice (products, Rx grid, payment)
+  5. Direct Insurance   — same record + insurer (OQIC/LIVA/Mednet) + salesperson;
+                          office & Ghiath get a "paid by insurance" dashboard. 4.8
+  6. Schedule           — the staff scheduler (scheduler.html), unchanged, inside
                           the portal; data in Postgres. See 4.7.
-  6. Settings (admin)   — request categories, brand groups, branch sign-in codes
+  7. Settings (admin)   — request categories, brand groups, Direct Insurance
+                          insurers, branch sign-in codes
 
 Plus a PUBLIC "View schedule" page (#/view-schedule, button top-right of the
 sign-in screen) that needs no code: the PUBLISHED weeks that haven't finished.
@@ -81,7 +84,9 @@ js/app.js                login screen, loading/error screens, shell + sidebar,
                          hash routing (#/fitting etc.), nav badges, live toasts,
                          presenter-mode loader
 js/fitting.js            Module 1   js/stock.js   Module 2   js/lens.js  Module 4
-js/claims.js             Module 5 (+ RECEIPT_CSS, receiptHTML, printClaim)
+js/claims.js             Insurance Claims AND Direct Insurance: claimsView(me,
+                         kind 'claim'|'direct') (+ RECEIPT_CSS, receiptHTML,
+                         printClaim, the direct dashboard)
 js/settings.js           Settings (admin)
 js/schedule.js           Schedule module: hosts scheduler.html in an iframe and
                          gives it window.focSched (load/save/loadWeek/saveWeek)
@@ -358,12 +363,34 @@ Who sees what:
   - The scheduler's own "Reset to defaults" resets the SHARED roster to
     schedule_defaults (it asks for confirmation).
 
+4.8 DIRECT INSURANCE (added 2026-10-11)
+--------------------------------------
+Sales operators record every insurance customer: exactly the claim form
+(date, branch, member ID, bill, full name + card note, products, Rx, payment,
+printable Invoice) plus INSURER (select from app_settings.insurers — seeded
+OQIC, LIVA, Mednet; office edits in Settings) and SALESPERSON (select from
+staff_list() = the schedule roster's names + branches; the branch's own people
+first in an "At <branch>" optgroup). Both required. The insurer and salesperson
+show in the list and the preview header ("· not printed") — NEVER on the paper.
+Stored in `claims` with kind='direct' (+ insurer, employee_id, employee_name
+snapshot), so items/rx/total trigger/RLS/realtime are shared; trigger
+claims_ref_kind renumbers them DI-… from the same claim_seq. Insurance Claims
+shows kind='claim' only (missing kind counts as 'claim').
+DASHBOARD (seesAll: office + Ghiath, above the list): period chips Today /
+Last 7 days / Last 30 days (by claim date, local, inclusive), stat tiles Paid
+by insurance (OMR) / customers / average, and three cards — By insurer (all
+listed insurers, even at 0), By branch, By employee — each a ranked list:
+name | single-hue navy bar on a #eef1f5 track (8px, 4px radius, scaled to the
+card's max) | amount | count; hover title gives the share. Fixed columns so
+bars align. Built per the dataviz skill (one series per card → no legend).
+
 4.6 SETTINGS (admin only)
 -------------------------
 - Categories: drag to reorder; flag chips Brand / Audience / Quantity;
   "Counted" pcs|box; "Brands from" brand group.
 - Brand groups: rename inline, drag groups, drag brands between groups
   (same brand may sit in several groups).
+- Direct Insurance — insurers: pills with ×, add form (app_settings.insurers).
 (app_settings is read with select '*', so a column the app doesn't know is ignored.)
 - Branch access: set any location's 6-digit code via RPC set_branch_code
   (rejects weak codes like 123456, 000000, <3 distinct runs). Codes cannot
@@ -436,10 +463,14 @@ Migrations are applied by hand, in order. Each file has a header with
                              APPLIED 2026-10-11 by Claude (user asked): verified
                              26 employees, 12 branches, 26 defaults, old JSON
                              columns gone, save_schedule_roster present.
-  schema-13-claim-invoice-fields.sql  claims.member_id (used), claims.insurer and
-                             app_settings.insurers (added, then dropped from the
-                             app at the user's request — unused, empty).
+  schema-13-claim-invoice-fields.sql  claims.member_id, claims.insurer,
+                             app_settings.insurers. (Insurance Claims doesn't use
+                             the insurer; Direct Insurance does.)
                              APPLIED 2026-10-11 by Claude (user asked).
+  schema-14-direct-insurance.sql  claims.kind ('claim'|'direct'), employee_id,
+                             employee_name; trigger claims_ref_kind (DI- refs);
+                             insurers seeded OQIC/LIVA/Mednet; staff_list() RPC
+                             for authenticated. APPLIED 2026-10-11 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -776,6 +807,10 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Direct Insurance tab: claim form + insurer + salesperson (from the
+             schedule roster), DI- numbers; office/Ghiath dashboard of what
+             insurance paid — total, by insurer, branch, employee; Today/7d/30d.
+             schema-14 applied by Claude. Settings card for the insurers.
  2026-10-11  Insurance company removed from claims altogether (form, list,
              filter, preview, Settings) — the user decided it isn't needed.
  2026-10-11  Invoice paper no longer mentions insurance (footer note and

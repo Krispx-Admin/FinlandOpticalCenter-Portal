@@ -85,7 +85,8 @@ function toClaim(r) {
   return {
     id: r.id, ref: r.ref, date: r.claim_date, branch: r.branch_code,
     billNo: r.bill_no ?? '', customer: r.customer ?? '',
-    memberId: r.member_id ?? '',
+    memberId: r.member_id ?? '', kind: r.kind ?? 'claim',
+    insurer: r.insurer ?? '', employeeId: r.employee_id ?? '', employeeName: r.employee_name ?? '',
     items: (r.claim_items ?? []).slice().sort((a, b) => a.position - b.position)
       .map(i => ({ id: i.id, name: i.name, price: num(i.price) })),
     rx: normaliseRx(rx), payment: r.payment,
@@ -102,7 +103,9 @@ function toSettings(r) {
   const cats = r?.categories?.length
     ? r.categories
     : DEFAULT_CATEGORIES.map(c => ({ ...c, brandGroup: DEFAULT_BRAND_GROUP }));
-  return { brandGroups: groups, categories: cats };
+  // The insurers Direct Insurance offers (schema-13/-14). `hasInsurers` says
+  // the column is there to write back to.
+  return { brandGroups: groups, categories: cats, insurers: r?.insurers ?? [], hasInsurers: !!r && 'insurers' in r };
 }
 
 // Same bargain as settings: an empty list means nobody has edited it yet, so
@@ -143,6 +146,11 @@ export const stockLineRows = (requestId, lines) => lines.map((l, i) => ({
 export const claimRow = (f, by) => ({
   claim_date: f.date, branch_code: f.branch, bill_no: f.billNo ?? '',
   ...(f.memberId ? { member_id: f.memberId } : {}),
+  // Direct insurance: the kind, the insurer and the salesperson.
+  ...(f.kind === 'direct' ? {
+    kind: 'direct', insurer: f.insurer || null,
+    employee_id: f.employeeId || null, employee_name: f.employeeName || null,
+  } : {}),
   customer: f.customer ?? '', payment: f.payment === 'card' ? 'card' : 'cash',
   add_od: f.rx?.add?.od ?? '', add_os: f.rx?.add?.os ?? '',
   ...(by ? { created_by: by } : {}),
@@ -232,6 +240,7 @@ export async function saveLensCatalogue(cat) {
 export async function saveSettings(settings) {
   const { error } = await supabase.from('app_settings').update({
     brand_groups: settings.brandGroups, categories: settings.categories,
+    ...(settings.hasInsurers ? { insurers: settings.insurers } : {}),
   }).eq('id', 1);
   if (error) throw new Error(error.message);
 }

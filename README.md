@@ -20,6 +20,7 @@ python3 -m http.server 8000     # or: npx serve
 | **Stock Requests** | Branches compose category-first requests; the admin controls, per category, which fields are needed, whether it's counted in pieces or boxes, and which brand group it offers (Settings). No review step — the office prints the pick sheet, fulfils it, and marks it completed. |
 | **Lens Stock** | One fitting centre (MGM) holds the loose-lens shelf and is the only location that can edit its counts. Every other branch browses that shelf by type / index / coating / SPH / CYL, builds a basket and requests it; MGM confirms — which deducts the quantities — or declines with a reason. The request opens its fitting order, which reads Waiting Lens Confirmation until MGM answers, carries a Stock Lens note and lists the lenses. |
 | **Insurance Claims** | Raises a printable A4 **invoice** — the company's CR and address in English and Arabic either side of the logo — with date, branch, bill number, the customer's full name and member ID exactly as on the insurance card, a priced product list that totals itself, a full SPH/CYL/AXIS/ADD/PD prescription grid, and the payment method. The on-screen preview and the printed sheet are built from the same markup, so what you see is what prints — brand logo on the header, logomark watermarked across the page. |
+| **Direct Insurance** | Every insurance customer, recorded like a claim plus the insurer (OQIC, LIVA, Mednet — the list lives in Settings) and the salesperson, picked from the schedule's roster. The office and Ghiath get a dashboard of what insurance paid — the total, by insurer, by branch and by employee — for today, the last 7 days or the last 30. Insurer and salesperson never appear on the printed invoice. |
 | **Schedule** | The weekly staff scheduler, unchanged, running inside the portal (`scheduler.html`). Ghiath and the office build each week and press **Publish** to release it; the roster, branches, leave, special dates and presets live in Postgres, and every week is saved so it can be reopened. Every branch sees the published weeks that haven't finished — and so does anyone, without a code, on the sign-in page's **View schedule**. |
 | **Settings** *(admin)* | Request categories: which fields each needs, pieces vs boxes, and its brand group. Brand groups: named lists of brands, drag-and-drop between them, so picking *Solutions & drops* never offers a sunglasses brand. |
 
@@ -69,7 +70,7 @@ js/fitting.js       Module 1 — Fitting Log
 js/stock.js         Module 2 — Stock Requests / Office queue
 js/settings.js      Module 3 — Settings: categories, brand groups, branch access
 js/lens.js          Module 4 — Lens Stock
-js/claims.js        Module 5 — Insurance Claim Receipts (A4 print)
+js/claims.js        Insurance Claims and Direct Insurance (+ its dashboard), A4 invoice
 js/schedule.js      Module 6 — Schedule: hosts scheduler.html, keeps its data in Postgres
 scheduler.html      the staff scheduler, as built — only its storage now goes to the portal
 img/                brand logos used on the printed receipt
@@ -95,7 +96,8 @@ Applied in order:
 | `supabase/schema-10-office-ghiath-schedule.sql` | WH → OFC ("Office"); Ghiath, a read-only schedule editor; `schedule_state`, `schedule_weeks`, `schedule_view()` |
 | `supabase/schema-11-schedule-publish.sql` | `publish_schedule_week()`; `schedule_view()` returns published, unfinished weeks; Al Mouj WAVE → MOUJ; saved days onto their real dates |
 | `supabase/schema-12-schedule-roster-tables.sql` | the roster in `schedule_employees` / `schedule_branches`, its defaults in `schedule_defaults`, saved by `save_schedule_roster()` — none of it in the code |
-| `supabase/schema-13-claim-invoice-fields.sql` | `claims.member_id` (also `claims.insurer` and `app_settings.insurers`, no longer used) |
+| `supabase/schema-13-claim-invoice-fields.sql` | `claims.member_id`, `claims.insurer`, `app_settings.insurers` |
+| `supabase/schema-14-direct-insurance.sql` | `claims.kind`, the salesperson columns, DI- numbering, the insurers seeded, `staff_list()` |
 
 Reference numbers (`SR-…`, `LR-…`, `IC-…`) are allocated by Postgres sequences
 as part of the insert, so two branches acting at the same instant cannot be

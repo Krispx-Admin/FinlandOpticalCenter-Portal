@@ -101,6 +101,42 @@ svg { width: 18px; height: 18px; flex: none; }
 .urgent-tag svg { animation: zapPulse 2.2s ease infinite; }
 @keyframes zapPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 
+/* the insurer on a direct-insurance customer — for the portal, never the paper */
+.ins-chip {
+  display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 6px;
+  background: #e2f5f3; color: var(--st-teal); font-weight: 700; font-size: 11.5px; white-space: nowrap;
+}
+
+/* ── Direct Insurance dashboard: one headline row and three ranked lists ── */
+.dash-periods { margin-bottom: 12px; }
+.stat-n small { font-size: 13px; font-weight: 600; color: var(--ink-3); letter-spacing: 0; }
+.dash-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
+.dash-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; min-width: 0;
+}
+.dash-card h3 {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 10px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3);
+}
+.dash-card h3 svg { width: 14px; height: 14px; }
+/* name · bar · amount · count. A thin single-hue bar with rounded ends on a
+   recessive track; the text beside it stays in the ink colours. */
+.bl-row {
+  display: grid; grid-template-columns: minmax(0, 40%) minmax(40px, 1fr) 70px 22px;
+  align-items: center; gap: 10px; padding: 6px 4px; border-radius: 7px; cursor: default;
+}
+.bl-row:hover { background: var(--page); }
+.bl-name { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bl-track { height: 8px; border-radius: 4px; background: #eef1f5; overflow: hidden; }
+.bl-track i { display: block; height: 100%; border-radius: 4px; background: var(--brand); }
+.bl-val { font-size: 12.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.bl-n { font-size: 11.5px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+.dash-note { margin: 0 0 18px; }
+.dash-list-h { font-size: 15px; margin: 6px 0 12px; }
+@media (max-width: 1180px) { .dash-cards { grid-template-columns: 1fr; } }
+.set-plain { cursor: default; }
+
 .loc-chip {
   display: inline-block; padding: 1px 7px; border-radius: 6px;
   background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 11px;

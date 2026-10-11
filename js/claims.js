@@ -4,6 +4,7 @@ import {
   RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly,
 } from './data.js';
 import { store } from './store.js';
+import { supabase } from './auth.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
 
 // Absolute, because the print window is an about:blank document with no base
@@ -297,28 +298,135 @@ export function printClaim(c) {
 }
 
 // ── Module view ────────────────────────────────────────────────────────────
-export function claimsView(me) {
-  // The office and the schedule editor see every branch's claims; the
+// Two tabs share this one view. Insurance Claims (kind 'claim') raise an
+// invoice. Direct Insurance (kind 'direct') is the same record for a customer
+// whose insurer pays the branch directly, plus which insurer and which
+// salesperson — and the office and Ghiath get a dashboard of what was paid.
+const KINDS = {
+  claim: {
+    title: 'Insurance Claims', sub: 'Raise a printable invoice with products, prescription and payment',
+    add: 'New claim', kicker: 'claim', heading: 'Insurance claim',
+    empty: 'No claims yet — create one to print its invoice.',
+  },
+  direct: {
+    title: 'Direct Insurance', sub: 'Every insurance customer — the insurer, the salesperson, what was sold',
+    add: 'New insurance customer', kicker: 'insurance customer', heading: 'Direct insurance',
+    empty: 'No insurance customers yet — add the first one.',
+  },
+};
+
+// The schedule's roster, as the salesperson list. Fetched once per visit.
+let staffCache = null;
+async function staffList() {
+  if (staffCache) return staffCache;
+  const { data, error } = await supabase.rpc('staff_list');
+  if (error) throw new Error(error.message);
+  staffCache = data ?? [];
+  return staffCache;
+}
+
+// Dates on a claim are local calendar days, so the periods are too.
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const PERIODS = [
+  { key: 'today', label: 'Today', days: 1 },
+  { key: '7d', label: 'Last 7 days', days: 7 },
+  { key: '30d', label: 'Last 30 days', days: 30 },
+];
+function periodRange(key) {
+  const days = PERIODS.find(p => p.key === key)?.days ?? 30;
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - (days - 1));
+  return { from: isoDay(from), to: isoDay(to) };
+}
+
+export function claimsView(me, kind = 'claim') {
+  // The office and the schedule editor see every branch's records; the
   // schedule editor may open and print them but not raise, edit or delete.
   const isAdmin = seesAll(me.role);
   const viewOnly = readOnly(me.role);
-  const ui = { q: '', branch: 'all' };
+  const direct = kind === 'direct';
+  const T = KINDS[kind];
+  const ui = { q: '', branch: 'all', insurer: 'all', period: '30d' };
   let root, layer = null;
 
+  const mine = () => store.claimsFor(me.code).filter(c => (c.kind || 'claim') === kind);
+
   function visible() {
-    let list = store.claimsFor(me.code);
+    let list = mine();
     if (isAdmin && ui.branch !== 'all') list = list.filter(c => c.branch === ui.branch);
+    if (direct && ui.insurer !== 'all') list = list.filter(c => c.insurer === ui.insurer);
     if (ui.q) {
       const q = ui.q.toLowerCase();
-      list = list.filter(c => [c.ref, c.customer, c.billNo, c.memberId, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
+      list = list.filter(c => [c.ref, c.customer, c.billNo, c.memberId, c.insurer, c.employeeName, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
         .some(v => String(v ?? '').toLowerCase().includes(q)));
     }
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
+  // The insurers the office has set up, and any still on older records.
+  function insurerChoices() {
+    const set = new Set(store.settings.insurers ?? []);
+    for (const c of mine()) if (c.insurer) set.add(c.insurer);
+    return [...set];
+  }
+
+  // ── the dashboard: what the insurers paid (office and Ghiath) ──
+  // One headline and three ranked lists — by insurer, branch and salesperson —
+  // each a single-hue bar against a quiet track, its amount and count written
+  // beside it, the detail on hover.
+  function dashHTML() {
+    const { from, to } = periodRange(ui.period);
+    const list = mine().filter(c => c.date >= from && c.date <= to);
+    const total = list.reduce((t, c) => t + claimTotal(c), 0);
+    const group = (keyOf, nameOf, seed = []) => {
+      const m = new Map(seed.map(k => [k, { name: nameOf(k), amount: 0, n: 0 }]));
+      for (const c of list) {
+        const k = keyOf(c) || '—';
+        if (!m.has(k)) m.set(k, { name: nameOf(k), amount: 0, n: 0 });
+        const g = m.get(k);
+        g.amount += claimTotal(c);
+        g.n += 1;
+      }
+      return [...m.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+    };
+    const bars = (title, icon, rows) => {
+      const max = Math.max(...rows.map(r => r.amount), 0);
+      return `
+        <div class="dash-card">
+          <h3>${icon} ${esc(title)}</h3>
+          ${rows.length ? rows.map(r => {
+            const share = total ? Math.round((r.amount / total) * 100) : 0;
+            return `
+            <div class="bl-row" title="${esc(r.name)} — ${money(r.amount)} ${CURRENCY} · ${r.n} customer${r.n === 1 ? '' : 's'} · ${share}% of the total">
+              <span class="bl-name">${esc(r.name)}</span>
+              <span class="bl-track"><i style="width:${max ? Math.max((r.amount / max) * 100, r.amount ? 2 : 0) : 0}%"></i></span>
+              <span class="bl-val">${money(r.amount)}</span>
+              <span class="bl-n">${r.n}</span>
+            </div>`;
+          }).join('') : `<p class="muted sm">Nothing in this period.</p>`}
+        </div>`;
+    };
+    const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
+    return `
+      <section class="chips dash-periods">${PERIODS.map(p =>
+        `<button class="chip ${ui.period === p.key ? 'on' : ''}" data-period="${p.key}">${esc(p.label)}</button>`).join('')}</section>
+      <section class="stats">
+        ${t(`${money(total)} <small>${CURRENCY}</small>`, 'Paid by insurance', 'stat-brand')}
+        ${t(list.length, list.length === 1 ? 'Insurance customer' : 'Insurance customers')}
+        ${t(`${money(list.length ? total / list.length : 0)} <small>${CURRENCY}</small>`, 'Average per customer')}
+      </section>
+      <section class="dash-cards">
+        ${bars('By insurer', icons.receipt, group(c => c.insurer, k => k, store.settings.insurers ?? []))}
+        ${bars('By branch', icons.store, group(c => c.branch, k => (k === '—' ? '—' : `${k} · ${locName(k)}`)))}
+        ${bars('By employee', icons.glasses, group(c => c.employeeName, k => k))}
+      </section>
+      <p class="muted sm dash-note">Amounts in ${CURRENCY}; the last figure on each line is the number of customers. Hover a line for its share of the total.</p>`;
+  }
+
   function rowsHTML() {
     const list = visible();
-    if (!list.length) return `<div class="empty">${icons.receipt}<p>No claims yet — create one to print its invoice.</p></div>`;
+    if (!list.length) return `<div class="empty">${icons.receipt}<p>${T.empty}</p></div>`;
     return list.map(c => {
       const n = (c.items ?? []).length;
       return `
@@ -326,9 +434,10 @@ export function claimsView(me) {
         <div class="row-main">
           <div class="row-title"><b>${esc(c.ref)}</b>
             <span class="row-cust">${esc(c.customer || '—')}</span>
+            ${direct && c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : ''}
             ${isAdmin ? locChip(c.branch) : ''}
           </div>
-          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
+          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))}${direct && c.employeeName ? ` · ${esc(c.employeeName)}` : ''} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
         </div>
         <div class="row-units"><b>${money(claimTotal(c))}</b> ${CURRENCY}</div>
         <div class="row-status"><span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span></div>
@@ -349,7 +458,8 @@ export function claimsView(me) {
       if (!cur) return `<div class="pad">This claim no longer exists.</div>`;
       return `
       <div class="dw-head">
-        <div><div class="dw-kicker">Invoice</div><h2>${esc(cur.ref)} · ${esc(cur.customer || '—')}</h2></div>
+        <div><div class="dw-kicker">Invoice</div><h2>${esc(cur.ref)} · ${esc(cur.customer || '—')}</h2>
+          ${direct ? `<div class="dw-sub"><span class="ins-chip">${esc(cur.insurer || '—')}</span> · Sold by ${esc(cur.employeeName || '—')} <span class="muted">· not printed</span></div>` : ''}</div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="rc-stage"><div class="rc-scale">${receiptHTML(cur)}</div></div>
@@ -371,7 +481,7 @@ export function claimsView(me) {
       if (e.target.closest('[data-edit]')) { layer.close(); return composer(store.claim(id)); }
       if (e.target.closest('[data-del]')) {
         const cur = store.claim(id);
-        if (!cur || !confirm(`Delete claim ${cur.ref}? This cannot be undone.`)) return;
+        if (!cur || !confirm(`Delete ${cur.ref}? This cannot be undone.`)) return;
         store.removeClaim(id, me.code);
         layer.close();
       }
@@ -396,16 +506,45 @@ export function claimsView(me) {
       ? {
         date: existing.date, branch: existing.branch, billNo: existing.billNo,
         customer: existing.customer, memberId: existing.memberId ?? '',
+        insurer: existing.insurer ?? '', employeeId: existing.employeeId ?? '', employeeName: existing.employeeName ?? '',
         payment: existing.payment,
         items: existing.items.map(i => ({ ...i })),
         rx: JSON.parse(JSON.stringify(normaliseRx(existing.rx))),
       }
       : {
         date: today(), branch: isAdmin ? BRANCHES[0].code : me.code, billNo: '', customer: '',
-        memberId: '', payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
+        memberId: '', insurer: '', employeeId: '', employeeName: '',
+        payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
       };
 
     const total = () => draft.items.reduce((t, i) => t + (Number(i.price) || 0), 0);
+
+    // Direct insurance: the insurer, and the salesperson from the schedule's
+    // roster — the branch's own people first.
+    const insurers = insurerChoices();
+    let staff = staffCache;
+    const staffHTML = () => {
+      if (!staff) return `<option value="">Loading the staff list…</option>`;
+      const here = staff.filter(s => (s.branches ?? []).includes(draft.branch));
+      const rest = staff.filter(s => !here.includes(s));
+      const opt = s => `<option value="${esc(s.id)}" ${draft.employeeId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`;
+      // Someone since taken off the roster still shows on their old sale.
+      const gone = draft.employeeId && !staff.some(s => s.id === draft.employeeId)
+        ? `<option value="${esc(draft.employeeId)}" selected>${esc(draft.employeeName)}</option>` : '';
+      return `<option value="">Choose the salesperson…</option>${gone}
+        ${here.length ? `<optgroup label="At ${esc(locName(draft.branch))}">${here.map(opt).join('')}</optgroup>` : ''}
+        <optgroup label="${here.length ? 'Everyone else' : 'Everyone'}">${rest.map(opt).join('')}</optgroup>`;
+    };
+    const directHTML = () => !direct ? '' : `
+        <div class="grid2">
+          <label>Insurer
+            <select id="f-ins">
+              <option value="">Choose the insurer…</option>
+              ${insurers.map(n => `<option ${draft.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Salesperson<select id="f-emp">${staffHTML()}</select></label>
+        </div>`;
 
     const itemRow = (it, i) => `
       <div class="ci-row">
@@ -416,7 +555,7 @@ export function claimsView(me) {
 
     layer = openLayer('modal', () => `
       <div class="dw-head">
-        <div><div class="dw-kicker">${existing ? 'Edit claim' : 'New claim'}</div><h2>Insurance claim</h2></div>
+        <div><div class="dw-kicker">${existing ? `Edit ${T.kicker}` : `New ${T.kicker}`}</div><h2>${T.heading}</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
@@ -428,6 +567,7 @@ export function claimsView(me) {
             </select>
           </label>
         </div>
+        ${directHTML()}
         <div class="grid2">
           <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
           <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
@@ -500,7 +640,26 @@ export function claimsView(me) {
       draft.customer = el.querySelector('#f-cust').value;
       draft.memberId = el.querySelector('#f-member').value;
       draft.payment = el.querySelector('#f-pay').value;
+      if (direct) {
+        draft.insurer = el.querySelector('#f-ins').value;
+        draft.employeeId = el.querySelector('#f-emp').value;
+        draft.employeeName = staff?.find(s => s.id === draft.employeeId)?.name
+          ?? (draft.employeeId ? draft.employeeName : '');
+      }
     };
+    if (direct) {
+      // A different branch changes whose names lead the list.
+      el.addEventListener('change', e => {
+        if (e.target.id === 'f-branch') { const s = el.querySelector('#f-emp'); if (s) s.innerHTML = staffHTML(); }
+      });
+      if (!staff) {
+        staffList().then(list => {
+          staff = list;
+          const s = el.querySelector('#f-emp');
+          if (s) s.innerHTML = staffHTML();
+        }).catch(err => toast({ title: 'Could not load the staff list', sub: err.message, tone: 'stock' }));
+      }
+    }
     const showTotal = () => { el.querySelector('#f-total').textContent = `${money(total())} ${CURRENCY}`; };
     const redrawItems = () => {
       el.querySelector('#ci-list').innerHTML = draft.items.map(itemRow).join('');
@@ -526,10 +685,12 @@ export function claimsView(me) {
       if (e.target.closest('[data-save]')) {
         sync();
         const items = draft.items.filter(i => (i.name || '').trim() || Number(i.price));
+        if (direct && !draft.insurer) return toast({ title: 'Choose the insurer', tone: 'stock' });
+        if (direct && !draft.employeeId) return toast({ title: 'Choose the salesperson', tone: 'stock' });
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
-        const fields = { ...draft, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
+        const fields = { ...draft, kind, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
         const save = e.target.closest('[data-save]');
         save.disabled = true;
         const was = save.innerHTML;
@@ -550,15 +711,19 @@ export function claimsView(me) {
       <style>${RECEIPT_CSS}</style>
       <header class="mod-head">
         <div>
-          <h1>Insurance Claims</h1>
-          <p class="mod-sub">Raise a printable invoice with products, prescription and payment</p>
+          <h1>${T.title}</h1>
+          <p class="mod-sub">${T.sub}</p>
         </div>
-        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} New claim</button>`}
+        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} ${T.add}</button>`}
       </header>
+      ${direct && isAdmin ? `<div id="d-dash">${dashHTML()}</div><h2 class="dash-list-h">Every insurance customer</h2>` : ''}
       <section class="toolbar">
-        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, bill…" value="${esc(ui.q)}"></div>
+        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, bill${direct ? ', insurer, salesperson' : ''}…" value="${esc(ui.q)}"></div>
         ${isAdmin ? `<select class="sel" id="c-branch"><option value="all">All branches</option>${
           BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')
+        }</select>` : ''}
+        ${direct ? `<select class="sel" id="c-ins" aria-label="Insurer"><option value="all">All insurers</option>${
+          insurerChoices().map(n => `<option value="${esc(n)}" ${ui.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')
         }</select>` : ''}
       </section>
       <section class="list" id="c-list">${rowsHTML()}</section>`;
@@ -570,6 +735,8 @@ export function claimsView(me) {
     const keep = a?.id === 'c-q' ? a.selectionStart : null;
     const l = root.querySelector('#c-list');
     if (l) l.innerHTML = rowsHTML();
+    const d = root.querySelector('#d-dash');
+    if (d) d.innerHTML = dashHTML();
     if (keep != null) {
       const f = root.querySelector('#c-q');
       if (f) { f.focus(); f.setSelectionRange(keep, keep); }
@@ -580,12 +747,15 @@ export function claimsView(me) {
   function wireBody() {
     root.querySelector('#c-q')?.addEventListener('input', e => { ui.q = e.target.value; refresh(); });
     root.querySelector('#c-branch')?.addEventListener('change', e => { ui.branch = e.target.value; refresh(); });
+    root.querySelector('#c-ins')?.addEventListener('change', e => { ui.insurer = e.target.value; refresh(); });
   }
 
   // Delegated once at mount, so re-rendering the list never stacks handlers.
   function wireRoot() {
     root.addEventListener('click', e => {
       if (e.target.closest('[data-new]')) return composer(null);
+      const per = e.target.closest('[data-period]');
+      if (per) { ui.period = per.dataset.period; refresh(); return; }
       const pr = e.target.closest('[data-print]');
       if (pr) { e.stopPropagation(); return printClaim(store.claim(pr.dataset.print)); }
       if (e.target.closest('[data-stop]')) return;
