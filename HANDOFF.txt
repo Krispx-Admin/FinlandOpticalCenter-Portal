@@ -686,6 +686,11 @@ Rules:
  8. DESIGN SYSTEM (css/styles.css)
 ================================================================================
 
+SCALE: on screens 1200px+ wide the whole portal is zoomed to 90% (html
+{ zoom:.9 }, user's choice 2026-10-11) — all px values below are drawn at 90%
+there. Heights that must fill the screen use calc(N * var(--vh)), never plain
+vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
+
 8.1 Tokens (:root)
   --brand #133056   --brand-dark #0c2138   --brand-mid #1c4373 (hover)
   --brand-soft #e9eef6 (selected/hover tint)   --brand-ink #10294a (text on light)
@@ -861,11 +866,11 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
- 2026-10-11  TRIAL: whole portal at 90% (user tried 80%, then asked for 90%) —
-             top of styles.css: @media (min-width:1200px)
-             { html { zoom:.9 } } + --vh = 1vh/.9 so screen-height sizes (invoice
-             preview, schedule frame, modal padding) still fill the screen.
-             Below 1200px wide: full size. TO REVERT: delete that block only.
+ 2026-10-11  Portal drawn at 90% on desktops (user tried 80%, chose 90%; kept):
+             top of styles.css: @media (min-width:1200px) { html { zoom:.9 } }
+             + --vh = 1vh/.9, so screen-height sizes (invoice preview, schedule
+             frame, modal padding) still fill the screen. Below 1200px: 100%.
+             RULE: a height that must fill the screen uses calc(N*var(--vh)).
  2026-10-11  Settings opens on a list of its pages; click one to open it alone.
              In-house (self-fit) orders also get Lenses delivered -> Lenses
              Delivered before Start fitting. .set-add selects styled (they were

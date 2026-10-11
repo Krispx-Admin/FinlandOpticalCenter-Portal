@@ -33,12 +33,13 @@
   --speed: .22s;
 }
 
-/* ── TRIAL (2026-10-11): the portal at 100% looks like Chrome at 90% ──
-   `zoom` shrinks everything evenly, so the layout stays exactly as aligned.
-   Only on screens 1200px+ wide; phones and small windows keep full size.
+/* ── The portal is drawn at 90% (user's choice, 2026-10-11) ──
+   On a desktop the whole page is zoomed to .9, as if the browser were at 90%:
+   everything shrinks evenly, so the layout stays exactly as aligned. Only on
+   screens 1200px+ wide; phones and small windows keep full size.
    In Chrome, vh units shrink with the zoom, so heights tied to the screen use
-   --vh, which undoes that. TO REVERT: delete this block — --vh then falls
-   back to plain 1vh everywhere it is used. */
+   --vh, which undoes that — use calc(N * var(--vh)), never plain vh, for a
+   height that must fill the screen. To change the size, change both .9s. */
 :root { --vh: 1vh; }
 @media (min-width: 1200px) {
   :root { --vh: calc(1vh / .9); }
