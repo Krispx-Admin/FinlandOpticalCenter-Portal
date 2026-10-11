@@ -16,7 +16,7 @@ python3 -m http.server 8000     # or: npx serve
 
 | Module | What it does |
 |---|---|
-| **Fitting Log** | Tracks a frame's physical journey: branch → fitting centre → back to the branch. Log an order with just a bill number, then send it to a fitting centre. Pipeline: Waiting for Lenses → In transit to the fitter → Waiting to be Fitted → Ready → Returning to the branch → Delivered, with click-to-select + bulk advance, urgent flags, a per-order journey diagram (the fitter node turns green when ready) and a full audit timeline. |
+| **Fitting Log** | Tracks a frame's physical journey: branch → fitting centre → back to the branch. Log an order with just a bill number, mark the lenses delivered when they arrive, then send it to a fitting centre when the driver comes. Pipeline: Waiting for Lenses → Lenses Delivered → In transit to the fitter → Waiting to be Fitted → Ready → Returning to the branch → Delivered, with click-to-select + bulk advance, urgent flags, a per-order journey diagram (the fitter node turns green when ready) and a full audit timeline. |
 | **Stock Requests** | Branches compose category-first requests; the admin controls, per category, which fields are needed, whether it's counted in pieces or boxes, and which brand group it offers (Settings). No review step — the office prints the pick sheet, fulfils it, and marks it completed. |
 | **Lens Stock** | One fitting centre (MGM) holds the loose-lens shelf and is the only location that can edit its counts. Every other branch browses that shelf by type / index / coating / SPH / CYL, builds a basket and requests it; MGM confirms — which deducts the quantities — or declines with a reason. The request opens its fitting order, which reads Waiting Lens Confirmation until MGM answers, carries a Stock Lens note and lists the lenses. |
 | **Insurance Claims** | Raises a printable A4 **invoice** — the company's CR and address in English and Arabic either side of the logo — with date, branch, bill number, the customer's full name and member ID exactly as on the insurance card, a priced product list that totals itself, a full SPH/CYL/AXIS/ADD/PD prescription grid, and the payment method. The on-screen preview and the printed sheet are built from the same markup, so what you see is what prints — brand logo on the header, logomark watermarked across the page. |
@@ -98,6 +98,7 @@ Applied in order:
 | `supabase/schema-12-schedule-roster-tables.sql` | the roster in `schedule_employees` / `schedule_branches`, its defaults in `schedule_defaults`, saved by `save_schedule_roster()` — none of it in the code |
 | `supabase/schema-13-claim-invoice-fields.sql` | `claims.member_id`, `claims.insurer`, `app_settings.insurers` |
 | `supabase/schema-14-direct-insurance.sql` | `claims.kind`, the salesperson columns, DI- numbering, the insurers seeded, `staff_list()` |
+| `supabase/schema-16-lenses-delivered.sql` | the Fitting Log's `lenses_in` status |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

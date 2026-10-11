@@ -174,9 +174,10 @@ branch, not globally — index orders_ref_per_branch). Never auto-suggest it
 (that was removed on purpose). Customer name is REQUIRED (trimmed).
 
 LONG ROAD (FIT_FLOW):
-  pending -> to_fitter -> at_fitter -> ready -> returning -> delivered
+  pending -> lenses_in -> to_fitter -> at_fitter -> ready -> returning -> delivered
   status     label                 pill color  action button      who acts
-  pending    Waiting for Lenses    slate       Send to fitter     origin
+  pending    Waiting for Lenses    slate       Lenses delivered   origin
+  lenses_in  Lenses Delivered      cyan        Send to fitter     origin
   to_fitter  In transit to X       blue        Confirm arrival    fitter
   at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
   ready      Ready                 green       Send to branch     fitter
@@ -187,6 +188,13 @@ LONG ROAD (FIT_FLOW):
    fitStep(o) names the place: "In transit to MGM", "Returning to SCC" — code
    in the list, full name with long:true in drawer/hover; chips use the
    generic FIT_STATUS label "In transit".)
+  lenses_in added 2026-10-11 (user): the lenses arrive at the branch first,
+  then "Send to fitter" when the driver comes. The fitter PICKER now opens from
+  lenses_in (needsFitter = lenses_in && !fitter; store.sendOrdersToFitter guards
+  .eq('status','lenses_in')). The journey diagram looks up stages BY NAME
+  (at('to_fitter') etc.), so pending and lenses_in draw identically.
+  Bulk "Send to fitter": orders without a fitter go through the picker, ones a
+  lens request already gave a fitter just advance.
   Filter chips are built one per DISTINCT label (fitting.js CHIP_DEFS), so if
   two stages ever share a label again they share a chip automatically.
 
@@ -204,7 +212,7 @@ ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
                            row says "waiting on MGM" (actor 'lens' -> LENS_OWNER);
                            canAdvanceOrder() is false, even for the warehouse
     'confirmed', frame goes over (long road) -> "Lens Confirmed" (green) +
-                           Send to fitter
+                           Lenses delivered (then Send to fitter)
     'confirmed', lenses come here (self-fit) -> "Waiting for Lenses" + Start
                            fitting
     'declined'          -> "Lens Declined" (red); the normal action stays
@@ -489,6 +497,8 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-15-invoice-numbers.sql  claims.ref default 'INV-'||nextval(claim_seq);
                              IC-3003..3005 renamed INV-…; claims_ref_kind turns
                              INV-/IC- into DI- for direct. APPLIED 2026-10-11.
+  schema-16-lenses-delivered.sql  orders_status_check gains 'lenses_in'.
+                             APPLIED 2026-10-11 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -830,6 +840,10 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Fitting Log: new step "Lenses Delivered" (lenses_in, cyan) between
+             Waiting for Lenses and In transit — buttons "Lenses delivered",
+             then "Send to fitter" (picker) when the driver arrives. schema-16
+             applied. Tour updated. Self-fit short road unchanged.
  2026-10-11  Direct Insurance: salesperson is type-to-search (datalist, no
              "At <branch>" groups); the list is a table (Number+date | Customer
              | Member ID | Insurer | Bill | Salesperson | Amount) with an arrow

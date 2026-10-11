@@ -194,7 +194,7 @@ export const store = {
     })).then(row => (row ? this.order(row.id) : null));
   },
 
-  // Assign a fitter to pending orders and set them going. An order whose own
+  // Assign a fitter to orders whose lenses are in and set them going. An order whose own
   // branch is the fitter has no journey to make, so it lands on the bench
   // directly; the rest go on the road.
   //
@@ -214,7 +214,7 @@ export const store = {
       const moved = (await Promise.all(legs.map(async leg => {
         const rows = ok(await supabase.from('orders')
           .update({ fitter_code: fitter, status: leg.status })
-          .in('id', leg.ids).eq('status', 'pending').is('fitter_code', null)
+          .in('id', leg.ids).eq('status', 'lenses_in').is('fitter_code', null)
           .select('id, ref'));
         if (!rows.length) return [];
         ok(await supabase.from('order_events').insert(rows.map(o => ({
@@ -241,7 +241,7 @@ export const store = {
   advanceOrders(ids, by) {
     return run(['orders'], async () => {
       const plan = ids.map(id => this.order(id))
-        .filter(o => o && canAdvanceOrder(o, by) && !(o.status === 'pending' && !o.fitter))
+        .filter(o => o && canAdvanceOrder(o, by) && !(o.status === 'lenses_in' && !o.fitter))
         .map(o => ({ o, from: o.status, to: nextFitStatus(o) }))
         .filter(p => p.to);
       if (!plan.length) return SKIP;

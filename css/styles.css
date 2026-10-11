@@ -89,6 +89,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .s-purple { color: var(--st-purple); background: #faeafc; border-color: #f0cdf4; }
 .s-green  { color: var(--st-green);  background: #e4f6ef; border-color: #bfe8d8; }
 .s-teal   { color: var(--st-teal);   background: #e2f5f3; border-color: #bde7e3; }
+.s-cyan   { color: #0e7490;          background: #e0f3f8; border-color: #b8e2ee; }
 .s-amber  { color: var(--st-amber);  background: #fdf1e3; border-color: #f5dcbb; }
 .s-red    { color: var(--st-red);    background: #fdecec; border-color: #f7cdcd; }
 .s-done   { color: var(--st-done);   background: #edf0f4; border-color: #d9dfe8; }

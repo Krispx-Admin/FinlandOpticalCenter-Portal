@@ -78,7 +78,8 @@ export const brandsFor = (settings, cat) =>
 // ── Fitting pipeline state machine ──
 // The long road: a branch sells the frame, it travels to a fitting centre for
 // its lenses, and it travels back to be collected where it was bought.
-export const FIT_FLOW = ['pending', 'to_fitter', 'at_fitter', 'ready', 'returning', 'delivered'];
+// The lenses arrive at the branch first; the frame goes when the driver comes.
+export const FIT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'at_fitter', 'ready', 'returning', 'delivered'];
 
 // The short road. A fitting centre that sells a frame it will glaze itself has
 // nothing to put in a van: the frame never leaves the building and the customer
@@ -97,11 +98,12 @@ export const flowFor = o => (onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
 //
-// The labels say what the job is waiting for: the lenses, then the road, then
-// the bench. On the road the order names the centre it is heading for (see
+// The labels say what the job is waiting for: the lenses, then the driver,
+// then the road, then the bench. On the road the order names the centre it is heading for (see
 // fitStep); the chip keeps the generic word.
 export const FIT_STATUS = {
-  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
+  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lenses delivered', actor: 'origin', done: 'Lenses delivered at the branch' },
+  lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
   to_fitter: { label: 'In transit',           color: 'blue',   action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },

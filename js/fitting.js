@@ -65,11 +65,14 @@ export function fittingView(me) {
 
   // ── journey mini-diagram ──
   function journey(o, big = false, tail = '') {
-    const stage = FIT_FLOW.indexOf(o.status); // 0..5
-    const seg1 = stage >= 2 ? 'done' : stage === 1 ? 'moving' : '';
-    const seg2 = stage >= 5 ? 'done' : stage === 4 ? 'moving' : '';
+    // By name, not position: waiting for the lenses and having them in both
+    // sit at the branch, so the drawing is the same for the two.
+    const stage = FIT_FLOW.indexOf(o.status);
+    const at = s => FIT_FLOW.indexOf(s);
+    const seg1 = stage >= at('at_fitter') ? 'done' : stage === at('to_fitter') ? 'moving' : '';
+    const seg2 = stage >= at('delivered') ? 'done' : stage === at('returning') ? 'moving' : '';
     // Fitter node: brand navy from the moment it's in play, green once ready.
-    const fitterCls = stage >= READY_IDX ? 'ready' : stage >= 1 ? 'done' : '';
+    const fitterCls = stage >= READY_IDX ? 'ready' : stage >= at('to_fitter') ? 'done' : '';
     // `tail` hangs off the middle node — the fitter, or the only node of an
     // in-house job — so a note under it centres on that pin.
     const node = (code, cls, lbl, extra = '') => `
@@ -92,7 +95,7 @@ export function fittingView(me) {
         <i class="j-seg ${seg1}"></i>
         ${node(fitterCode, `${fitterCls} j-mid`, fitterName, tail)}
         <i class="j-seg ${seg2}"></i>
-        ${node(o.origin, stage >= 5 ? 'done' : '', 'Back at branch')}
+        ${node(o.origin, stage >= at('delivered') ? 'done' : '', 'Back at branch')}
       </div>`;
   }
 
@@ -120,7 +123,7 @@ export function fittingView(me) {
       const can = canAdvanceOrder(o, me.code);
       const st = fitStep(o);
       const selected = ui.selected.has(o.id);
-      const needsFitter = o.status === 'pending' && !o.fitter;
+      const needsFitter = o.status === 'lenses_in' && !o.fitter;
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
       if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
@@ -156,7 +159,7 @@ export function fittingView(me) {
     let action = null, ok = sel.length > 0;
     for (const o of sel) {
       const label = !canAdvanceOrder(o, me.code) ? null
-        : (o.status === 'pending' && !o.fitter) ? 'Send to fitter'
+        : (o.status === 'lenses_in' && !o.fitter) ? 'Send to fitter'
         : fitStep(o).action;
       if (!label) { ok = false; continue; }
       if (action === null) action = label;
@@ -193,7 +196,7 @@ export function fittingView(me) {
     if (!o) return `<div class="pad">Order no longer exists.</div>`;
     const can = canAdvanceOrder(o, me.code);
     const st = fitStep(o, { long: true });
-    const needsFitter = o.status === 'pending' && !o.fitter;
+    const needsFitter = o.status === 'lenses_in' && !o.fitter;
     return `
       <div class="dw-head">
         <div>
@@ -271,7 +274,7 @@ export function fittingView(me) {
   // ── fitter picker (assign + send, one order or a bulk selection) ──
   function fitterPicker(ids) {
     ids = Array.isArray(ids) ? ids : [ids];
-    const orders = ids.map(id => store.order(id)).filter(o => o && o.status === 'pending' && !o.fitter);
+    const orders = ids.map(id => store.order(id)).filter(o => o && o.status === 'lenses_in' && !o.fitter);
     if (!orders.length) return;
     const what = orders.length === 1 ? orders[0].ref : `${orders.length} orders`;
     // If every frame here was sold by a fitting centre, that centre can simply
@@ -420,7 +423,14 @@ export function fittingView(me) {
         const { action, ok } = bulkAction();
         if (!ok) return;
         const ids = [...ui.selected];
-        if (action === 'Send to fitter') { fitterPicker(ids); return; } // picker clears selection on send
+        // Frames with no fitter yet are sent through the picker; frames a lens
+        // request already gave one simply go.
+        const unassigned = ids.filter(id => !store.order(id)?.fitter);
+        if (action === 'Send to fitter' && unassigned.length) {
+          const assigned = ids.filter(id => !unassigned.includes(id));
+          if (assigned.length) store.advanceOrders(assigned, me.code);
+          fitterPicker(unassigned); return; // picker clears selection on send
+        }
         ui.selected.clear();
         store.advanceOrders(ids, me.code); // store change triggers refresh
         return;
