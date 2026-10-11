@@ -261,8 +261,10 @@ qty). Lookup: store.lensRequestForOrder(orderId). No DB change needed.
 Header: English registration on the LEFT of the logo, Arabic on the RIGHT
 (.rc-head-row grid): "CR. 1032797 / P.O. Box: 3742 / Postal Code 112, Muscat /
 Sultanate of Oman" and "س.ت: 1032797 / ص.ب: 3742 / الرمز البريدي: 112، مسقط /
-سلطنة عُمان". Meta = 2 rows of 4: Date, Branch, Bill Number, Invoice No. |
-Customer Name (2 cols), Member ID, Insurance. Form: Insurance company (select
+سلطنة عُمان". Meta = Date, Branch, Bill Number, Invoice No. | Customer Name
+(2 cols), Member ID (2 cols). THE PAPER NEVER MENTIONS INSURANCE (user,
+2026-10-11): no insurer box, no "Issued for insurance claim purposes" note.
+The insurer is still recorded on the claim and shown in the portal list. Form: Insurance company (select
 from app_settings.insurers, required when the list isn't empty), Member ID
 (required), Full name (required) with an amber English + Arabic note under it
 (.field-note) that it must match the insurance card exactly. The Claims page
@@ -773,6 +775,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Invoice paper no longer mentions insurance (footer note and
+             insurer box removed; Member ID spans two columns).
  2026-10-11  schema-12 and schema-13 applied by Claude and verified. Standing
              rule: Claude applies migrations itself, without asking.
  2026-10-11  Roster moved into schedule_employees / schedule_branches /

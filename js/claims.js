@@ -207,8 +207,7 @@ export function receiptHTML(c) {
       <div><dt>Bill Number</dt><dd>${esc(c.billNo || '—')}</dd></div>
       <div><dt>Invoice No.</dt><dd>${esc(c.ref)}</dd></div>
       <div class="rc-wide"><dt>Customer Name</dt><dd>${esc(c.customer || '—')}</dd></div>
-      <div><dt>Member ID</dt><dd>${esc(c.memberId || '—')}</dd></div>
-      <div><dt>Insurance</dt><dd>${esc(c.insurer || '—')}</dd></div>
+      <div class="rc-wide"><dt>Member ID</dt><dd>${esc(c.memberId || '—')}</dd></div>
     </dl>
 
     <h3 class="rc-sec">Products</h3>
@@ -241,7 +240,6 @@ export function receiptHTML(c) {
 
       <div class="rc-note">
         <span>Finland Optical Center · ${esc(locName(c.branch))}</span>
-        <span>Issued for insurance claim purposes.</span>
       </div>
     </div>
   </div>
