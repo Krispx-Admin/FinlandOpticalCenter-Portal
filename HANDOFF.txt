@@ -861,6 +861,11 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  TRIAL: whole portal at 80% (looks like Chrome zoomed to 80% while
+             at 100%) — top of styles.css: @media (min-width:1200px)
+             { html { zoom:.8 } } + --vh = 1vh/.8 so screen-height sizes (invoice
+             preview, schedule frame, modal padding) still fill the screen.
+             Below 1200px wide: full size. TO REVERT: delete that block only.
  2026-10-11  Settings opens on a list of its pages; click one to open it alone.
              In-house (self-fit) orders also get Lenses delivered -> Lenses
              Delivered before Start fitting. .set-add selects styled (they were
