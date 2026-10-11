@@ -425,9 +425,29 @@ export function claimsView(me, kind = 'claim') {
       <p class="muted sm dash-note">Amounts in ${CURRENCY}; the last figure on each line is the number of customers. Hover a line for its share of the total.</p>`;
   }
 
+  // Direct insurance reads as a table — number and date, customer, member ID,
+  // insurer, bill, salesperson, amount — and each line opens its details on
+  // the right, where printing lives.
+  function directRowsHTML(list) {
+    return `
+      <div class="dl-head"><span>Number</span><span>Customer name</span><span>Member ID</span><span>Insurer</span><span>Bill</span><span>Salesperson</span><span class="num">Amount</span><span></span></div>
+      ${list.map(c => `
+      <div class="row dl-row" data-open="${c.id}">
+        <div class="dl-ref"><b>${esc(c.ref)}</b><span>${esc(fmtDay(c.date))}${isAdmin ? ` · ${esc(c.branch)}` : ''}</span></div>
+        <div class="dl-strong">${esc(c.customer || '—')}</div>
+        <div class="dl-mono">${esc(c.memberId || '—')}</div>
+        <div>${c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : '<span class="muted">—</span>'}</div>
+        <div class="dl-mono">${esc(c.billNo || '—')}</div>
+        <div class="dl-txt">${esc(c.employeeName || '—')}</div>
+        <div class="num"><b>${money(claimTotal(c))}</b> <span class="muted">${CURRENCY}</span></div>
+        <div class="row-act" data-stop><button class="icon-btn open-arrow" data-detail="${c.id}" title="Open">${icons.chevronRight}</button></div>
+      </div>`).join('')}`;
+  }
+
   function rowsHTML() {
     const list = visible();
     if (!list.length) return `<div class="empty">${icons.receipt}<p>${T.empty}</p></div>`;
+    if (direct) return directRowsHTML(list);
     return list.map(c => {
       const n = (c.items ?? []).length;
       return `
@@ -448,6 +468,76 @@ export function claimsView(me, kind = 'claim') {
         </div>
       </div>`;
     }).join('');
+  }
+
+  // ── the details drawer (Direct Insurance) ──
+  let drawer = null;
+  function detailHTML(id) {
+    const c = store.claim(id);
+    if (!c) return `<div class="pad">This record no longer exists.</div>`;
+    const items = c.items ?? [];
+    const rx = normaliseRx(c.rx);
+    const cells = [...RX_ROWS.map(r => r.key)].flatMap(k => ['od', 'os'].flatMap(e => RX_COLS.map(col => rx[k][e][col.key])));
+    const hasRx = cells.some(v => String(v ?? '').trim()) || rx.add.od || rx.add.os;
+    const kv = (label, value, wide = false) => `<div${wide ? ' class="kv-wide"' : ''}><span>${label}</span><b>${value}</b></div>`;
+    return `
+      <div class="dw-head">
+        <div>
+          <div class="dw-kicker">Insurance customer</div>
+          <h2>${esc(c.ref)}</h2>
+          <div class="dw-sub">${esc(c.customer || '—')}</div>
+        </div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="dw-body">
+        <div class="dw-status-row">${c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : ''}<span class="dw-when">${esc(fmtDay(c.date))}</span></div>
+        <div class="kv">
+          ${kv('Customer name', esc(c.customer || '—'), true)}
+          ${kv('Member ID', esc(c.memberId || '—'))}
+          ${kv('Insurer', esc(c.insurer || '—'))}
+          ${kv('Bill number', esc(c.billNo || '—'))}
+          ${kv('Salesperson', esc(c.employeeName || '—'))}
+          ${kv('Branch', `${locChip(c.branch)} ${esc(locName(c.branch))}`)}
+          ${kv('Date', esc(fmtDay(c.date)))}
+        </div>
+        <h3 class="tl-h">${icons.receipt} Products</h3>
+        <table class="lines">
+          <thead><tr><th>Description</th><th class="num">Amount (${CURRENCY})</th></tr></thead>
+          <tbody>${items.map(i => `<tr><td>${esc(i.name || '—')}</td><td class="num">${money(i.price)}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td>Total</td><td class="num">${money(claimTotal(c))} ${CURRENCY}</td></tr></tfoot>
+        </table>
+        ${hasRx ? `
+        <h3 class="tl-h">${icons.glasses} Prescription</h3>
+        <div class="rx-wrap"><table class="lines rx-mini-tbl">
+          <thead><tr><th></th>${['OD', 'OS'].map(e => RX_COLS.map(col => `<th>${e} ${esc(col.label)}</th>`).join('')).join('')}</tr></thead>
+          <tbody>
+            ${RX_ROWS.map(r => `<tr><th>${esc(r.label)}</th>${['od', 'os'].map(e => RX_COLS.map(col => `<td>${esc(rx[r.key][e][col.key] || '')}</td>`).join('')).join('')}</tr>`).join('')}
+            <tr><th>Add</th><td colspan="4">${esc(rx.add.od || '')}</td><td colspan="4">${esc(rx.add.os || '')}</td></tr>
+          </tbody>
+        </table></div>` : ''}
+        <div class="dw-actions">
+          <button class="btn btn-primary" data-do-print>${icons.printer} Print invoice</button>
+          <button class="btn btn-ghost" data-preview>See the invoice</button>
+          ${viewOnly ? '' : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
+          <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
+        </div>
+      </div>`;
+  }
+
+  function openDetail(id) {
+    drawer = openLayer('drawer', () => detailHTML(id), { onClose: () => { drawer = null; } });
+    drawer.el.addEventListener('click', e => {
+      if (e.target.closest('[data-close]')) return drawer.close();
+      if (e.target.closest('[data-do-print]')) return printClaim(store.claim(id));
+      if (e.target.closest('[data-preview]')) return openPreview(id);
+      if (e.target.closest('[data-edit]')) { const c = store.claim(id); drawer.close(); return composer(c); }
+      if (e.target.closest('[data-del]')) {
+        const c = store.claim(id);
+        if (!c || !confirm(`Delete ${c.ref}? This cannot be undone.`)) return;
+        store.removeClaim(id, me.code);
+        drawer.close();
+      }
+    });
   }
 
   // ── preview ──
@@ -520,22 +610,13 @@ export function claimsView(me, kind = 'claim') {
 
     const total = () => draft.items.reduce((t, i) => t + (Number(i.price) || 0), 0);
 
-    // Direct insurance: the insurer, and the salesperson from the schedule's
-    // roster — the branch's own people first.
+    // Direct insurance: the insurer, and the salesperson — typed and picked
+    // from the schedule's roster, one list in alphabetical order, each name
+    // with its home branch beside it.
     const insurers = insurerChoices();
     let staff = staffCache;
-    const staffHTML = () => {
-      if (!staff) return `<option value="">Loading the staff list…</option>`;
-      const here = staff.filter(s => (s.branches ?? []).includes(draft.branch));
-      const rest = staff.filter(s => !here.includes(s));
-      const opt = s => `<option value="${esc(s.id)}" ${draft.employeeId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`;
-      // Someone since taken off the roster still shows on their old sale.
-      const gone = draft.employeeId && !staff.some(s => s.id === draft.employeeId)
-        ? `<option value="${esc(draft.employeeId)}" selected>${esc(draft.employeeName)}</option>` : '';
-      return `<option value="">Choose the salesperson…</option>${gone}
-        ${here.length ? `<optgroup label="At ${esc(locName(draft.branch))}">${here.map(opt).join('')}</optgroup>` : ''}
-        <optgroup label="${here.length ? 'Everyone else' : 'Everyone'}">${rest.map(opt).join('')}</optgroup>`;
-    };
+    const staffOptions = () => (staff ?? []).map(s =>
+      `<option value="${esc(s.name)}" label="${esc((s.branches ?? [])[0] ?? '')}"></option>`).join('');
     const directHTML = () => !direct ? '' : `
         <div class="grid2">
           <label>Insurer
@@ -544,7 +625,11 @@ export function claimsView(me, kind = 'claim') {
               ${insurers.map(n => `<option ${draft.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
             </select>
           </label>
-          <label>Salesperson<select id="f-emp">${staffHTML()}</select></label>
+          <label>Salesperson
+            <input id="f-emp" list="f-emp-list" autocomplete="off" value="${esc(draft.employeeName)}"
+                   placeholder="${staff ? 'Type a name…' : 'Loading the staff list…'}">
+            <datalist id="f-emp-list">${staffOptions()}</datalist>
+          </label>
         </div>`;
 
     const itemRow = (it, i) => `
@@ -645,23 +730,22 @@ export function claimsView(me, kind = 'claim') {
       if (!direct) draft.payment = el.querySelector('#f-pay').value;
       if (direct) {
         draft.insurer = el.querySelector('#f-ins').value;
-        draft.employeeId = el.querySelector('#f-emp').value;
-        draft.employeeName = staff?.find(s => s.id === draft.employeeId)?.name
-          ?? (draft.employeeId ? draft.employeeName : '');
+        // The name typed has to be one on the roster — or, editing an old
+        // sale, the person it was already recorded against.
+        const typed = el.querySelector('#f-emp').value.trim();
+        const hit = staff?.find(s => s.name.toLowerCase() === typed.toLowerCase());
+        if (hit) { draft.employeeId = hit.id; draft.employeeName = hit.name; }
+        else if (existing && typed === existing.employeeName) { draft.employeeId = existing.employeeId; draft.employeeName = typed; }
+        else { draft.employeeId = ''; draft.employeeName = typed; }
       }
     };
-    if (direct) {
-      // A different branch changes whose names lead the list.
-      el.addEventListener('change', e => {
-        if (e.target.id === 'f-branch') { const s = el.querySelector('#f-emp'); if (s) s.innerHTML = staffHTML(); }
-      });
-      if (!staff) {
-        staffList().then(list => {
-          staff = list;
-          const s = el.querySelector('#f-emp');
-          if (s) s.innerHTML = staffHTML();
-        }).catch(err => toast({ title: 'Could not load the staff list', sub: err.message, tone: 'stock' }));
-      }
+    if (direct && !staff) {
+      staffList().then(list => {
+        staff = list;
+        const dl = el.querySelector('#f-emp-list');
+        if (dl) dl.innerHTML = staffOptions();
+        el.querySelector('#f-emp')?.setAttribute('placeholder', 'Type a name…');
+      }).catch(err => toast({ title: 'Could not load the staff list', sub: err.message, tone: 'stock' }));
     }
     const showTotal = () => { el.querySelector('#f-total').textContent = `${money(total())} ${CURRENCY}`; };
     const redrawItems = () => {
@@ -689,7 +773,7 @@ export function claimsView(me, kind = 'claim') {
         sync();
         const items = draft.items.filter(i => (i.name || '').trim() || Number(i.price));
         if (direct && !draft.insurer) return toast({ title: 'Choose the insurer', tone: 'stock' });
-        if (direct && !draft.employeeId) return toast({ title: 'Choose the salesperson', tone: 'stock' });
+        if (direct && !draft.employeeId) return toast({ title: 'Choose the salesperson', sub: draft.employeeName ? `“${draft.employeeName}” is not on the staff list — pick a name from the list.` : 'Type a name and pick it from the list.', tone: 'stock' });
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
@@ -729,7 +813,7 @@ export function claimsView(me, kind = 'claim') {
           insurerChoices().map(n => `<option value="${esc(n)}" ${ui.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')
         }</select>` : ''}
       </section>
-      <section class="list" id="c-list">${rowsHTML()}</section>`;
+      <section class="list ${direct ? 'dl-list' : ''}" id="c-list">${rowsHTML()}</section>`;
     wireBody();
   }
 
@@ -740,6 +824,7 @@ export function claimsView(me, kind = 'claim') {
     if (l) l.innerHTML = rowsHTML();
     const d = root.querySelector('#d-dash');
     if (d) d.innerHTML = dashHTML();
+    drawer?.update();
     if (keep != null) {
       const f = root.querySelector('#c-q');
       if (f) { f.focus(); f.setSelectionRange(keep, keep); }
@@ -757,13 +842,15 @@ export function claimsView(me, kind = 'claim') {
   function wireRoot() {
     root.addEventListener('click', e => {
       if (e.target.closest('[data-new]')) return composer(null);
+      const det = e.target.closest('[data-detail]');
+      if (det) { e.stopPropagation(); return openDetail(det.dataset.detail); }
       const per = e.target.closest('[data-period]');
       if (per) { ui.period = per.dataset.period; refresh(); return; }
       const pr = e.target.closest('[data-print]');
       if (pr) { e.stopPropagation(); return printClaim(store.claim(pr.dataset.print)); }
       if (e.target.closest('[data-stop]')) return;
       const row = e.target.closest('[data-open]');
-      if (row) openPreview(row.dataset.open);
+      if (row) (direct ? openDetail : openPreview)(row.dataset.open);
     });
   }
 
