@@ -199,8 +199,9 @@ LONG ROAD (FIT_FLOW):
   two stages ever share a label again they share a chip automatically.
 
 SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale):
-  pending -> at_fitter -> delivered, labels Waiting for Lenses / In fitting / Done,
-  actions "Start fitting" / "Mark as done". No transit, journey diagram shows
+  pending -> lenses_in -> at_fitter -> delivered, labels Waiting for Lenses /
+  Lenses Delivered / In fitting / Done, actions "Lenses delivered" / "Start
+  fitting" / "Mark as done" (lenses_in added here too, 2026-10-11, user). No transit, journey diagram shows
   one node + "In-house — no transit". onShortRoad(o) is only true if the
   current status is on SELF_FLOW, so legacy self-fit orders mid-long-road
   finish the long way.
@@ -213,8 +214,8 @@ ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
                            canAdvanceOrder() is false, even for the warehouse
     'confirmed', frame goes over (long road) -> "Lens Confirmed" (green) +
                            Lenses delivered (then Send to fitter)
-    'confirmed', lenses come here (self-fit) -> "Waiting for Lenses" + Start
-                           fitting
+    'confirmed', lenses come here (self-fit) -> "Waiting for Lenses" +
+                           Lenses delivered (then Start fitting)
     'declined'          -> "Lens Declined" (red); the normal action stays
   needsAction(o, code) (data.js) drives the nav badge and "Need your action":
   any advanceable order except a self-fit job still pending.
@@ -409,6 +410,13 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 
 4.6 SETTINGS (admin only)
 -------------------------
+Opens on a LIST (settings.js PAGES: Tabs, Categories, Brand groups, Direct
+Insurance — insurers, Branch access) — icon, title, one-line description, a
+live summary ("2 under maintenance", "5 categories") and a chevron. Clicking
+one shows only that section (SECTIONS[key]) under "‹ All settings" + its title.
+`page` is in-memory only (starts on the list each visit). wire() runs once at
+mount; refresh() redraws whichever parts exist; loadAccess() runs when Branch
+access is opened.
 - Tabs (first card, added 2026-10-11): one row + on/off switch per sidebar tab
   (data.js TABS: fitting, stock, lens, claims, direct, schedule — Settings is
   never switchable). Off = key in app_settings.disabled_tabs (jsonb, schema-17),
@@ -853,6 +861,10 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Settings opens on a list of its pages; click one to open it alone.
+             In-house (self-fit) orders also get Lenses delivered -> Lenses
+             Delivered before Start fitting. .set-add selects styled (they were
+             bare after the portal-wide arrow change).
  2026-10-11  Invoice preview fits the whole A4 page on screen: the modal is
              the screen's height (header + buttons fixed), fitSheet scales the
              sheet by min(width, height), re-fits on window resize.

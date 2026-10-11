@@ -144,15 +144,30 @@ export function settingsView(me) {
     setTimeout(() => { msg.textContent = ''; msg.className = 'ba-msg'; }, 4000);
   }
 
-  function render() {
-    root.innerHTML = `
-      <header class="mod-head">
-        <div>
-          <h1>Settings</h1>
-          <p class="mod-sub">Control what branches can request — categories, how they're counted, and which brands each one offers</p>
-        </div>
-      </header>
+  // Settings opens on a list; each entry opens its own page, with a way back.
+  // Which one is open is only this screen's state — it starts on the list.
+  let page = null;
+  const count = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+  const PAGES = [
+    { key: 'tabs',   icon: 'menu',   title: 'Tabs',
+      desc: 'Switch sidebar tabs off while they are being worked on',
+      sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
+    { key: 'cats',   icon: 'tag',    title: 'Categories',
+      desc: 'What branches can request, the fields each needs, how it is counted',
+      sum: () => count(store.settings.categories.length, 'category', 'categories') },
+    { key: 'groups', icon: 'box',    title: 'Brand groups',
+      desc: 'The lists of brands each category offers',
+      sum: () => count(groups().length, 'group') },
+    { key: 'ins',    icon: 'shield', title: 'Direct Insurance — insurers',
+      desc: 'The insurers a branch picks from for an insurance customer',
+      sum: () => count((store.settings.insurers ?? []).length, 'insurer') },
+    { key: 'access', icon: 'logout', title: 'Branch access',
+      desc: 'The 6-digit code each branch signs in with',
+      sum: () => '' },
+  ];
 
+  const SECTIONS = {
+    tabs: () => `
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.menu} Tabs</h2>
@@ -160,8 +175,8 @@ export function settingsView(me) {
              marked <i>under maintenance</i>, and cannot open it; you still can. It changes for everyone at once.</p>
         </div>
         <div id="set-tabs">${tabsHTML()}</div>
-      </section>
-
+      </section>`,
+    cats: () => `
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.tag} Categories</h2>
@@ -177,8 +192,8 @@ export function settingsView(me) {
           <select name="brandGroup" aria-label="Brand group">${groupOptionsHTML(groups()[0]?.name)}</select>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add category</button>
         </form>
-      </section>
-
+      </section>`,
+    groups: () => `
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.box} Brand groups</h2>
@@ -189,8 +204,8 @@ export function settingsView(me) {
           <input name="name" placeholder="New brand group — e.g. Solution brands" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add group</button>
         </form>
-      </section>
-
+      </section>`,
+    ins: () => `
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.shield} Direct Insurance — insurers</h2>
@@ -202,8 +217,8 @@ export function settingsView(me) {
           <input name="name" placeholder="New insurer" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add insurer</button>
         </form>
-      </section>
-
+      </section>`,
+    access: () => `
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.logout} Branch access</h2>
@@ -212,9 +227,37 @@ export function settingsView(me) {
              setting a new code is the way to recover a forgotten one.</p>
         </div>
         <div id="set-access"><p class="muted sm">Loading…</p></div>
-      </section>`;
-    wire();
-    loadAccess();
+      </section>`,
+  };
+
+  function listHTML() {
+    return `<div class="set-index">${PAGES.map(pg => `
+      <button class="set-entry" data-page="${pg.key}">
+        <span class="set-entry-ico">${icons[pg.icon]}</span>
+        <span class="set-entry-txt"><b>${esc(pg.title)}</b><span>${esc(pg.desc)}</span></span>
+        <span class="set-entry-sum">${esc(pg.sum())}</span>
+        ${icons.chevronRight}
+      </button>`).join('')}</div>`;
+  }
+
+  function render() {
+    const pg = PAGES.find(x => x.key === page);
+    root.innerHTML = pg ? `
+      <header class="mod-head set-page-head">
+        <div>
+          <button class="set-back" data-page="">${icons.chevronRight} All settings</button>
+          <h1>${esc(pg.title)}</h1>
+        </div>
+      </header>
+      ${SECTIONS[pg.key]()}` : `
+      <header class="mod-head">
+        <div>
+          <h1>Settings</h1>
+          <p class="mod-sub">Choose what to change</p>
+        </div>
+      </header>
+      ${listHTML()}`;
+    if (page === 'access') loadAccess();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group
@@ -247,6 +290,7 @@ export function settingsView(me) {
     if (ins) ins.innerHTML = insurersHTML();
     const tabs = root.querySelector('#set-tabs');
     if (tabs) tabs.innerHTML = tabsHTML();
+    if (!page) { const ix = root.querySelector('.set-index'); if (ix) ix.outerHTML = listHTML(); }
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
     const sel = root.querySelector('#add-cat select[name="brandGroup"]');
@@ -302,6 +346,8 @@ export function settingsView(me) {
     });
 
     root.addEventListener('click', e => {
+      const go = e.target.closest('[data-page]');
+      if (go) { page = go.dataset.page || null; render(); root.scrollIntoView?.({ block: 'start' }); return; }
       const di = e.target.closest('[data-del-ins]');
       if (di) return store.removeInsurer(di.dataset.delIns);
       const dc = e.target.closest('[data-del-cat]');
@@ -390,7 +436,7 @@ export function settingsView(me) {
   }
 
   return {
-    mount(container) { root = container; render(); },
+    mount(container) { root = container; render(); wire(); },
     // Only settings changes affect this screen. Redrawing for every fitting
     // order or stock request the network produces would throw away whatever
     // the admin is part-way through typing, for nothing.

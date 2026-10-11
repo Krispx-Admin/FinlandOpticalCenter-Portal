@@ -742,6 +742,36 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 }
 .set-add input { flex: 1 1 220px; border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 12px; outline: none; font-size: 13px; }
 .set-add input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
+.set-add select { border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 34px 8px 12px; outline: none;
+  font-size: 13px; font-weight: 600; color: var(--ink); background-color: var(--surface); }
+.set-add select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
+
+/* Settings opens on a list of its pages */
+.set-index { display: flex; flex-direction: column; gap: 10px; max-width: 860px; }
+.set-entry {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; cursor: pointer;
+  padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow); font: inherit; color: var(--ink);
+  transition: border-color var(--speed), transform var(--speed), box-shadow var(--speed);
+}
+.set-entry:hover { border-color: var(--brand); transform: translateY(-1px); box-shadow: 0 4px 18px rgba(19,48,86,.10); }
+.set-entry-ico { width: 40px; height: 40px; border-radius: 11px; background: var(--brand-soft); color: var(--brand);
+  display: grid; place-items: center; flex: none; }
+.set-entry-ico svg { width: 19px; height: 19px; }
+.set-entry-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.set-entry-txt b { font-size: 14.5px; }
+.set-entry-txt span { font-size: 12.5px; color: var(--ink-3); }
+.set-entry-sum { font-size: 12.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.set-entry > svg { width: 17px; height: 17px; color: var(--ink-3); flex: none; }
+.set-back {
+  display: inline-flex; align-items: center; gap: 4px; margin: 0 0 6px -4px; padding: 3px 8px 3px 4px;
+  border: none; background: none; border-radius: 7px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--brand);
+}
+.set-back:hover { background: var(--brand-soft); }
+.set-back svg { width: 15px; height: 15px; transform: rotate(180deg); }
+.set-page-head + .set-card .set-card-head h2 { display: none; }
+@media (max-width: 640px) { .set-entry-sum { display: none; } }
 
 /* Settings › Tabs — one row per sidebar tab with an on/off switch */
 .tab-list { display: flex; flex-direction: column; gap: 8px; }

@@ -370,9 +370,11 @@ const mgm = [
 const moujDone = [
   ['as', 'MOUJ', { title: 'Back at Al Mouj', sub: 'The lenses have arrived from Muscat Grand Mall', kicker: 'Chapter 4 · Fitting centre' }],
   ['focus', '{moujLens}'],
-  ['caption', 'The lenses are in — start fitting'],
+  ['caption', 'The lenses are in — Lenses delivered, then start fitting'],
   beat(1800),
   ['reset'],
+  ['tap', '{moujLens} >> Lenses delivered'],
+  beat(900),
   ['tap', '{moujLens} >> Start fitting'],
   beat(900),
   ['focus', '{moujLens} >> .row-status', { zoom: 1.8 }],

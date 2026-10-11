@@ -97,7 +97,8 @@ export const FIT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'at_fitter', 'read
 // nothing to put in a van: the frame never leaves the building and the customer
 // collects from the same counter. So both road legs drop out, and with them the
 // hand-over at each end — there is no arrival to confirm and no delivery back.
-export const SELF_FLOW = ['pending', 'at_fitter', 'delivered'];
+// The lenses still have to arrive, so that step stays.
+export const SELF_FLOW = ['pending', 'lenses_in', 'at_fitter', 'delivered'];
 export const isSelfFit = o => !!o.fitter && o.fitter === o.origin;
 
 // An order already on the road finishes the way it started, even if its fitter
@@ -128,7 +129,8 @@ export const FIT_STATUS = {
 const SELF_STATUS = {
   // Pending with the fitter already set is a job the lens request opened: the
   // bench is waiting on the lenses, not on anyone choosing where to send it.
-  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
+  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lenses delivered', actor: 'fitter', done: 'Lenses delivered at the branch' },
+  lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
   at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
