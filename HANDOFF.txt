@@ -431,11 +431,12 @@ Migrations are applied by hand, in order. Each file has a header with
                              save_schedule_roster(jsonb, jsonb).
                              Dry-run 2026-10-11: 26 employees / 12 branches
                              convert exactly.
-                             >>> NOT YET APPLIED as of 2026-10-11 — user to run. <<<
+                             APPLIED 2026-10-11 by Claude (user asked): verified
+                             26 employees, 12 branches, 26 defaults, old JSON
+                             columns gone, save_schedule_roster present.
   schema-13-claim-invoice-fields.sql  claims.member_id, claims.insurer,
                              app_settings.insurers jsonb.
-                             >>> NOT YET APPLIED as of 2026-10-11 — user to run.
-                                 Until then a claim with a member ID won't save. <<<
+                             APPLIED 2026-10-11 by Claude (user asked).
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -467,11 +468,13 @@ Data facts known (from commit notes, not re-checked live this session):
 
 ACCESS FOR CLAUDE: previous chats ran SQL through the Supabase Management API
 using a personal token stored at ~/.foc-supabase-token (outside the repo).
-2026-10-08: after the user explicitly authorised it, READ-ONLY queries worked
-(POST /v1/projects/<ref>/database/query with "read_only": true). WRITES
-(applying a migration) were still BLOCKED by the permission system. So the
-user runs migrations in the Supabase dashboard SQL editor unless they add a
-permission rule. Do not try to work around a block.
+READ-ONLY queries work (POST /v1/projects/<ref>/database/query with
+"read_only": true). STANDING RULE (user, 2026-10-11): "from now on you do it
+on your own, don't ask me" — Claude applies migrations to the live database
+itself (helper: scratchpad q.py, --write), then verifies read-only and marks
+the file STATUS: applied. Write each migration so the site keeps working
+before and after it. If the permission system ever blocks a write, stop and
+tell the user — never work around it.
 Live counts on 2026-10-08: lens_requests 7 confirmed + 1 requested; orders
 3 pending, 2 at_fitter, 1 ready, 1 returning, 9 delivered; 7 shelf rows.
 Sign-in codes are kept by the user outside the repo — never ask to see them
@@ -770,6 +773,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  schema-12 and schema-13 applied by Claude and verified. Standing
+             rule: Claude applies migrations itself, without asking.
  2026-10-11  Roster moved into schedule_employees / schedule_branches /
              schedule_defaults (schema-12, NOT YET APPLIED); scheduler.html has
              no staff list any more. Branch/public schedule filters by
