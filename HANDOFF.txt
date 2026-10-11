@@ -277,6 +277,9 @@ unused and empty. Form: Member ID (required) + Bill number, then Full name
 (.field-note) that it must match the insurance card exactly. The Claims page
 has NO stat tiles (user removed "Claim receipts / Raised / Claimed / Paid by
 card"). Module title "Insurance Claims", button "New claim", "Print invoice".
+BRANCH (user, 2026-10-11): a branch never picks one — the form shows its own,
+fixed (.fixed-field with its loc-chip). Only the office (role admin) gets the
+Branch dropdown. Same for Direct Insurance.
 
 Fields: date, branch, bill no, customer (required), products (name + price,
 OMR with 3 decimals — 1 rial = 1000 baisa), Rx grid, payment cash|card.
@@ -809,6 +812,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Claims + Direct Insurance: branch is fixed to the signed-in branch
+             (dropdown only for the office).
  2026-10-11  Direct Insurance: Cash/Card removed (form, list, invoice).
  2026-10-11  Direct Insurance tab: claim form + insurer + salesperson (from the
              schedule roster), DI- numbers; office/Ghiath dashboard of what

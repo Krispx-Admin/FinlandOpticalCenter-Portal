@@ -562,11 +562,13 @@ export function claimsView(me, kind = 'claim') {
       <div class="form">
         <div class="grid2">
           <label>Date<input type="date" id="f-date" value="${esc(draft.date)}"></label>
-          <label>Branch
+          ${me.role === 'admin' ? `<label>Branch
             <select id="f-branch">
               ${BRANCHES.map(b => `<option value="${b.code}" ${draft.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
             </select>
-          </label>
+          </label>` : `<label>Branch
+            <span class="fixed-field">${locChip(draft.branch)} ${esc(locName(draft.branch))}</span>
+          </label>`}
         </div>
         ${directHTML()}
         <div class="grid2">
@@ -636,7 +638,7 @@ export function claimsView(me, kind = 'claim') {
     const el = layer.el;
     const sync = () => {
       draft.date = el.querySelector('#f-date').value;
-      draft.branch = el.querySelector('#f-branch').value;
+      draft.branch = el.querySelector('#f-branch')?.value ?? (existing?.branch ?? me.code);
       draft.billNo = el.querySelector('#f-bill').value;
       draft.customer = el.querySelector('#f-cust').value;
       draft.memberId = el.querySelector('#f-member').value;
