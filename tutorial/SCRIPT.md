@@ -64,7 +64,7 @@ Card: *"A retail branch sells the frame, sends it out for lenses, and hands it b
 
 | On screen | Caption |
 |---|---|
-| Taps **New claim**; member ID, full name **Salim Al Rawahi**, bill number | Insurance Claims. *A printable invoice for the customer's insurer* |
+| Taps **New claim**; member ID, full name **Salim Al Rawahi**, bill number | Insurance Claims. *A printable invoice for the customer* |
 | Two products with prices; zoom on the total | What they bought, and the price in rials · The total adds itself up |
 | Zoom: the prescription grid; both eyes typed in, plus Add | The prescription — distance and near, for each eye |
 | Payment: Card; taps **Create invoice**; the A4 invoice appears | Ready to print and sign. *Clinics raise their claims exactly the same way* |

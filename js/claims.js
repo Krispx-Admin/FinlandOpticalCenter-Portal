@@ -310,7 +310,7 @@ export function claimsView(me) {
     if (isAdmin && ui.branch !== 'all') list = list.filter(c => c.branch === ui.branch);
     if (ui.q) {
       const q = ui.q.toLowerCase();
-      list = list.filter(c => [c.ref, c.customer, c.billNo, c.memberId, c.insurer, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
+      list = list.filter(c => [c.ref, c.customer, c.billNo, c.memberId, c.branch, locName(c.branch), ...(c.items ?? []).map(i => i.name)]
         .some(v => String(v ?? '').toLowerCase().includes(q)));
     }
     return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -328,7 +328,7 @@ export function claimsView(me) {
             <span class="row-cust">${esc(c.customer || '—')}</span>
             ${isAdmin ? locChip(c.branch) : ''}
           </div>
-          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))}${c.insurer ? ` · ${esc(c.insurer)}` : ''} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
+          <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
         </div>
         <div class="row-units"><b>${money(claimTotal(c))}</b> ${CURRENCY}</div>
         <div class="row-status"><span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span></div>
@@ -395,21 +395,17 @@ export function claimsView(me) {
     const draft = existing
       ? {
         date: existing.date, branch: existing.branch, billNo: existing.billNo,
-        customer: existing.customer, memberId: existing.memberId ?? '', insurer: existing.insurer ?? '',
+        customer: existing.customer, memberId: existing.memberId ?? '',
         payment: existing.payment,
         items: existing.items.map(i => ({ ...i })),
         rx: JSON.parse(JSON.stringify(normaliseRx(existing.rx))),
       }
       : {
         date: today(), branch: isAdmin ? BRANCHES[0].code : me.code, billNo: '', customer: '',
-        memberId: '', insurer: '', payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
+        memberId: '', payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
       };
 
     const total = () => draft.items.reduce((t, i) => t + (Number(i.price) || 0), 0);
-    // The insurers the office has set up, and this claim's own if it has since
-    // been taken off the list, so editing never silently changes it.
-    const insurers = store.settings.insurers ?? [];
-    const insurerOptions = draft.insurer && !insurers.includes(draft.insurer) ? [...insurers, draft.insurer] : insurers;
 
     const itemRow = (it, i) => `
       <div class="ci-row">
@@ -433,22 +429,13 @@ export function claimsView(me) {
           </label>
         </div>
         <div class="grid2">
-          <label>Insurance company
-            <select id="f-ins">
-              <option value="">${insurers.length ? 'Choose the insurance company…' : 'None set up yet — ask the office'}</option>
-              ${insurerOptions.map(n => `<option ${draft.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
-            </select>
-          </label>
           <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
+          <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
         </div>
         <label>Full name<input id="f-cust" placeholder="Full name" value="${esc(draft.customer)}">
           <span class="field-note">Must be exactly the name on the insurance card.
             <span lang="ar" dir="rtl">يجب أن يكون الاسم مطابقاً تماماً للاسم المكتوب في بطاقة التأمين.</span></span>
         </label>
-        <div class="grid2">
-          <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
-          <span></span>
-        </div>
 
         <div class="fieldset">
           <div class="fs-head"><span>Products</span><span class="muted sm">Price in ${CURRENCY}</span></div>
@@ -512,7 +499,6 @@ export function claimsView(me) {
       draft.billNo = el.querySelector('#f-bill').value;
       draft.customer = el.querySelector('#f-cust').value;
       draft.memberId = el.querySelector('#f-member').value;
-      draft.insurer = el.querySelector('#f-ins').value;
       draft.payment = el.querySelector('#f-pay').value;
     };
     const showTotal = () => { el.querySelector('#f-total').textContent = `${money(total())} ${CURRENCY}`; };
@@ -540,7 +526,6 @@ export function claimsView(me) {
       if (e.target.closest('[data-save]')) {
         sync();
         const items = draft.items.filter(i => (i.name || '').trim() || Number(i.price));
-        if (insurers.length && !draft.insurer) return toast({ title: 'Choose the insurance company', tone: 'stock' });
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
@@ -566,12 +551,12 @@ export function claimsView(me) {
       <header class="mod-head">
         <div>
           <h1>Insurance Claims</h1>
-          <p class="mod-sub">Raise a printable invoice for the insurer, with products, prescription and payment</p>
+          <p class="mod-sub">Raise a printable invoice with products, prescription and payment</p>
         </div>
         ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} New claim</button>`}
       </header>
       <section class="toolbar">
-        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, insurer, bill…" value="${esc(ui.q)}"></div>
+        <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, bill…" value="${esc(ui.q)}"></div>
         ${isAdmin ? `<select class="sel" id="c-branch"><option value="all">All branches</option>${
           BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')
         }</select>` : ''}

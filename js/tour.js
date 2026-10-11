@@ -154,7 +154,7 @@ const seeb = [
   ['reset'],
 
   // ── insurance claims ──
-  ['caption', 'Insurance Claims', 'A printable invoice for the customer’s insurer'],
+  ['caption', 'Insurance Claims', 'A printable invoice for the customer'],
   nav('claims'),
   beat(900),
   ['tap', 'New claim'],

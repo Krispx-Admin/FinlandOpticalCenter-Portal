@@ -264,9 +264,11 @@ Sultanate of Oman" and "س.ت: 1032797 / ص.ب: 3742 / الرمز البريدي
 سلطنة عُمان". Meta = Date, Branch, Bill Number, Invoice No. | Customer Name
 (2 cols), Member ID (2 cols). THE PAPER NEVER MENTIONS INSURANCE (user,
 2026-10-11): no insurer box, no "Issued for insurance claim purposes" note.
-The insurer is still recorded on the claim and shown in the portal list. Form: Insurance company (select
-from app_settings.insurers, required when the list isn't empty), Member ID
-(required), Full name (required) with an amber English + Arabic note under it
+NO INSURANCE COMPANY ANYWHERE (user changed their mind, 2026-10-11: "don't
+mention the insurer, no need") — not on the form, list, preview or Settings.
+The schema-13 columns claims.insurer and app_settings.insurers exist but are
+unused and empty. Form: Member ID (required) + Bill number, then Full name
+(required) with an amber English + Arabic note under it
 (.field-note) that it must match the insurance card exactly. The Claims page
 has NO stat tiles (user removed "Claim receipts / Raised / Claimed / Paid by
 card"). Module title "Insurance Claims", button "New claim", "Print invoice".
@@ -362,9 +364,7 @@ Who sees what:
   "Counted" pcs|box; "Brands from" brand group.
 - Brand groups: rename inline, drag groups, drag brands between groups
   (same brand may sit in several groups).
-- Insurance companies: the claim form's list (app_settings.insurers, pills
-  with ×, add form). Disabled with a note until schema-13 adds the column;
-  db.js reads app_settings with '*' and only writes insurers when present.
+(app_settings is read with select '*', so a column the app doesn't know is ignored.)
 - Branch access: set any location's 6-digit code via RPC set_branch_code
   (rejects weak codes like 123456, 000000, <3 distinct runs). Codes cannot
   be read back by anyone. Shows last sign-in.
@@ -436,8 +436,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              APPLIED 2026-10-11 by Claude (user asked): verified
                              26 employees, 12 branches, 26 defaults, old JSON
                              columns gone, save_schedule_roster present.
-  schema-13-claim-invoice-fields.sql  claims.member_id, claims.insurer,
-                             app_settings.insurers jsonb.
+  schema-13-claim-invoice-fields.sql  claims.member_id (used), claims.insurer and
+                             app_settings.insurers (added, then dropped from the
+                             app at the user's request — unused, empty).
                              APPLIED 2026-10-11 by Claude (user asked).
 
 Tables (public): branches, orders, order_events, stock_requests,
@@ -775,6 +776,8 @@ Rules:
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-11  Insurance company removed from claims altogether (form, list,
+             filter, preview, Settings) — the user decided it isn't needed.
  2026-10-11  Invoice paper no longer mentions insurance (footer note and
              insurer box removed; Member ID spans two columns).
  2026-10-11  schema-12 and schema-13 applied by Claude and verified. Standing
