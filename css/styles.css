@@ -946,6 +946,70 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* ── Lens Stock ─────────────────────────────────────────────────────────── */
 .tabs-row { margin-bottom: 16px; }
 
+/* ── Lens Stock: folder tabs (one per shelf, then the request lists) ── */
+.shelf-tabs {
+  display: flex; align-items: flex-end; gap: 6px; padding: 0 2px; margin-top: 4px;
+  overflow-x: auto; scrollbar-width: thin; position: relative; z-index: 1;
+}
+.shelf-tab {
+  flex: 0 0 auto; min-width: 176px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 16px 10px; margin-bottom: 0; position: relative; cursor: pointer; text-align: left;
+  font: inherit; color: var(--ink-2); background: #e9edf3;
+  border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0;
+  transition: background var(--speed), color var(--speed), padding var(--speed);
+}
+.shelf-tab b { font-size: 13px; font-weight: 650; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.shelf-tab b svg { width: 15px; height: 15px; }
+.shelf-tab span { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.shelf-tab:hover { background: #e1e6ee; color: var(--ink); }
+/* the open tab: taller, white, a brand edge on top, and joined to the panel */
+.shelf-tab.on {
+  min-width: 220px; padding: 15px 20px 16px; background: var(--surface); color: var(--ink);
+  margin-bottom: -1px; box-shadow: 0 -4px 14px rgba(19,48,86,.07);
+}
+.shelf-tab.on::before {
+  content: ''; position: absolute; left: -1px; right: -1px; top: -1px; height: 3px;
+  background: var(--brand); border-radius: 12px 12px 0 0;
+}
+.shelf-tab.on b { font-size: 15.5px; font-weight: 700; color: var(--brand-ink); }
+.shelf-tab.on span { color: var(--brand); font-weight: 600; }
+.shelf-tab .tab-basket { font-style: normal; color: var(--st-green); font-weight: 700; }
+.shelf-tab .tab-n {
+  font-style: normal; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--st-amber);
+  border-radius: 999px; padding: 1px 7px; margin-left: 2px;
+}
+.shelf-tabs .tab-gap { flex: 1 0 14px; }
+#l-list .row-act .btn { white-space: nowrap; }
+.shelf-tabs .req-tab { min-width: 150px; }
+.shelf-tabs .req-tab.on { min-width: 180px; }
+.shelf-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px; box-shadow: var(--shadow); position: relative; min-height: 320px;
+}
+.shelf-panel.first-on { border-top-left-radius: 0; }
+.shelf-panel .empty { padding: 50px 0; }
+/* the shelf's toolbar: search, the filter button, and (own shelf) its tools */
+.shelf-toolbar .toolbar-gap { flex: 1; }
+.filter-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+}
+.filter-btn svg { width: 18px; height: 18px; }
+.filter-btn:hover, .filter-btn.on { border-color: var(--brand); color: var(--brand); }
+.filter-btn.on { background: var(--brand-soft); }
+.filter-btn em { font-style: normal; font-size: 11px; font-weight: 700; color: #fff; background: var(--brand); border-radius: 999px; padding: 1px 7px; }
+.filter-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -2px 0 14px;
+  padding: 12px; background: var(--page); border: 1px solid var(--border); border-radius: 12px;
+}
+.cart-sum span { opacity: .75; font-weight: 500; }
+@media (max-width: 700px) {
+  .shelf-tab { min-width: 140px; padding: 8px 12px 9px; }
+  .shelf-tab.on { min-width: 160px; padding: 12px 14px 13px; }
+  .shelf-panel { padding: 14px; }
+}
+
 .lens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 11px; }
 .lens-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);

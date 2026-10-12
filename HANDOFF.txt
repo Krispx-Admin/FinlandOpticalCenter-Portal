@@ -272,6 +272,20 @@ Refs SR-1001… from DB sequence.
 
 4.4 LENS STOCK
 --------------
+LAYOUT (redesign, user's drawing, 2026-10-12): stats, then a row of FOLDER
+TABS — one per shelf, Muscat Grand Mall ALWAYS FIRST (data.js FIRST_SHELF =
+'MGM'; the rest in branch order; a new holder just joins the row) — then, at
+the right end, the request tabs: "Incoming requests" (holder, with a count of
+lenses to send), "My requests" (anyone who orders), "All requests" (office).
+The open tab is taller, white, brand edge on top, and joins the panel below
+(.shelf-tab.on, .shelf-panel; panel's top-left corner squares off when the
+first tab is open). Inside a shelf: search + a Filters button (type / index /
+coating / in stock, with a count of filters in use; .filter-row); then the
+lens cards — or, on a holder's OWN shelf ("Your shelf"), the editable table,
+with the cog and "Add lens stock" in the toolbar. One basket per shelf
+(carts Map) — switching tabs keeps them, the tab says "N in basket", the cart
+bar says which shelf. A holder with lenses to send opens on Incoming
+requests; everyone else on the first shelf (a holder: its own).
 SEVERAL HOLDERS (schema-20, 2026-10-12): any open fitting centre the office
 marks "Holds lens stock" (Settings › Branches) keeps its OWN shelf. Every
 lens_stock row and lens_requests row has holder_code (all old data = MGM).
@@ -988,6 +1002,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Lens Stock redesigned to the user's drawing: folder tabs per shelf
+             (Muscat Grand Mall first; the open one taller and joined to the
+             panel), request lists as tabs at the right, search + Filters
+             button, one basket per shelf. Tour updated.
  2026-10-12  Received-lens jobs read "Waiting for Lenses" from the moment they
              are ordered (was "Lenses Requested" until sent); the holder still
              has Send lenses, the branch gets Lenses delivered once sent.

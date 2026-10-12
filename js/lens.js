@@ -1,6 +1,6 @@
 // ── Module 4: Lens Stock — holders keep shelves, every branch shops from them ──
 import {
-  LENS_HOLDERS, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
+  LENS_HOLDERS, FIRST_SHELF, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll,
 } from './data.js';
 import { store } from './store.js';
@@ -31,36 +31,44 @@ export function lensView(me) {
   const isOwner = isLensOwner(me.code);
   // The office and the schedule editor look on; neither shops the shelf.
   const isAdmin = seesAll(me.role);
-  // The shelves this branch can ask from: every holder but itself.
-  const otherHolders = () => LENS_HOLDERS.filter(h => h.code !== me.code);
-  const canShop = !isAdmin && otherHolders().length > 0;
   // The branch that keeps the lenses decides what may go on the shelf. The
   // office can too — it is the same pair the database lets write.
   const canEditLists = isOwner || me.role === 'admin';
 
+  // One tab per shelf, Muscat Grand Mall always first (user, 2026-10-12), then
+  // the others in branch order — a shelf added later simply joins the row.
+  const shelves = () => [...LENS_HOLDERS].sort((a, b) => (b.code === FIRST_SHELF) - (a.code === FIRST_SHELF));
+  const otherShelves = () => shelves().filter(h => h.code !== me.code);
+  const canShop = !isAdmin && otherShelves().length > 0;
+  // The request lists sit at the end of the same row.
+  const reqTabs = () => isAdmin ? [['queue', 'All requests']]
+    : [...(isOwner ? [['queue', 'Incoming requests']] : []), ...(canShop || !isOwner ? [['mine', 'My requests']] : [])];
+
+  const toSend = () => store.lensRequestsFor(me.code).filter(r => r.holder === me.code && r.status === 'requested').length;
+  const firstShelf = () => (isOwner && !isAdmin ? me.code : shelves()[0]?.code) ?? null;
   const ui = {
-    tab: isOwner || !canShop ? 'queue' : 'shop',
-    // The shelf being browsed (shopping, or the office looking on).
-    holder: (isAdmin ? LENS_HOLDERS[0] : otherHolders()[0])?.code ?? null,
+    // A holder with lenses to send starts on them; everyone else on the first shelf.
+    tab: isOwner && !isAdmin && toSend() ? 'queue' : firstShelf() ? 'shelf' : (isAdmin || isOwner ? 'queue' : 'mine'),
+    holder: firstShelf(),
+    filters: false,
     chip: isOwner ? 'requested' : 'all',
     q: '', type: 'all', index: 'all', coating: 'all', inStock: true,
     branch: 'all',
     seen: new Set(store.state.lensRequests.map(r => r.id)),
     prevStatus: new Map(store.state.lensRequests.map(r => [r.id, r.status])),
   };
-  // Basket lives for the visit only — nothing is shared until a request is placed.
-  const cart = new Map(); // itemId → qty
+  // One basket per shelf, for the visit only — switching tabs keeps each one,
+  // and nothing is shared until a request is placed.
+  const carts = new Map(); // holder → (itemId → qty)
+  const basket = (code = ui.holder) => carts.get(code) ?? carts.set(code, new Map()).get(code);
   let root, drawer = null, drawerId = null, declining = false;
 
-  const tabs = isOwner
-    ? [['queue', 'Incoming requests'], ['stock', 'My shelf'], ...(canShop ? [['shop', 'Other shelves'], ['mine', 'My requests']] : [])]
-    : canShop ? [['shop', 'Browse lenses'], ['mine', 'My requests']]
-    : [['queue', 'All requests'], ['stock', LENS_HOLDERS.length > 1 ? 'Shelves' : `Shelf at ${LENS_HOLDERS[0]?.code ?? ''}`]];
-
-  // Whose shelf this tab shows: a holder's own on "My shelf", else the one picked.
-  const shelfCode = () => (ui.tab === 'stock' && isOwner ? me.code : ui.holder);
-  const shelf = () => store.lensStock.filter(i => i.holder === shelfCode());
-  // Which requests this tab is about.
+  // The shelf on screen, and whether it is this branch's own (edited here) or
+  // one it can order from.
+  const shelf = () => store.lensStock.filter(i => i.holder === ui.holder);
+  const ownShelf = () => isOwner && ui.holder === me.code;
+  const shopHere = () => !isAdmin && ui.holder && ui.holder !== me.code;
+  // Which requests a request tab is about.
   const scope = () => {
     const all = store.lensRequestsFor(me.code);
     if (ui.tab === 'mine') return all.filter(r => r.branch === me.code);
@@ -88,7 +96,7 @@ export function lensView(me) {
     let list = scope();
     if (ui.chip !== 'all') list = list.filter(r => r.status === ui.chip);
     if (ui.tab !== 'mine' && ui.branch !== 'all') list = list.filter(r => r.branch === ui.branch);
-    if (ui.q && ui.tab !== 'shop') {
+    if (ui.q && ui.tab !== 'shelf') {
       const q = ui.q.toLowerCase();
       list = list.filter(r => [r.ref, r.billNo, r.branch, locName(r.branch), ...r.lines.map(lensFull)]
         .some(v => String(v).toLowerCase().includes(q)));
@@ -105,37 +113,45 @@ export function lensView(me) {
   };
 
   // ── stats ──
+  // About the shelf and the requests on screen: a holder at its own shelf or
+  // its incoming requests sees its shelf; anyone ordering sees the shelf
+  // picked and its own requests; the office sees them all.
   function statsHTML() {
-    const stock = isAdmin ? store.lensStock : shelf();
-    const c = reqCounts();
-    const pcs = stock.reduce((s, i) => s + i.qty, 0);
     const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
-    if (isOwner && ui.tab !== 'shop' && ui.tab !== 'mine') {
+    const all = store.lensRequestsFor(me.code);
+    if (isAdmin) {
+      const stock = store.lensStock;
+      return t(all.filter(r => r.status === 'requested').length, 'Lenses to send', 'stat-amber')
+           + t(stock.reduce((s, i) => s + i.qty, 0), 'Lenses on all shelves', 'stat-brand')
+           + t(LENS_HOLDERS.length, LENS_HOLDERS.length === 1 ? 'Shelf' : 'Shelves') + t(all.length, 'All requests');
+    }
+    if (isOwner && (ui.tab === 'queue' || ownShelf())) {
+      const stock = store.lensStock.filter(i => i.holder === me.code);
       const low = stock.filter(isLow).length;
       const out = stock.filter(i => i.qty === 0).length;
-      return t(c.requested, 'Lenses to send', 'stat-amber') + t(pcs, 'Lenses on the shelf', 'stat-brand')
+      return t(toSend(), 'Lenses to send', 'stat-amber') + t(stock.reduce((s, i) => s + i.qty, 0), 'Lenses on your shelf', 'stat-brand')
            + t(low, 'Running low', low ? 'stat-amber' : '') + t(out, 'Out of stock', out ? 'stat-red' : '');
     }
-    if (isAdmin) {
-      return t(c.requested, 'Lenses to send', 'stat-amber') + t(pcs, LENS_HOLDERS.length > 1 ? 'Lenses on all shelves' : `Lenses at ${LENS_HOLDERS[0]?.code ?? ''}`, 'stat-brand')
-           + t(stock.length, 'Lens types') + t(c.all, 'All requests');
-    }
-    const avail = stock.filter(i => i.qty > 0).length;
-    return t(avail, 'Lens types available', 'stat-brand') + t(c.requested, 'Waiting to be sent', 'stat-amber')
-         + t(c.confirmed, 'Confirmed') + t(c.all, 'My requests');
+    const mine = all.filter(r => r.branch === me.code);
+    const avail = ui.tab === 'shelf' ? shelf().filter(i => i.qty > 0).length : null;
+    return (avail == null ? t(mine.filter(r => r.status === 'reserved').length, 'Set aside for a frame', 'stat-brand')
+                          : t(avail, `Lens types at ${esc(ui.holder)}`, 'stat-brand'))
+         + t(mine.filter(r => r.status === 'requested').length, 'Waiting to be sent', 'stat-amber')
+         + t(mine.filter(r => ['sent', 'confirmed'].includes(r.status)).length, 'Sent to you')
+         + t(mine.length, 'My requests');
   }
 
   // ── shop: catalogue grid ──
-  function cartCount() { return [...cart.values()].reduce((s, n) => s + n, 0); }
+  const cartCount = (code = ui.holder) => [...basket(code).values()].reduce((s, n) => s + n, 0);
 
   function cardHTML(i) {
-    const inCart = cart.get(i.id) ?? 0;
+    const inCart = basket().get(i.id) ?? 0;
     const out = i.qty === 0;
     const maxed = inCart >= i.qty;
     const stockTag = out
       ? `<span class="lens-qty out">Out of stock</span>`
       : `<span class="lens-qty ${isLow(i) ? 'low' : ''}"><b>${i.qty}</b> in stock</span>`;
-    const control = !canShop ? ''
+    const control = !shopHere() ? ''
       : out ? `<button class="btn btn-ghost btn-sm" disabled>Unavailable</button>`
       : inCart ? `
         <div class="stepper" data-stop>
@@ -158,41 +174,54 @@ export function lensView(me) {
       </div>`;
   }
 
-  // Pick a shelf: shown only when there is a choice to make.
-  function holderPickHTML() {
-    const opts = ui.tab === 'shop' ? otherHolders() : (isAdmin ? LENS_HOLDERS : []);
-    if (opts.length < 2) return '';
-    return `<select class="sel" id="l-holder" aria-label="Shelf">${opts.map(h =>
-      `<option value="${h.code}" ${ui.holder === h.code ? 'selected' : ''}>Shelf at ${esc(h.name)}</option>`).join('')}</select>`;
+  // The filters hide behind one button; it shows how many are in use.
+  function filterCount() {
+    return ['type', 'index', 'coating'].filter(k => ui[k] !== 'all').length + (ui.inStock ? 0 : 1);
   }
-
-  function shopHTML() {
-    const list = catalogue();
+  function shelfToolbarHTML() {
+    const own = ownShelf();
     const sel = (id, label, opts, val) => `
       <select class="sel" id="${id}" aria-label="${label}">
         <option value="all">${esc(label)}</option>
         ${opts.map(o => `<option value="${esc(o)}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
       </select>`;
+    const n = filterCount();
     return `
-      <section class="toolbar">
+      <section class="toolbar shelf-toolbar">
         <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search type, index, power…" value="${esc(ui.q)}"></div>
-        ${holderPickHTML()}
+        <button class="filter-btn ${ui.filters ? 'on' : ''}" data-filters title="Filters" aria-expanded="${ui.filters}">
+          ${icons.filter}<span>Filters</span>${n ? `<em>${n}</em>` : ''}
+        </button>
+        ${own ? `<span class="toolbar-gap"></span>
+          ${canEditLists ? `<button class="icon-btn" id="l-cog" title="Edit lens types, indices and coatings">${icons.settings}</button>` : ''}
+          <button class="btn btn-primary btn-sm" data-new>${icons.plus} Add lens stock</button>` : ''}
+      </section>
+      ${ui.filters ? `
+      <section class="filter-row">
         ${sel('l-type', 'All types', store.lensTypes, ui.type)}
         ${sel('l-index', 'All indices', store.lensIndices, ui.index)}
         ${sel('l-coating', 'All coatings', store.lensCoatings, ui.coating)}
-        <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>In stock only</label>
-      </section>
+        <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>${own ? 'Hide empty' : 'In stock only'}</label>
+        ${n ? `<button class="btn btn-ghost btn-sm" data-clear-filters>Clear filters</button>` : ''}
+      </section>` : ''}`;
+  }
+
+  function shopHTML() {
+    const list = catalogue();
+    return `
+      ${shelfToolbarHTML()}
       ${list.length
         ? `<section class="lens-grid">${list.map(cardHTML).join('')}</section>`
-        : `<div class="empty">${icons.lens}<p>No lenses match these filters.</p></div>`}`;
+        : `<div class="empty">${icons.lens}<p>${shelf().length ? 'No lenses match these filters.' : `Nothing on ${esc(locName(ui.holder))}’s shelf yet.`}</p></div>`}`;
   }
 
   function cartBarHTML() {
     const n = cartCount();
-    if (!canShop || !n) return '';
+    if (ui.tab !== 'shelf' || !shopHere() || !n) return '';
+    const b = basket();
     return `
       <div class="cart-bar">
-        <div class="cart-sum">${icons.lens}<b>${cart.size}</b> lens type${cart.size === 1 ? '' : 's'} · <b>${n}</b> pcs</div>
+        <div class="cart-sum">${icons.lens}<span>From ${esc(locName(ui.holder))}:</span> <b>${b.size}</b> lens type${b.size === 1 ? '' : 's'} · <b>${n}</b> pcs</div>
         <button class="btn btn-ghost btn-sm" data-clear>Clear</button>
         <button class="btn btn-primary" data-review>${icons.send} Review &amp; request</button>
       </div>`;
@@ -244,22 +273,9 @@ export function lensView(me) {
   // ── owner: shelf editor ──
   function stockHTML() {
     const list = catalogue();
-    const mine = isOwner && shelfCode() === me.code;
-    const sel = (id, label, opts, val) => `
-      <select class="sel" id="${id}" aria-label="${label}">
-        <option value="all">${esc(label)}</option>
-        ${opts.map(o => `<option value="${esc(o)}" ${val === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
-      </select>`;
+    const mine = ownShelf();
     return `
-      <section class="toolbar">
-        <div class="searchbox">${icons.search}<input id="l-q" placeholder="Search type, index, power…" value="${esc(ui.q)}"></div>
-        ${sel('l-type', 'All types', store.lensTypes, ui.type)}
-        ${sel('l-index', 'All indices', store.lensIndices, ui.index)}
-        ${sel('l-coating', 'All coatings', store.lensCoatings, ui.coating)}
-        ${holderPickHTML()}
-        <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>Hide empty</label>
-        ${canEditLists ? `<button class="icon-btn" id="l-cog" title="Edit lens types, indices and coatings">${icons.settings}</button>` : ''}
-      </section>
+      ${shelfToolbarHTML()}
       ${mine ? `<div class="review-hint">${icons.box} Keep these counts matching the drawer. Lenses come off them the moment a branch orders them.</div>` : ''}
       ${list.length ? `
         <table class="lines stock-table">
@@ -363,6 +379,8 @@ export function lensView(me) {
     // Every branch chooses; sending the frame is the default. What happens to
     // received lenses depends on whether this branch has a bench.
     const canCut = canCutOwnLenses(me.role);
+    const holder = ui.holder;
+    const cart = basket(holder);
     const draft = { customer: '', billNo: '', fulfilment: 'send_frames' };
     const layer = openLayer('modal', () => {
       const rows = [...cart.entries()].map(([id, qty]) => {
@@ -386,7 +404,7 @@ export function lensView(me) {
       }).join('');
       return `
         <div class="dw-head">
-          <div><div class="dw-kicker">New lens request</div><h2>Request lenses from ${esc(locName(ui.holder))}</h2></div>
+          <div><div class="dw-kicker">New lens request</div><h2>Request lenses from ${esc(locName(holder))}</h2></div>
           <button class="icon-btn" data-close>${icons.x}</button>
         </div>
         <div class="form">
@@ -406,10 +424,10 @@ export function lensView(me) {
                 <span>${esc(!canCut && f.subShop ? f.subShop : f.sub)}</span>
               </label>`).join('')}
           </div>
-          <p class="muted">The lenses come off ${esc(locName(ui.holder))}’s shelf as soon as you send this, and a fitting order opens for the bill.
-             ${draft.fulfilment === 'receive_lens' ? `It reads “Waiting for Lenses” straight away; ${esc(locName(ui.holder))} sends them from its Fitting Log.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
+          <p class="muted">The lenses come off ${esc(locName(holder))}’s shelf as soon as you send this, and a fitting order opens for the bill.
+             ${draft.fulfilment === 'receive_lens' ? `It reads “Waiting for Lenses” straight away; ${esc(locName(holder))} sends them from its Fitting Log.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
           <div class="form-foot">
-            <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
+            <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount(holder)} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>
             <button class="btn btn-primary" data-send>${icons.send} Send request</button>
           </div>
@@ -439,7 +457,7 @@ export function lensView(me) {
         const id = el.dataset.plus ?? el.dataset.minus ?? el.dataset.drop;
         sync();
         if (drop) cart.delete(id);
-        else bump(id, plus ? 1 : -1);
+        else bump(id, plus ? 1 : -1, holder);
         if (!cart.size) return layer.close();
         layer.update();
         refreshBody();
@@ -465,51 +483,84 @@ export function lensView(me) {
         const was = send.innerHTML;
         send.textContent = 'Sending…';
         const r = await store.createLensRequest({
-          lines, billNo: draft.billNo, customer: draft.customer, fulfilment: draft.fulfilment, holder: ui.holder,
+          lines, billNo: draft.billNo, customer: draft.customer, fulfilment: draft.fulfilment, holder,
         }, me.code);
         if (!r) { send.disabled = false; send.innerHTML = was; return; }
         cart.clear();
         layer.close();
         ui.tab = 'mine';
-        render();
+        refreshBody();
         openDrawer(r.id);
       }
     });
   }
 
-  function bump(id, by) {
+  function bump(id, by, code = ui.holder) {
     const item = store.lensItem(id);
     if (!item) return;
+    const cart = basket(code);
     const next = Math.min(item.qty, Math.max(0, (cart.get(id) ?? 0) + by));
     if (next === 0) cart.delete(id); else cart.set(id, next);
   }
 
   // ── render ──
   function bodyHTML() {
-    if (ui.tab === 'shop') return shopHTML();
-    if (ui.tab === 'mine' || ui.tab === 'queue') return queueHTML();
-    return stockHTML();
+    if (ui.tab === 'shelf') return ui.holder ? (ownShelf() ? stockHTML() : shopHTML())
+      : `<div class="empty">${icons.lens}<p>No branch holds lens stock yet.</p></div>`;
+    return queueHTML();
   }
 
+  // Folder tabs: the shelves first (Muscat Grand Mall leading), then the
+  // request lists. The open tab stands taller and joins the panel below.
+  function tabsHTML() {
+    const shelfTab = h => {
+      const on = ui.tab === 'shelf' && ui.holder === h.code;
+      const inBasket = cartCount(h.code);
+      const own = h.code === me.code;
+      return `
+        <button class="shelf-tab ${on ? 'on' : ''}" data-shelf="${h.code}" aria-pressed="${on}">
+          <b>${esc(h.name)}</b>
+          <span>${own ? 'Your shelf' : 'Stock lenses'}${inBasket ? ` · <i class="tab-basket">${inBasket} in basket</i>` : ''}</span>
+        </button>`;
+    };
+    const reqTab = ([k, label]) => {
+      const on = ui.tab === k;
+      const n = k === 'queue' && !isAdmin ? toSend()
+        : k === 'mine' ? store.lensRequestsFor(me.code).filter(r => r.branch === me.code && r.status === 'requested').length : 0;
+      return `
+        <button class="shelf-tab req-tab ${on ? 'on' : ''}" data-tab="${k}" aria-pressed="${on}">
+          <b>${icons.inbox} ${esc(label)}${n ? `<em class="tab-n">${n}</em>` : ''}</b>
+          <span>${k === 'queue' ? (isAdmin ? 'Every shelf' : 'Asked of your shelf') : 'What you ordered'}</span>
+        </button>`;
+    };
+    return `<nav class="shelf-tabs" aria-label="Lens shelves">${shelves().map(shelfTab).join('')}<span class="tab-gap"></span>${reqTabs().map(reqTab).join('')}</nav>`;
+  }
+
+  // The panel's top-left corner squares off when the first tab is open, so
+  // the tab and the panel read as one piece.
+  const panelClass = () => {
+    const first = shelves()[0]?.code;
+    return (ui.tab === 'shelf' && ui.holder === first) || (!first && ui.tab === reqTabs()[0]?.[0]) ? 'first-on' : '';
+  };
+
   function render() {
-    const where = LENS_HOLDERS.map(h => h.name).join(' and ') || 'the lens holders';
-    const sub = isOwner
-      ? 'Keep your lens shelf up to date and answer what the other branches ask for'
-      : isAdmin
-        ? `Loose-lens stock held at ${where} and every request against it`
-        : `Browse the lenses ${where} ${LENS_HOLDERS.length > 1 ? 'have' : 'has'} on hand and request what you need`;
+    const sub = isAdmin
+      ? 'Every lens shelf, and every request made against them'
+      : isOwner
+        ? 'Keep your shelf up to date, send the lenses branches ask for, and order from the other shelves'
+        : 'Pick a shelf, find the lenses you need and request them';
     root.innerHTML = `
       <header class="mod-head">
         <div>
           <h1>Lens Stock</h1>
           <p class="mod-sub">${esc(sub)}</p>
         </div>
-        ${isOwner ? `<button class="btn btn-primary" data-new>${icons.plus} Add lens stock</button>` : ''}
       </header>
       <section class="stats" id="l-stats">${statsHTML()}</section>
-      <section class="chips tabs-row">${tabs.map(([k, label]) =>
-        `<button class="chip ${ui.tab === k ? 'on' : ''}" data-tab="${k}">${esc(label)}</button>`).join('')}</section>
-      <div id="l-body">${bodyHTML()}</div>
+      <div id="l-tabs">${tabsHTML()}</div>
+      <section class="shelf-panel ${panelClass()}" id="l-panel">
+        <div id="l-body">${bodyHTML()}</div>
+      </section>
       <div id="l-cart">${cartBarHTML()}</div>`;
     wireBody();
     markSeen();
@@ -524,6 +575,9 @@ export function lensView(me) {
     const active = document.activeElement;
     const keepFocus = active?.id === 'l-q' ? { id: 'l-q', pos: active.selectionStart } : null;
     if (s) s.innerHTML = statsHTML();
+    const tb = root.querySelector('#l-tabs');
+    if (tb) tb.innerHTML = tabsHTML();
+    root.querySelector('#l-panel')?.setAttribute('class', `shelf-panel ${panelClass()}`);
     b.innerHTML = bodyHTML();
     if (c) c.innerHTML = cartBarHTML();
     if (keepFocus) {
@@ -662,13 +716,7 @@ export function lensView(me) {
     root.querySelector('#l-instock')?.addEventListener('change', e => { ui.inStock = e.target.checked; refreshBody(); });
     root.querySelector('#l-cog')?.addEventListener('click', catalogueModal);
     root.querySelector('#l-branch')?.addEventListener('change', e => { ui.branch = e.target.value; refreshBody(); });
-    // A basket is for one shelf: switching shelves empties it, after asking.
-    root.querySelector('#l-holder')?.addEventListener('change', e => {
-      if (cart.size && !confirm('Your basket holds lenses from this shelf. Empty it and switch?')) { e.target.value = ui.holder; return; }
-      cart.clear();
-      ui.holder = e.target.value;
-      refreshBody();
-    });
+
     root.querySelectorAll('[data-qty]').forEach(el => {
       el.addEventListener('change', ev => store.setLensQty(ev.target.dataset.qty, ev.target.value, me.code));
     });
@@ -679,8 +727,12 @@ export function lensView(me) {
   function wireRoot() {
     root.addEventListener('click', e => {
       if (e.target.closest('[data-new]')) return addStockModal();
+      const sh = e.target.closest('[data-shelf]');
+      if (sh) { ui.tab = 'shelf'; ui.holder = sh.dataset.shelf; ui.q = ''; refreshBody(); return; }
       const tab = e.target.closest('[data-tab]');
-      if (tab) { ui.tab = tab.dataset.tab; ui.q = ''; ui.chip = ui.tab === 'queue' && isOwner ? 'requested' : 'all'; render(); return; }
+      if (tab) { ui.tab = tab.dataset.tab; ui.q = ''; ui.chip = ui.tab === 'queue' && isOwner && !isAdmin ? 'requested' : 'all'; refreshBody(); return; }
+      if (e.target.closest('[data-filters]')) { ui.filters = !ui.filters; refreshBody(); return; }
+      if (e.target.closest('[data-clear-filters]')) { ui.type = ui.index = ui.coating = 'all'; ui.inStock = true; refreshBody(); return; }
       const chip = e.target.closest('[data-chip]');
       if (chip) { ui.chip = chip.dataset.chip; refreshBody(); return; }
 
@@ -690,7 +742,7 @@ export function lensView(me) {
       if (plus) { bump(plus.dataset.plus, 1); refreshBody(); return; }
       const minus = e.target.closest('[data-minus]');
       if (minus) { bump(minus.dataset.minus, -1); refreshBody(); return; }
-      if (e.target.closest('[data-clear]')) { cart.clear(); refreshBody(); return; }
+      if (e.target.closest('[data-clear]')) { basket().clear(); refreshBody(); return; }
       if (e.target.closest('[data-review]')) return cartModal();
 
       const del = e.target.closest('[data-del]');

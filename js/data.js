@@ -45,6 +45,9 @@ export const FITTERS = LOCATIONS.filter(l => l.role === 'fitting');
 export const BRANCHES = LOCATIONS.filter(l => BRANCH_KINDS.includes(l.role));
 // The fitting centres that keep loose-lens stock (branches.holds_lens_stock).
 export const LENS_HOLDERS = LOCATIONS.filter(l => l.holdsLens);
+// Lens Stock always shows this shelf first (user, 2026-10-12); the rest follow
+// in branch order. If it ever stops holding stock, the first in order leads.
+export const FIRST_SHELF = 'MGM';
 
 // Replace the lists in place: every module imported these arrays, so they keep
 // their identity, and an existing location object is updated rather than
