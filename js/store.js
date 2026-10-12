@@ -16,7 +16,7 @@ import * as db from './db.js';
 import {
   locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
-  LENS_OWNER, BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
+  BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
   ROLES, loc, setLocations,
 } from './data.js';
 import { toast } from './ui.js';
@@ -50,7 +50,7 @@ function linkLensRequests() {
   const byOrder = new Map(state.lensRequests.filter(r => r.orderId).map(r => [r.orderId, r]));
   for (const o of state.orders) {
     const r = byOrder.get(o.id);
-    o.lensRequest = r ? { status: r.status, fulfilment: r.fulfilment, ref: r.ref } : null;
+    o.lensRequest = r ? { status: r.status, fulfilment: r.fulfilment, ref: r.ref, holder: r.holder } : null;
   }
 }
 
@@ -60,7 +60,7 @@ function explain(e) {
   const m = String(e?.message ?? e);
   if (/orders_ref_per_branch|duplicate key.*orders/i.test(m)) return 'That bill number is already logged at your branch.';
   if (/row-level security|violates row-level/i.test(m)) return 'Your branch is not allowed to do that.';
-  if (/only the lens-holding branch/i.test(m)) return `Only ${locName(LENS_OWNER)} can change the lens shelf.`;
+  if (/only the lens-holding branch/i.test(m)) return 'Only the branch holding those lenses can do that.';
   if (/only the warehouse|only the office/i.test(m)) return 'Only the office can do that.';
   if (/already (confirmed|declined|completed)/i.test(m)) return 'Someone already answered that one.';
   if (/Failed to fetch|NetworkError|network/i.test(m)) return 'No connection to the server. Check the internet and try again.';
@@ -353,7 +353,7 @@ export const store = {
       const spec = db.lensStockRow(f);
       const row = ok(await supabase.rpc('add_lens_stock', {
         p_type: spec.lens_type, p_index: spec.lens_index, p_coating: spec.coating,
-        p_sph: spec.sph, p_cyl: spec.cyl, p_qty: qty,
+        p_sph: spec.sph, p_cyl: spec.cyl, p_qty: qty, p_holder: f.holder ?? by,
       }));
       return row;
     }, row => {
@@ -432,10 +432,10 @@ export const store = {
   // lens request with no job behind it the first time someone retyped a bill
   // number. The function also decides the fitter, so a branch cannot name
   // itself one. The order waits on MGM's confirmation before it can move.
-  createLensRequest({ lines, billNo, customer, fulfilment }, by) {
+  createLensRequest({ lines, billNo, customer, fulfilment, holder }, by) {
     return run(['lensRequests', 'orders'], async () => {
       const row = ok(await supabase.rpc('create_lens_request', {
-        p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines,
+        p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines, p_holder: holder,
       }));
       const pcs = lines.reduce((s, l) => s + (l.qty || 0), 0);
       return { ...row, lines, pcs };
@@ -443,7 +443,7 @@ export const store = {
       by, module: 'lens', title: `${by} requested lenses ${r.ref}`,
       sub: r.fulfilment === 'receive_lens'
         ? `${r.pcs} pcs to ${locName(by)} · fitting here`
-        : `${r.pcs} pcs · frame going to ${locName(LENS_OWNER)}`,
+        : `${r.pcs} pcs · frame going to ${locName(r.holder_code ?? holder)}`,
       refs: [r.id],
     })).then(r => (r ? this.lensRequest(r.id) : null));
   },
@@ -531,6 +531,15 @@ export const store = {
   },
 
   // Names are the key categories point at, so a rename carries those with it.
+  // Requests already placed keep the name they were placed under.
+  renameCategory(oldName, newName) {
+    newName = String(newName).trim();
+    const c = state.settings.categories.find(x => x.name === oldName);
+    if (!c || !newName || newName === oldName || state.settings.categories.some(x => x.name === newName)) return Promise.resolve(null);
+    c.name = newName;
+    return saveSettings({ module: 'settings', title: `Category renamed to “${newName}”` });
+  },
+
   renameBrandGroup(oldName, newName) {
     newName = String(newName).trim();
     const g = this.brandGroup(oldName);
@@ -614,6 +623,55 @@ export const store = {
       ok(await supabase.rpc('save_branch', { p_code: code, p_name: next.name, p_role: next.role, p_active: next.active }));
       return true;
     }, { module: 'settings', title });
+  },
+
+  // Gone for good — only a branch with nothing recorded; the database checks.
+  deleteBranch(code) {
+    const name = loc(code)?.name ?? code;
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('delete_branch', { p_code: code }));
+      return true;
+    }, { module: 'settings', title: `${name} deleted` });
+  },
+
+  // Make a fitting centre a lens-stock holder, or stop it being one.
+  setLensHolder(code, on) {
+    const name = loc(code)?.name ?? code;
+    return run(['branches', 'lensStock'], async () => {
+      ok(await supabase.rpc('set_lens_holder', { p_code: code, p_on: on }));
+      return true;
+    }, { module: 'settings', title: on ? `${name} now holds lens stock` : `${name} no longer holds lens stock` });
+  },
+
+  // ── Employees: the schedule's roster, which is also the salesperson list ──
+  // Read on demand by Settings; the office and Ghiath may write it.
+  async loadEmployees() {
+    const [emps, brs] = await Promise.all([
+      supabase.from('schedule_employees').select('id, name, optom, type, weekend_days, priority, position').order('position'),
+      supabase.from('schedule_branches').select('code, name').order('position'),
+    ]);
+    if (emps.error) throw new Error(emps.error.message);
+    if (brs.error) throw new Error(brs.error.message);
+    return { employees: emps.data ?? [], branches: brs.data ?? [] };
+  },
+
+  saveEmployee(e, isNew) {
+    const name = String(e.name ?? '').trim();
+    if (!name) return Promise.resolve(null);
+    return run([], async () => {
+      ok(await supabase.from('schedule_employees').upsert({
+        id: e.id, name, optom: !!e.optom, type: e.type, weekend_days: e.weekendDays ?? [],
+        priority: e.priority ?? [], position: e.position ?? 0,
+      }));
+      return true;
+    }, { module: 'settings', title: isNew ? `${name} added to the employees` : `${name} updated` });
+  },
+
+  deleteEmployee(id, name) {
+    return run([], async () => {
+      ok(await supabase.from('schedule_employees').delete().eq('id', id));
+      return true;
+    }, { module: 'settings', title: `${name} removed from the employees` });
   },
 
   // ── Outside cutters: the 3rd parties "Send to fitter" offers ──

@@ -336,6 +336,45 @@ export function fittingView(me) {
     });
   }
 
+  // ── outside cutters (the office) — the 3rd parties Send to fitter offers ──
+  function cuttersModal() {
+    const layer = openLayer('modal', () => {
+      const list = store.settings.outsideCutters ?? [];
+      return `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Fitting Log</div><h2>Outside cutters</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <p class="muted">The 3rd-party cutters offered under “Outside” when a branch sends a frame to a fitter.
+           With none named, branches simply pick “${esc(OUTSIDE_DEFAULT)}”. Taking one off leaves the frames already sent to it as they are.</p>
+        ${list.length ? `<div class="set-brands">${list.map(n => `
+          <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-cutter="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`
+          : `<div class="empty">${icons.glasses}<p>No outside cutters named yet — add the first below.</p></div>`}
+        <form class="set-add" id="add-cutter" autocomplete="off">
+          <input name="name" placeholder="New outside cutter — e.g. the lab's name" required>
+          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add cutter</button>
+        </form>
+      </div>`;
+    });
+    layer.el.addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = e.target.querySelector('input[name="name"]');
+      if (!input?.value.trim()) return;
+      await store.addCutter(input.value);
+      layer.update();
+      layer.el.querySelector('#add-cutter input')?.focus();
+    });
+    layer.el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      const del = e.target.closest('[data-del-cutter]');
+      if (!del) return;
+      if (!confirm(`Take ${del.dataset.delCutter} off the outside cutters?`)) return;
+      await store.removeCutter(del.dataset.delCutter);
+      layer.update();
+    });
+  }
+
   // ── new order modal — bill number only ──
   function newOrderModal() {
     const layer = openLayer('modal', () => `
@@ -396,7 +435,8 @@ export function fittingView(me) {
           <h1>Fitting Log</h1>
           <p class="mod-sub">${isAdmin ? 'Every frame travelling across the network' : 'Frames travelling between your branch and the fitting centres'}</p>
         </div>
-        ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>` : ''}
+        ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>`
+          : me.role === 'admin' ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
       </header>
       <section class="stats" id="f-stats">${statsHTML()}</section>
       <section class="toolbar">
@@ -437,6 +477,7 @@ export function fittingView(me) {
     root.querySelector('#f-q').addEventListener('input', e => { ui.q = e.target.value; refreshLists(); });
     root.querySelector('#f-urgent').addEventListener('click', () => { ui.urgentOnly = !ui.urgentOnly; root.querySelector('#f-urgent').classList.toggle('on', ui.urgentOnly); refreshLists(); });
     root.querySelector('[data-new]')?.addEventListener('click', newOrderModal);
+    root.querySelector('[data-cutters]')?.addEventListener('click', cuttersModal);
     root.querySelector('#f-origin')?.addEventListener('change', e => { ui.origin = e.target.value; refreshLists(); });
     root.querySelector('#f-fitter')?.addEventListener('change', e => { ui.fitter = e.target.value; refreshLists(); });
 

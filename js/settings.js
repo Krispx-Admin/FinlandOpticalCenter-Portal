@@ -1,8 +1,8 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, OUTSIDE_DEFAULT, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS } from './data.js';
+import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
-import { esc, icons, relTime } from './ui.js';
+import { esc, icons, relTime, openLayer } from './ui.js';
 
 export function settingsView(me) {
   let root;
@@ -10,13 +10,14 @@ export function settingsView(me) {
   const groups = () => store.settings.brandGroups;
   const usedBy = name => store.settings.categories.filter(c => c.brandGroup === name).length;
 
-  // Shows "— none —" when a category points at a group that no longer exists,
-  // so a dangling pointer is visible rather than silently showing group one.
-  function groupOptionsHTML(selected) {
+  // "No brands" leads the list: picking it is the same as unticking Brand. It
+  // also shows when a category points at a group that no longer exists, so a
+  // dangling pointer is visible rather than silently showing group one.
+  function groupOptionsHTML(selected, noBrands = false) {
     const gs = groups();
-    const known = gs.some(g => g.name === selected);
-    return (known ? '' : `<option value="" selected>— none —</option>`)
-      + gs.map(g => `<option value="${esc(g.name)}" ${g.name === selected ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+    const none = noBrands || !gs.some(g => g.name === selected);
+    return `<option value="" ${none ? 'selected' : ''}>No brands</option>`
+      + gs.map(g => `<option value="${esc(g.name)}" ${!none && g.name === selected ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
   }
 
   const unitOptionsHTML = selected =>
@@ -26,10 +27,10 @@ export function settingsView(me) {
     const cats = store.settings.categories;
     if (!cats.length) return `<div class="empty">${icons.tag}<p>No categories yet — add one below.</p></div>`;
     return cats.map((c, i) => `
-      <div class="set-cat" draggable="true" data-idx="${i}">
-        <span class="drag-grip" title="Drag to reorder">${icons.grip}</span>
+      <div class="set-cat" data-idx="${i}">
+        <span class="drag-grip" draggable="true" title="Drag to reorder">${icons.grip}</span>
         <div class="set-cat-body">
-          <div class="set-cat-name">${icons.tag}<b>${esc(c.name)}</b></div>
+          <div class="set-cat-name">${icons.tag}<input class="set-bg-name set-cat-input" value="${esc(c.name)}" data-cat-name="${esc(c.name)}" aria-label="Category name" title="Click to rename"></div>
           <div class="set-cat-flags">
             <label class="check sm"><input type="checkbox" data-flag="needsBrand" data-cat="${esc(c.name)}" ${c.needsBrand ? 'checked' : ''}><i></i>Brand</label>
             <label class="check sm"><input type="checkbox" data-flag="needsAudience" data-cat="${esc(c.name)}" ${c.needsAudience ? 'checked' : ''}><i></i>Audience</label>
@@ -40,9 +41,9 @@ export function settingsView(me) {
               <select data-cat-unit="${esc(c.name)}">${unitOptionsHTML(c.unit)}</select>
             </label>
             <label class="set-ctl"><span>Brands from</span>
-              <select data-cat-group="${esc(c.name)}" ${c.needsBrand ? '' : 'disabled'}
+              <select data-cat-group="${esc(c.name)}"
                 title="${c.needsBrand ? 'Which brand group this category offers' : 'This category does not ask for a brand'}">
-                ${groupOptionsHTML(c.brandGroup)}
+                ${groupOptionsHTML(c.brandGroup, !c.needsBrand)}
               </select>
             </label>
           </div>
@@ -94,13 +95,6 @@ export function settingsView(me) {
     }).join('')}</div>`;
   }
 
-  function cuttersHTML() {
-    const list = store.settings.outsideCutters ?? [];
-    if (!list.length) return `<div class="empty">${icons.glasses}<p>No outside cutters named yet — add the first below.</p></div>`;
-    return `<div class="set-brands">${list.map(n => `
-      <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-cutter="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`;
-  }
-
   function insurersHTML() {
     const list = store.settings.insurers ?? [];
     if (!list.length) return `<div class="empty">${icons.receipt}<p>No insurers yet — add the first below.</p></div>`;
@@ -129,7 +123,7 @@ export function settingsView(me) {
         <input class="br-name" data-br-name="${esc(r.code)}" value="${esc(r.name)}" aria-label="Name of ${esc(r.code)}" required>
         ${fixed ? `<span class="br-fixed">${esc(ROLES[r.role]?.label ?? r.role)}</span>`
           : `<select class="br-role" data-br-role="${esc(r.code)}" aria-label="What ${esc(r.code)} is"
-               ${r.holds_lens_stock ? 'disabled title="Holds the lens stock, so it stays a fitting centre"' : ''}>${kindOptions(r.role)}</select>`}
+               ${r.holds_lens_stock ? 'disabled title="Holds lens stock, so it stays a fitting centre"' : ''}>${kindOptions(r.role)}</select>`}
         <div class="ba-seen muted sm">${!r.active ? 'closed — cannot sign in' : r.has_account
           ? (r.last_sign_in ? 'last signed in ' + relTime(Date.parse(r.last_sign_in)) : 'never signed in')
           : 'no account'}</div>
@@ -138,8 +132,14 @@ export function settingsView(me) {
                  placeholder="new code" ${r.has_account && r.active ? '' : 'disabled'} autocomplete="off">
           <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account && r.active ? '' : 'disabled'}>Set</button>
         </form>
-        ${keep ? `<span class="br-open muted sm" title="${fixed ? 'The office and the schedule editor are always open' : 'Holds the lens stock'}">Always open</span>`
+        ${keep ? `<span class="br-open muted sm" title="${fixed ? 'The office and the schedule editor are always open' : 'Holds lens stock'}">Always open</span>`
           : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
+        ${fixed ? '<span></span>' : `<button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${r.holds_lens_stock ? 'Holds lens stock — stop that first' : 'Delete this branch'}" ${r.holds_lens_stock ? 'disabled' : ''}>${icons.trash}</button>`}
+        ${r.role === 'fitting' && r.active ? `
+        <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
+          <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>
+          <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
+        </label>` : ''}
         <div class="ba-msg"></div>
       </div>`;
     }).join('');
@@ -175,6 +175,139 @@ export function settingsView(me) {
         : '';
     if (!confirm(`Make ${b.name} a ${what}?\n\n${note}`.trim())) { sel.value = b.role; return; }
     store.saveBranch(code, { role });
+  }
+
+  function saveLens(box) {
+    const code = box.dataset.brLens, b = LOCATIONS.find(l => l.code === code);
+    if (!b) return;
+    const on = box.checked;
+    const ask = on
+      ? `Make ${b.name} hold lens stock?\n\nIt gets its own shelf in Lens Stock, and every branch can request lenses from it.`
+      : `Stop ${b.name} holding lens stock?\n\nIts shelf has to be empty and nothing may be waiting on it.`;
+    if (!confirm(ask)) { box.checked = !on; return; }
+    store.setLensHolder(code, on);
+  }
+
+  // Deleting is for a branch added by mistake: it must have nothing recorded,
+  // and the code is typed back to be sure. Anything else is closed instead.
+  function deleteBranchModal(code) {
+    const b = LOCATIONS.find(l => l.code === code);
+    if (!b) return;
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Delete branch</div><h2>Delete ${esc(b.name)}?</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <p>This removes <b>${esc(b.code)} · ${esc(b.name)}</b> and its sign-in account for good. It cannot be undone.</p>
+        <p class="muted">Only a branch with nothing recorded can be deleted — one added by mistake. A branch that has
+           orders, requests or claims is refused: close it instead, which keeps them.</p>
+        <label>Type <b>${esc(b.code)}</b> to confirm
+          <input id="del-code" autocomplete="off" placeholder="${esc(b.code)}">
+        </label>
+        <div class="form-foot">
+          <button class="btn btn-ghost" data-close>Cancel</button>
+          <button class="btn btn-danger" data-do-del disabled>${icons.trash} Delete branch</button>
+        </div>
+      </div>`);
+    const input = layer.el.querySelector('#del-code');
+    const go = layer.el.querySelector('[data-do-del]');
+    input.focus();
+    input.addEventListener('input', () => { go.disabled = input.value.trim().toUpperCase() !== b.code; });
+    layer.el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      if (e.target.closest('[data-do-del]') && !go.disabled) {
+        go.disabled = true;
+        const done = await store.deleteBranch(code);
+        if (done) layer.close(); else go.disabled = false;
+      }
+    });
+  }
+
+  // ── Employees: the schedule's roster ──
+  const STAFF_TYPES = ['Stable', 'High-Stable', 'High', 'Medium', 'Low', 'Non-Stable', 'Part-Time'];
+  const WEEK = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  let staffCount = null, staffData = null;
+
+  async function loadStaff() {
+    const host = root.querySelector('#set-staff');
+    if (!host) return;
+    try { staffData = await store.loadEmployees(); }
+    catch (err) { host.innerHTML = `<p class="muted sm">Could not load the employees — ${esc(err.message)}</p>`; return; }
+    if (!root.contains(host)) return;
+    staffCount = staffData.employees.length;
+    const bname = c => staffData.branches.find(b => b.code === c)?.name ?? c;
+    host.innerHTML = staffData.employees.length ? staffData.employees.map(e => `
+      <div class="st-row">
+        <div class="st-who"><b>${esc(e.name)}</b>${e.optom ? '<span class="st-tag">Optometrist</span>' : ''}</div>
+        <div class="st-br">${(e.priority ?? []).map((c, i) => `<span class="loc-chip ${i ? 'st-alt' : ''}" title="${esc(bname(c))}${i ? '' : ' — home branch'}">${esc(c)}</span>`).join('') || '<span class="muted sm">No branch</span>'}</div>
+        <div class="st-type muted sm">${esc(e.type)}</div>
+        <div class="st-off muted sm">${(e.weekend_days ?? []).length ? `Off ${esc(e.weekend_days.join(', '))}` : 'No days off set'}</div>
+        <div class="row-act">
+          <button class="icon-btn" data-emp-edit="${esc(e.id)}" title="Edit">${icons.wrench}</button>
+          <button class="icon-btn" data-emp-del="${esc(e.id)}" title="Remove">${icons.trash}</button>
+        </div>
+      </div>`).join('') : `<div class="empty">${icons.users}<p>No employees yet — add the first one.</p></div>`;
+  }
+
+  function employeeModal(id) {
+    if (!staffData) return;
+    const old = staffData.employees.find(e => e.id === id);
+    const pri = old?.priority ?? [];
+    const draft = {
+      name: old?.name ?? '', optom: !!old?.optom, type: old?.type ?? 'Stable',
+      home: pri[0] ?? staffData.branches[0]?.code ?? '', also: pri.slice(1), off: old?.weekend_days ?? [],
+    };
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">${old ? 'Edit employee' : 'New employee'}</div><h2>${old ? esc(old.name) : 'Add an employee'}</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form" id="emp-form" autocomplete="off">
+        <div class="grid2">
+          <label>Name<input name="name" required value="${esc(draft.name)}" placeholder="e.g. Ahmed"></label>
+          <label>Home branch<select name="home">${staffData.branches.map(b => `<option value="${esc(b.code)}" ${draft.home === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
+        </div>
+        <div class="fieldset">
+          <div class="fs-head"><span>Can also work at</span><span class="muted sm">in the order the schedule should try them</span></div>
+          <div class="emp-checks">${staffData.branches.map(b => `
+            <label class="check sm"><input type="checkbox" name="also" value="${esc(b.code)}" ${draft.also.includes(b.code) ? 'checked' : ''}><i></i>${esc(b.code)}</label>`).join('')}</div>
+        </div>
+        <div class="grid2">
+          <label>Type<select name="type">${STAFF_TYPES.map(s => `<option ${draft.type === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>
+          <label class="check emp-optom"><input type="checkbox" name="optom" ${draft.optom ? 'checked' : ''}><i></i>Optometrist</label>
+        </div>
+        <div class="fieldset">
+          <div class="fs-head"><span>Days off</span></div>
+          <div class="emp-checks">${WEEK.map(d => `
+            <label class="check sm"><input type="checkbox" name="off" value="${d}" ${draft.off.includes(d) ? 'checked' : ''}><i></i>${d}</label>`).join('')}</div>
+        </div>
+        <p class="muted sm">They appear on the staff schedule and in the Direct Insurance salesperson list.
+           If the Schedule tab is open somewhere, reload it there before saving the schedule, so they are not dropped.</p>
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} ${old ? 'Save changes' : 'Add employee'}</button>
+        </div>
+      </form>`);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const d = new FormData(f);
+      const name = String(d.get('name') ?? '').trim();
+      if (!name) return;
+      const home = String(d.get('home') ?? '');
+      // The home branch leads; the rest follow in the schedule's own order.
+      const also = d.getAll('also').map(String).filter(c => c !== home);
+      const id = old?.id ?? `e${Date.now().toString(36)}`;
+      const position = old?.position ?? (Math.max(-1, ...staffData.employees.map(x => x.position ?? 0)) + 1);
+      const ok = await store.saveEmployee({
+        id, name, optom: !!d.get('optom'), type: String(d.get('type')),
+        weekendDays: WEEK.filter(w => d.getAll('off').includes(w)),
+        priority: [home, ...also].filter(Boolean), position,
+      }, !old);
+      if (ok) layer.close();
+    });
   }
 
   function saveOpen(box) {
@@ -219,9 +352,9 @@ export function settingsView(me) {
     { key: 'branches', group: 'General', icon: 'warehouse', title: 'Branches', sections: ['branches', 'addBranch'],
       desc: 'Add branches, rename them, set what each one is, close one, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
-    { key: 'fitting', group: 'By tab', icon: 'glasses', title: 'Fitting Log', sections: ['cutters'],
-      desc: 'The outside, 3rd-party cutters a frame can be sent to',
-      sum: () => { const n = (store.settings.outsideCutters ?? []).length; return n ? count(n, 'outside cutter') : 'No cutters named'; } },
+    { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'],
+      desc: 'Everyone on the staff schedule and the Direct Insurance salesperson list',
+      sum: () => (staffCount == null ? '' : count(staffCount, 'employee')) },
     { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'],
       desc: 'Categories — the fields each needs, how it is counted — and the brand groups they offer',
       sum: () => `${count(store.settings.categories.length, 'category', 'categories')} · ${count(groups().length, 'brand group')}` },
@@ -269,19 +402,6 @@ export function settingsView(me) {
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add group</button>
         </form>
       </section>`,
-    cutters: () => `
-      <section class="set-card">
-        <div class="set-card-head">
-          <h2>${icons.glasses} Outside cutters</h2>
-          <p class="muted">The 3rd-party cutters offered under “Outside” when a branch sends a frame to a fitter.
-             With none named, the branch simply picks “${OUTSIDE_DEFAULT}”. Taking one off leaves the frames already sent to it as they are.</p>
-        </div>
-        <div id="set-cutters">${cuttersHTML()}</div>
-        <form class="set-add" id="add-cutter">
-          <input name="name" placeholder="New outside cutter — e.g. the lab's name" required>
-          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add cutter</button>
-        </form>
-      </section>`,
     ins: () => `
       <section class="set-card">
         <div class="set-card-head">
@@ -306,6 +426,16 @@ export function settingsView(me) {
              forgotten one is recovered.</p>
         </div>
         <div id="set-branches"><p class="muted sm">Loading…</p></div>
+      </section>`,
+    staff: () => `
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.users} Employees</h2>
+          <p class="muted">Everyone who works in the branches. The staff schedule plans them by home branch, the
+             other branches they can cover, their type and their days off; Direct Insurance offers them as salespeople.</p>
+        </div>
+        <div id="set-staff"><p class="muted sm">Loading…</p></div>
+        <div class="set-add"><button class="btn btn-primary btn-sm" data-emp-new>${icons.plus} Add employee</button></div>
       </section>`,
     addBranch: () => `
       <section class="set-card">
@@ -357,6 +487,7 @@ export function settingsView(me) {
       </header>
       ${listHTML()}`;
     if (pg?.sections.includes('branches')) loadBranches();
+    if (pg?.sections.includes('staff')) loadStaff();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group
@@ -389,9 +520,8 @@ export function settingsView(me) {
     if (ins) ins.innerHTML = insurersHTML();
     const tabs = root.querySelector('#set-tabs');
     if (tabs) tabs.innerHTML = tabsHTML();
-    const cut = root.querySelector('#set-cutters');
-    if (cut) cut.innerHTML = cuttersHTML();
     if (root.querySelector('#set-branches')) loadBranches();
+    if (root.querySelector('#set-staff')) loadStaff();
     if (!page) { const ix = root.querySelector('.set-index'); if (ix) ix.outerHTML = listHTML(); }
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
@@ -419,19 +549,17 @@ export function settingsView(me) {
       if (f.id === 'add-cat') {
         store.addCategory({
           name: val('name'),
-          needsBrand: !!d.get('needsBrand'),
+          needsBrand: !!d.get('needsBrand') && val('brandGroup') !== '',
           needsAudience: !!d.get('needsAudience'),
           needsQty: !!d.get('needsQty'),
           unit: val('unit'),
-          brandGroup: val('brandGroup'),
+          brandGroup: val('brandGroup') || undefined,
         });
       } else if (f.id === 'add-group') {
         store.addBrandGroup(val('name'));
       } else if (f.id === 'add-branch') {
         addBranch(f);
         return;
-      } else if (f.id === 'add-cutter') {
-        store.addCutter(val('name'));
       } else if (f.id === 'add-ins') {
         store.addInsurer(val('name'));
       } else if (f.dataset.addBrand) {
@@ -444,6 +572,15 @@ export function settingsView(me) {
     });
 
     root.addEventListener('change', e => {
+      // The add-category row: the Brand tick and "Brands from" move together.
+      const add = e.target.closest('#add-cat');
+      if (add) {
+        const tick = add.querySelector('[name="needsBrand"]');
+        const sel = add.querySelector('[name="brandGroup"]');
+        if (e.target === tick) sel.value = tick.checked ? (sel.value || groups()[0]?.name || '') : '';
+        if (e.target === sel) tick.checked = sel.value !== '';
+        return;
+      }
       const d = e.target.dataset;
       if (d.tab) return store.setTabOff(d.tab, !e.target.checked, d.tabLabel);
       if (d.brName != null) {
@@ -453,17 +590,45 @@ export function settingsView(me) {
       }
       if (d.brRole) return saveRole(e.target);
       if (d.brOpen) return saveOpen(e.target);
-      if (d.flag) return store.updateCategory(d.cat, { [d.flag]: e.target.checked });
+      if (d.brLens) return saveLens(e.target);
+      if (d.flag) {
+        // Ticking Brand on a category with no group gives it the first one.
+        const cat = store.settings.categories.find(c => c.name === d.cat);
+        const noGroup = !groups().some(g => g.name === cat?.brandGroup);
+        return store.updateCategory(d.cat, d.flag === 'needsBrand' && e.target.checked && noGroup
+          ? { needsBrand: true, brandGroup: groups()[0]?.name }
+          : { [d.flag]: e.target.checked });
+      }
       if (d.catUnit) return store.updateCategory(d.catUnit, { unit: e.target.value });
-      if (d.catGroup) return store.updateCategory(d.catGroup, { brandGroup: e.target.value });
+      if (d.catGroup) return store.updateCategory(d.catGroup, e.target.value
+        ? { needsBrand: true, brandGroup: e.target.value }
+        : { needsBrand: false });
       if (d.groupName) return store.renameBrandGroup(d.groupName, e.target.value);
+      if (d.catName != null) {
+        const v = e.target.value.trim();
+        if (!v || v === d.catName) { e.target.value = d.catName; return; }
+        if (store.settings.categories.some(c => c.name.toLowerCase() === v.toLowerCase() && c.name !== d.catName)) {
+          e.target.value = d.catName;
+          return alert(`There is already a category called “${v}”.`);
+        }
+        return store.renameCategory(d.catName, v);
+      }
     });
 
     root.addEventListener('click', e => {
+      const bd = e.target.closest('[data-br-del]');
+      if (bd) return deleteBranchModal(bd.dataset.brDel);
+      if (e.target.closest('[data-emp-new]')) return employeeModal(null);
+      const ee = e.target.closest('[data-emp-edit]');
+      if (ee) return employeeModal(ee.dataset.empEdit);
+      const ed = e.target.closest('[data-emp-del]');
+      if (ed) {
+        const emp = staffData?.employees.find(x => x.id === ed.dataset.empDel);
+        if (emp && confirm(`Remove ${emp.name} from the employees?\n\nThey leave the staff schedule and the salesperson list. Sales already recorded keep their name.`)) store.deleteEmployee(emp.id, emp.name);
+        return;
+      }
       const go = e.target.closest('[data-page]');
       if (go) { page = go.dataset.page || null; render(); root.scrollIntoView?.({ block: 'start' }); return; }
-      const dcu = e.target.closest('[data-del-cutter]');
-      if (dcu) return store.removeCutter(dcu.dataset.delCutter);
       const di = e.target.closest('[data-del-ins]');
       if (di) return store.removeInsurer(di.dataset.delIns);
       const dc = e.target.closest('[data-del-cat]');

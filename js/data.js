@@ -15,7 +15,7 @@ export const LOCATIONS = [
   // Fitting centres (sell + fit lenses)
   { code: 'MOUJ', name: 'Al Mouj',            role: 'fitting' },
   { code: 'MOO',  name: 'Mall of Oman',       role: 'fitting' },
-  { code: 'MGM',  name: 'Muscat Grand Mall',  role: 'fitting' },
+  { code: 'MGM',  name: 'Muscat Grand Mall',  role: 'fitting', holdsLens: true },
   // Clinics (FOC Eye Clinics)
   { code: 'QURFEC', name: 'Qurum FEC',        role: 'clinic' },
   { code: 'SALFEC', name: 'Salalah FEC',      role: 'clinic' },
@@ -43,6 +43,8 @@ export const BRANCH_KINDS = ['retail', 'fitting', 'clinic'];
 const isOpen = l => l.active !== false;
 export const FITTERS = LOCATIONS.filter(l => l.role === 'fitting');
 export const BRANCHES = LOCATIONS.filter(l => BRANCH_KINDS.includes(l.role));
+// The fitting centres that keep loose-lens stock (branches.holds_lens_stock).
+export const LENS_HOLDERS = LOCATIONS.filter(l => l.holdsLens);
 
 // Replace the lists in place: every module imported these arrays, so they keep
 // their identity, and an existing location object is updated rather than
@@ -50,11 +52,12 @@ export const BRANCHES = LOCATIONS.filter(l => BRANCH_KINDS.includes(l.role));
 export function setLocations(rows) {
   if (!rows?.length) return;
   const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
-    code: r.code, name: r.name, role: r.role, active: r.active !== false,
+    code: r.code, name: r.name, role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
   BRANCHES.splice(0, BRANCHES.length, ...next.filter(l => isOpen(l) && BRANCH_KINDS.includes(l.role)));
+  LENS_HOLDERS.splice(0, LENS_HOLDERS.length, ...next.filter(l => isOpen(l) && l.holdsLens));
 }
 
 // Who looks at the whole network. The office runs it; the schedule editor
@@ -205,7 +208,8 @@ export const nextFitStatus = o => {
 // Which location acts on an order in its current status.
 export function fitActor(order) {
   const a = fitStep(order).actor;
-  return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter : a === 'lens' ? LENS_OWNER : null;
+  return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter
+    : a === 'lens' ? (order.lensRequest?.holder ?? LENS_HOLDERS[0]?.code ?? null) : null;
 }
 
 // Whether an order is this location's to move now. A self-fit job still
@@ -224,9 +228,10 @@ export const REQ_STATUS = {
 };
 
 // ── Lens stock ──────────────────────────────────────────────────────────────
-// One fitting centre physically holds the loose-lens stock and owns the shelf
-// count; every other location browses it and requests against it.
-export const LENS_OWNER = 'MGM';
+// Fitting centres the office marks as holders (LENS_HOLDERS, from the
+// branches table) each keep a shelf of loose lenses and own its count; every
+// other location browses a shelf and requests against it. Each shelf row and
+// each request names its holder.
 // What the shelf may hold. These are only the starting lists: the branch that
 // holds the lenses edits them from the shelf's own cog, and they live in the
 // database from the first edit on. Falling back to these when the row is empty
@@ -343,9 +348,10 @@ export function canSeeRequest(r, code) {
 export function canSeeClaim(c, code) {
   return seesAll(loc(code)?.role) || c.branch === code;
 }
-// Only the holding branch edits the shelf count; the office may look on.
-export const isLensOwner = code => code === LENS_OWNER;
+// A holder edits its own shelf and answers the requests made to it; the
+// office may look on at all of them.
+export const isLensOwner = code => LENS_HOLDERS.some(l => l.code === code);
 export function canSeeLensRequest(r, code) {
-  return isLensOwner(code) || seesAll(loc(code)?.role) || r.branch === code;
+  return seesAll(loc(code)?.role) || r.branch === code || r.holder === code;
 }
 

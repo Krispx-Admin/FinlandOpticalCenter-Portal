@@ -316,10 +316,11 @@ const KINDS = {
   },
 };
 
-// The schedule's roster, as the salesperson list. Fetched once per visit.
+// The schedule's roster, as the salesperson list. The last copy shows at
+// once; a fresh one is fetched every time the form opens, so an employee
+// added in Settings appears without reloading the page.
 let staffCache = null;
 async function staffList() {
-  if (staffCache) return staffCache;
   const { data, error } = await supabase.rpc('staff_list');
   if (error) throw new Error(error.message);
   staffCache = data ?? [];
@@ -746,7 +747,7 @@ export function claimsView(me, kind = 'claim') {
         else { draft.employeeId = ''; draft.employeeName = typed; }
       }
     };
-    if (direct && !staff) {
+    if (direct) {
       staffList().then(list => {
         staff = list;
         const dl = el.querySelector('#f-emp-list');

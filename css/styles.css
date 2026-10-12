@@ -851,6 +851,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .set-bg-name:hover { border-color: var(--border-strong); background: var(--surface); }
 .set-bg-name:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
 .set-bg-n { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.set-cat-input { flex: 0 1 280px; margin-left: -4px; }
+.set-cat .drag-grip { cursor: grab; }
 .set-bg-empty { font-size: 12.5px; color: var(--ink-3); font-style: italic; }
 .set-add.sm { margin-top: 10px; padding-top: 10px; }
 .set-add.sm input { flex: 1 1 180px; padding: 6px 10px; font-size: 12.5px; }
@@ -1017,6 +1019,11 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .br-fixed { font-size: 12.5px; font-weight: 600; color: var(--ink-3); padding-left: 2px; }
 .br-open { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
 span.br-open { cursor: default; }
+.br-row { grid-template-columns: 74px minmax(160px, 1.3fr) 150px minmax(120px, 1fr) auto 104px 34px; }
+.br-del:hover:not(:disabled) { color: var(--st-red); border-color: var(--st-red); }
+.br-del:disabled { opacity: .35; cursor: not-allowed; }
+.br-lens { grid-column: 2 / -1; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink-3); cursor: pointer; width: fit-content; }
+.br-lens:has(input:checked) { color: var(--brand); }
 .br-row.is-closed { background: var(--surface); border-style: dashed; }
 .br-row.is-closed .loc-chip, .br-row.is-closed .br-name, .br-row.is-closed .br-role { opacity: .55; }
 .br-row.is-closed .br-open { color: var(--st-amber); }
@@ -1027,6 +1034,21 @@ span.br-open { cursor: default; }
   .br-row { grid-template-columns: 74px 1fr 150px; }
   .br-row .ba-seen { grid-column: 1 / 2; }
 }
+
+/* ── Settings › Employees ── */
+.st-row {
+  display: grid; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 8px;
+  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1.3fr) 100px minmax(120px, 1fr) auto;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--page);
+}
+.st-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.st-who b { font-size: 13.5px; }
+.st-tag { font-size: 10.5px; font-weight: 700; color: var(--st-purple); background: #faeafc; border-radius: 999px; padding: 2px 8px; }
+.st-br { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-br .loc-chip.st-alt { opacity: .6; }
+.emp-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.emp-optom { align-self: end; padding-bottom: 9px; }
+@media (max-width: 1100px) { .st-row { grid-template-columns: 1fr auto; } .st-br, .st-type, .st-off { grid-column: 1; } }
 
 /* ── Branch access (warehouse only) ── */
 .ba-row {

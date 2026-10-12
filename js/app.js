@@ -268,7 +268,7 @@ function badgeCounts(me) {
     : s.requests.filter(r => canSeeRequest(r, me.code) && r.status === 'placed').length;
   // Only the branch holding the lenses has something to act on here.
   const lens = isLensOwner(me.code)
-    ? s.lensRequests.filter(r => r.status === 'requested').length
+    ? s.lensRequests.filter(r => r.holder === me.code && r.status === 'requested').length
     : 0;
   return { fitting, stock, lens };
 }

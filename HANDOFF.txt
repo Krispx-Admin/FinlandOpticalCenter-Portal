@@ -126,7 +126,7 @@ app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it
   SUR     Sur                  retail
   MOUJ    Al Mouj              fitting   was retail in schema.sql seed; fixed in schema-02
   MOO     Mall of Oman         fitting
-  MGM     Muscat Grand Mall    fitting   HOLDS THE LENS SHELF (LENS_OWNER)
+  MGM     Muscat Grand Mall    fitting   holds a lens shelf (branches.holds_lens_stock)
   QURFEC  Qurum FEC            clinic    FEC = FOC Eye Clinic
   SALFEC  Salalah FEC          clinic
   SOHFEC  Sohar FEC            clinic
@@ -149,8 +149,9 @@ app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it
    FITTERS/BRANCHES exclude closed ones; LOCATIONS keeps them for names.
    If a signed-in branch is closed it is signed out; if its kind changes the
    shell rebuilds (app.js subscribe).
-!! LENS_OWNER = 'MGM' is hard-coded in data.js; the DB uses
-   branches.holds_lens_stock. Keep them in step.
+!! Lens stock holders = branches.holds_lens_stock (open fitting centres only),
+   switched in Settings › Branches (RPC set_lens_holder). data.js
+   LENS_HOLDERS is filled by setLocations; there is no LENS_OWNER any more.
 
 ROLES (data.js): retail "Retail branch", fitting "Fitting centre",
 clinic "Clinic", admin "Office · Admin", scheduler "Schedule editor".
@@ -218,7 +219,8 @@ SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale
 OUTSIDE ROAD (OUT_FLOW) — sent to a 3rd-party cutter (added 2026-10-12, user):
   pending -> lenses_in -> to_fitter -> delivered. In "Send to fitter" the picker
   lists our centres, then "Outside — 3rd-party cutters": the names in
-  app_settings.outside_cutters (Settings › Fitting Log), or one "Outside cutter"
+  app_settings.outside_cutters (office: "Outside cutters" button in the Fitting
+  Log header, cuttersModal in fitting.js), or one "Outside cutter"
   (OUTSIDE_DEFAULT) when none are named. store.sendOrdersOutside sets
   orders.outside_cutter = name, status to_fitter (guard: lenses_in, fitter_code
   null, outside_cutter null); fitter_code STAYS NULL. o.outside = the name;
@@ -232,7 +234,8 @@ ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
   store.linkLensRequests() puts o.lensRequest = {status, fulfilment, ref} on
   each order after every load/pull; fitStep() reads it while status = pending:
     request 'requested' -> "Waiting Lens Confirmation" (amber), NO action,
-                           row says "waiting on MGM" (actor 'lens' -> LENS_OWNER);
+                           row says "waiting on <holder>" (actor 'lens' ->
+                           order.lensRequest.holder);
                            canAdvanceOrder() is false, even for the warehouse
     'confirmed', frame goes over (long road) -> "Lens Confirmed" (green) +
                            Lenses delivered (then Send to fitter)
@@ -262,14 +265,27 @@ Refs SR-1001… from DB sequence.
 
 4.4 LENS STOCK
 --------------
-MGM keeps the shelf (rows: type, index, coating, SPH, CYL, qty; unique per
-spec). Others browse a card grid, build a basket (cart, per-visit only),
-"Review & request". Lens types/indices/coatings lists live in lens_catalogue
-(edited by MGM or WH via the cog on the shelf tab; defaults in data.js).
+SEVERAL HOLDERS (schema-20, 2026-10-12): any open fitting centre the office
+marks "Holds lens stock" (Settings › Branches) keeps its OWN shelf. Every
+lens_stock row and lens_requests row has holder_code (all old data = MGM).
+Rows: holder, type, index, coating, SPH, CYL, qty; unique per holder+spec.
+A holder: tabs Incoming requests (made TO it) · My shelf (edit counts, add,
+remove) · and, if other holders exist, Other shelves (shop) · My requests.
+A non-holder: Browse lenses · My requests, with a "Shelf at …" picker when
+there is more than one other shelf (switching empties the basket, asks first).
+Office/Ghiath: All requests · Shelves (picker). The request goes to the shelf
+browsed (create_lens_request p_holder); "frame goes over" sends the frame to
+THAT holder. Only that holder (or the office) confirms/declines (RLS +
+confirm_lens_request check holder_code = jwt_branch()); add_lens_stock adds to
+the caller's own shelf (office may name p_holder). The nav badge counts
+requests made to this holder. Others browse a card grid, build a basket (cart,
+per-visit only), "Review & request". Lens types/indices/coatings lists live in
+lens_catalogue — SHARED by all holders (edited by any holder or the office via
+the cog on the shelf tab; defaults in data.js).
 A value in use on the shelf can't be removed; "None" coating can't be removed;
 a list can't be emptied. LOW_LENS_STOCK = 4 (amber).
 
-Lens request statuses: requested "Awaiting MGM" (amber) / confirmed (green) /
+Lens request statuses: requested "Awaiting answer" (amber) / confirmed (green) /
 declined (red, with reason).
 
 FULFILMENT (schema-07) — every lens request also OPENS A FITTING ORDER, in one
@@ -433,11 +449,14 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 4.6 SETTINGS (admin only)
 -------------------------
 Opens on a LIST (settings.js PAGES), grouped (user, 2026-10-11):
-  GENERAL  — Branches (list + add; replaced "Branch access"), Tabs (on/off)
-  BY TAB   — Fitting Log (Outside cutters), Stock Requests (Categories +
-             Brand groups on one page), Direct Insurance (Insurers)
-  One page per sidebar tab that HAS settings; Lens Stock, Insurance Claims
-  and Schedule have none yet — add a PAGES entry (group
+  GENERAL  — Tabs (on/off), Branches (list + add; replaced "Branch access"),
+             Employees
+  BY TAB   — Stock Requests (Categories + Brand groups on one page),
+             Direct Insurance (Insurers)
+  Outside cutters are NOT in Settings (user, 2026-10-12): they are managed
+  from the Fitting Log itself (office header button).
+  One page per sidebar tab that HAS settings; Fitting Log, Lens Stock,
+  Insurance Claims and Schedule have none here — add a PAGES entry (group
   'By tab', the tab's icon/title, sections: [...]) when they do.
 Each entry: icon, title, one-line description, live summary ("2 under
 maintenance", "5 categories · 3 brand groups"), chevron. Clicking one shows its
@@ -476,6 +495,34 @@ access is opened.
   the others (identity row, confirmed, app_metadata branch_code/branch_role).
   All three RPCs check is_admin() server-side. A new branch is NOT added to
   the staff schedule automatically (scheduler has its own branch list).
+  DELETE (2026-10-12): bin icon per row -> modal; the code must be typed to
+  enable "Delete branch" -> RPC delete_branch: refuses the office/Ghiath, a
+  lens holder, and ANY branch with records (orders, stock/lens requests,
+  claims, timeline entries) — the message lists them and says close it
+  instead. Otherwise removes the row, its auth user + identity.
+  LENS STOCK switch (fitting centres, open): "Holds lens stock" -> RPC
+  set_lens_holder(code, on). Turning on: open fitting centre only. Turning
+  off: refused while its shelf has lenses or requests wait on it, or if it is
+  the only holder. A holder's kind select is locked and it cannot be closed
+  or deleted until it stops holding.
+- Employees (2026-10-12): the staff schedule's roster (schedule_employees,
+  written directly — RLS can_schedule() = office/Ghiath). Rows: name,
+  Optometrist tag, branch chips (priority; first = home), type, days off;
+  edit (modal) / remove (confirm). Modal: name, home branch, "can also work
+  at" (schedule_branches), type (Stable, High-Stable, High, Medium, Low,
+  Non-Stable, Part-Time — the scheduler's list), optometrist, days off
+  Sat..Fri. New id = 'e' + base36 time; position = last. They show in the
+  scheduler and the Direct Insurance salesperson list (claims.js staffList
+  now refetches each time the form opens). CAVEAT: the scheduler saves the
+  whole roster (save_schedule_roster deletes ids it doesn't have), so a
+  scheduler left open from before an add can drop the new person — the
+  modal says to reload the Schedule tab first.
+- Categories (Stock Requests page): the name is an inline input (rename via
+  store.renameCategory; old stock requests keep the name they were placed
+  under; duplicates refused). "Brands from" starts with "No brands" — picking
+  it = untick Brand; ticking Brand on a category with no group gives it the
+  first group. The add-category row keeps the Brand tick and the select in
+  step the same way. Rows drag by the grip only (so the name can be edited).
 Settings = one JSON row (app_settings id=1), written whole, optimistic UI,
 rolled back from server on refusal.
 
@@ -567,6 +614,13 @@ Migrations are applied by hand, in order. Each file has a header with
                              save_branch, branch_access (new columns),
                              set_branch_code (shared pin check). APPLIED
                              2026-10-12 by Claude.
+  schema-20-delete-branch-lens-holders.sql  delete_branch(); lens_stock and
+                             lens_requests get holder_code (backfilled MGM),
+                             unique per holder+spec, RLS by holder;
+                             add_lens_stock/create_lens_request gain p_holder
+                             (old overloads dropped); confirm checks holder;
+                             set_lens_holder(). APPLIED 2026-10-12 by Claude,
+                             rehearsed in a rolled-back transaction.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -876,8 +930,6 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
     for a deliberate decision.
   - orders.phone and orders.note are never written by the UI (drawer shows
     them only if set).
-  - LENS_OWNER = 'MGM' is still hard-coded vs branches.holds_lens_stock
-    (save_branch keeps the lens-stock branch an open fitting centre).
   - In db.js TABLE_COLLECTION, the comment "Confirming a request draws the
     shelf down…" sits above the claims line (misplaced; the real handling is
     the lens_request_events special case in watch()).
@@ -913,6 +965,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Several branches can hold lens stock (schema-20); delete a branch
+             (type its code; only one with no records); Settings › Employees
+             (the schedule roster = salesperson list); outside cutters moved
+             to the Fitting Log header; categories renamable + "No brands".
  2026-10-12  Branches editable in Settings › Branches (schema-19, applied and
              trial-run in a rolled-back transaction): add a branch with its
              sign-in account, rename, change kind (retail/fitting/clinic),

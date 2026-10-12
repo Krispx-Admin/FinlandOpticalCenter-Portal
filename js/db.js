@@ -53,12 +53,12 @@ const toRequest = r => ({
 });
 
 const toLensItem = r => ({
-  id: r.id, type: r.lens_type, index: r.lens_index, coating: r.coating,
+  id: r.id, holder: r.holder_code ?? null, type: r.lens_type, index: r.lens_index, coating: r.coating,
   sph: num(r.sph), cyl: num(r.cyl), qty: r.qty, updatedAt: ts(r.updated_at),
 });
 
 const toLensRequest = r => ({
-  id: r.id, ref: r.ref, branch: r.branch_code, status: r.status,
+  id: r.id, ref: r.ref, branch: r.branch_code, holder: r.holder_code ?? null, status: r.status,
   // The form calls this "Bill Number"; the column is the generic `note`.
   billNo: r.note ?? '', reason: r.reason ?? '',
   customer: r.customer ?? '',
@@ -188,7 +188,7 @@ const SELECTS = {
   lensStock:    ['lens_stock', '*', { column: 'updated_at', asc: false }, toLensItem],
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
-  branches:     ['branches', 'code, name, role, active, position', { column: 'position', asc: true }, r => r],
+  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock', { column: 'position', asc: true }, r => r],
 };
 
 export const COLLECTIONS = Object.keys(SELECTS);
