@@ -230,7 +230,7 @@ const mouj = [
   ['reset'],
   ['tap', '{moujLens} >> [data-open]'],
   ['focus', '.drawer .journey'],
-  ['caption', 'It reads “Lenses Requested” until Muscat Grand Mall sends them'],
+  ['caption', 'It reads “Waiting for Lenses” straight away', 'Muscat Grand Mall sends them from its own Fitting Log'],
   beat(2200),
   ['focus', '.drawer .timeline'],
   beat(1800),

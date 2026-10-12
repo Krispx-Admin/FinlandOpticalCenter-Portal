@@ -407,7 +407,7 @@ export function lensView(me) {
               </label>`).join('')}
           </div>
           <p class="muted">The lenses come off ${esc(locName(ui.holder))}’s shelf as soon as you send this, and a fitting order opens for the bill.
-             ${draft.fulfilment === 'receive_lens' ? `It reads “Lenses Requested” until ${esc(locName(ui.holder))} sends them.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
+             ${draft.fulfilment === 'receive_lens' ? `It reads “Waiting for Lenses” straight away; ${esc(locName(ui.holder))} sends them from its Fitting Log.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>

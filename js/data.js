@@ -172,10 +172,12 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
-// A branch that asked to receive lenses waits for the holder to send them.
-// Until then the job is the holder's: its Fitting Log shows "Send lenses"
-// (canSendLenses) and everyone else's row says who it is waiting on.
-const LENS_WAIT = { label: 'Lenses Requested', color: 'amber', action: 'Send lenses', actor: 'lens' };
+// A branch that asked to receive lenses reads "Waiting for Lenses" from the
+// moment it orders (user, 2026-10-12). Until the holder sends them the job is
+// the holder's: its Fitting Log shows "Send lenses" (canSendLenses) and the
+// branch's row says who it is waiting on; once sent, the branch gets
+// "Lenses delivered". The long form (drawer, hover) says which of the two.
+const LENS_WAIT = { label: 'Waiting for Lenses', color: 'slate', action: 'Send lenses', actor: 'lens' };
 export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
 export const canSendLenses = (o, code) =>
   awaitingLens(o) && (o.lensRequest.holder === code || loc(code)?.role === 'admin');
@@ -192,7 +194,9 @@ export function fitStep(o, { long = false } = {}) {
   // set aside for a frame that goes over wait at the holder for it.
   if (o.status === 'pending' && o.lensRequest) {
     const ans = o.lensRequest.status;
-    if (ans === 'requested') return { ...base, ...LENS_WAIT };
+    const from = o.lensRequest.holder;
+    if (ans === 'requested') return { ...base, ...LENS_WAIT, ...(long && from ? { label: `Waiting for Lenses — ${locName(from)} to send them` } : {}) };
+    if (ans === 'sent' && long && from) return { ...base, label: `Waiting for Lenses — sent by ${locName(from)}` };
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {

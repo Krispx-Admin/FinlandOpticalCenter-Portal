@@ -237,8 +237,10 @@ ORDERS OPENED BY A LENS REQUEST (reworked 2026-10-12, schema-21 — no confirm).
   them. fitStep():
     send_frames: order created at lenses_in, fitter = holder ->
                  "Lenses at <holder>" + Send to fitter (origin) -> normal road.
-    receive_lens, request 'requested' (pending) -> "Lenses Requested" (amber),
-                 actor 'lens' = holder: the holder's row/drawer has
+    receive_lens, request 'requested' (pending) -> "Waiting for Lenses" from
+                 the moment it is ordered (user, 2026-10-12; long form in
+                 drawer/hover: "— <holder> to send them" / after: "— sent by
+                 <holder>"), actor 'lens' = holder: the holder's row/drawer has
                  "Send lenses" (canSendLenses -> store.sendLenses -> RPC
                  send_lens_request); everyone else "waiting on <holder>".
                  canAdvanceOrder() is false.
@@ -986,6 +988,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Received-lens jobs read "Waiting for Lenses" from the moment they
+             are ordered (was "Lenses Requested" until sent); the holder still
+             has Send lenses, the branch gets Lenses delivered once sent.
  2026-10-12  Lens requests: no confirming. Lenses come off the shelf when ordered;
              every branch picks Send the frame (default) or Receive the lenses;
              the holder presses "Send lenses" in its Fitting Log (it now sees
