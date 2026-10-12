@@ -203,6 +203,13 @@ async function fetchCollection(key) {
 
 // Before anyone signs in, for the sign-in screen (readable without a session).
 export const fetchBranches = () => fetchCollection('branches');
+// The tabs the office switched off — also readable before signing in, so the
+// sign-in page can grey out "View schedule" (schema-23).
+export async function fetchDisabledTabs() {
+  const { data, error } = await supabase.rpc('disabled_tabs');
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data : [];
+}
 
 async function fetchDoc(key) {
   const [table, select, map] = DOCS[key];

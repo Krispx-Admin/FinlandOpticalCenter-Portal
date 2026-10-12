@@ -248,6 +248,9 @@ svg { width: 18px; height: 18px; flex: none; }
 
 /* the public rota, one press from the sign-in page and no code needed */
 .lp-view { position: absolute; top: 18px; right: 28px; z-index: 2; }
+.lp-view.is-off { opacity: .5; cursor: not-allowed; pointer-events: auto; }
+.lp-view.is-off:hover { background: transparent; transform: none; }
+.lp-view.is-off i { font-weight: 500; font-size: 12px; }
 .loc-name { font-weight: 600; font-size: 12.5px; }
 
 /* boot — shown while the branch's records come down from the server */

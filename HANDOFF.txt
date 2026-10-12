@@ -515,6 +515,11 @@ access is opened.
       handler re-routes live, so a tab switched off while someone is on it
       moves them at once (realtime on app_settings). Badges hidden on off tabs.
     office: same grey + note, but still a link — the office can go in.
+    signed out (schema-23): the sign-in page's "View schedule" button is
+      greyed with "— under maintenance" while 'schedule' is off (RPC
+      disabled_tabs(), readable by anon — only that list), and #/view-schedule
+      shows an under-maintenance page; schedule_view() itself returns nothing
+      while the tab is off (except to the office).
 - Categories: drag to reorder; flag chips Brand / Audience / Quantity;
   "Counted" pcs|box; "Brands from" brand group.
 - Brand groups: rename inline, drag groups, drag brands between groups
@@ -672,6 +677,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              wdwd/sg/FEF (Al Mouj from Salalah, recorded as
                              receive under the old fitting-centre default) to
                              send the frame. APPLIED 2026-10-12 by Claude.
+  schema-23-public-tab-maintenance.sql  disabled_tabs() for anon; schedule_view()
+                             returns nothing while the Schedule tab is off
+                             (office excepted). APPLIED 2026-10-12 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1016,6 +1024,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  DATA WIPED at the user's request (no backup, by choice): all fitting
+             orders + events, stock requests + lines + events, lens stock rows,
+             lens requests + lines + events, claims + Direct Insurance + items +
+             prescriptions. Numbering restarted: requests 1001, LR-1001,
+             INV-/DI-3001. KEPT: branches + sign-in accounts, app_settings
+             (brand groups, categories, insurers, tabs), lens type lists,
+             employees, schedule (roster, presets, weeks).
+ 2026-10-12  "View schedule" on the sign-in page greys out (and the public
+             schedule page shows under maintenance) while the Schedule tab is
+             switched off. schema-23.
  2026-10-12  Al Mouj's three jobs from Salalah were recorded as "receive the
              lenses" (the form used to pre-select that for fitting centres);
              switched to "send the frame" (schema-22). New: the ordering branch

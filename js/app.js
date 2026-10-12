@@ -1,6 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
 import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations } from './data.js';
-import { fetchBranches } from './db.js';
+import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
@@ -18,8 +18,25 @@ let clockTimer = null;
 
 
 // ─────────────────────────── LOGIN ───────────────────────────
+// Before signing in, the only setting the page needs: which tabs are off.
+let publicOff = [];
+const scheduleOff = () => publicOff.includes('schedule');
+const viewScheduleHTML = () => scheduleOff()
+  ? `<span class="btn btn-ghost lp-view is-off" aria-disabled="true" title="The schedule is under maintenance">${icons.calendar} View schedule <i>— under maintenance</i></span>`
+  : `<a class="btn btn-ghost lp-view" href="#/view-schedule">${icons.calendar} View schedule</a>`;
+// Refresh the list, and redraw the button if it changed while the page was open.
+function refreshPublicOff() {
+  fetchDisabledTabs().then(list => {
+    const was = scheduleOff();
+    publicOff = list;
+    if (was !== scheduleOff()) app.querySelector('.lp-view')?.replaceWith(
+      Object.assign(document.createElement('div'), { innerHTML: viewScheduleHTML() }).firstElementChild);
+  }).catch(() => { /* keep what we had */ });
+}
+
 function renderLogin(preselect = null) {
   teardownShell();
+  refreshPublicOff();
   // The office and Ghiath sit on their own panel above the rest; the other
   // three run side by side so every location is on screen at once.
   const columns = [
@@ -42,7 +59,7 @@ function renderLogin(preselect = null) {
   <div class="login">
     <div class="login-mark"><img src="img/foc-logomark.png" alt=""></div>
     <img class="lp-logo" src="img/foc-logo-horizontal.png" alt="Finland Optical Center">
-    <a class="btn btn-ghost lp-view" href="#/view-schedule">${icons.calendar} View schedule</a>
+    ${viewScheduleHTML()}
     <main class="login-panel">
       <div class="lp-inner">
         <section class="lp-step" id="step-pick">
@@ -156,6 +173,12 @@ function renderPublicSchedule() {
     </header>
     <main class="pub-body" id="pub-stage"></main>
   </div>`;
+  // Switched off by the office: say so instead of showing the rota.
+  if (scheduleOff()) {
+    app.querySelector('#pub-sub').textContent = 'Under maintenance';
+    app.querySelector('#pub-stage').innerHTML = `<div class="empty">${icons.calendar}<p>The schedule is under maintenance — please check back later.</p></div>`;
+    return;
+  }
   mountScheduleViewer(app.querySelector('#pub-stage'), app.querySelector('#pub-sub'));
 }
 
@@ -454,6 +477,7 @@ async function switchBranch(code, pin) {
   // The locations come from the database; if it cannot be reached, the
   // built-in list stands in until it can.
   try { setLocations(await fetchBranches()); } catch { /* fallback list */ }
+  try { publicOff = await fetchDisabledTabs(); } catch { /* assume all on */ }
   store.session = await auth.currentBranch();
   if (store.session) {
     if (isPublicRoute()) location.hash = '#/schedule';
