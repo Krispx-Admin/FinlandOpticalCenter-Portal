@@ -106,7 +106,19 @@ export const isSelfFit = o => !!o.fitter && o.fitter === o.origin;
 // SELF_FLOW has no answer for, and the alternative is a button offering to
 // send a frame backwards.
 export const onShortRoad = o => isSelfFit(o) && SELF_FLOW.includes(o.status);
-export const flowFor = o => (onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
+
+// The outside road. A frame sent to a 3rd-party cutter goes to someone with no
+// account here, so the branch that sent it does every step: it goes, and it
+// comes back. The cutter's name is on the order (outside); fitter stays empty.
+export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered'];
+export const isOutside = o => !!o.outside;
+export const OUTSIDE_DEFAULT = 'Outside cutter';
+const OUT_STATUS = {
+  to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Received back', actor: 'origin', done: 'Received back from the outside cutter' },
+  delivered: { label: 'Delivered',         color: 'done',   action: null,            actor: null,     done: null },
+};
+
+export const flowFor = o => (isOutside(o) ? OUT_FLOW : onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
 
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
@@ -145,7 +157,7 @@ export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status
 // is. `long` spells the place out; the compact form uses the code, which is
 // what the journey chips next to it already show.
 export function fitStep(o, { long = false } = {}) {
-  const base = (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
+  const base = (isOutside(o) && OUT_STATUS[o.status]) || (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
   // An order a lens request opened cannot start until MGM answers it. After a
   // yes, a frame that travels says so and may go; one fitted here goes back to
@@ -156,6 +168,7 @@ export function fitStep(o, { long = false } = {}) {
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
     if (ans === 'confirmed' && !onShortRoad(o)) return { ...base, label: 'Lens Confirmed', color: 'green' };
   }
+  if (o.status === 'to_fitter' && isOutside(o)) return { ...base, label: long ? `At ${o.outside} (outside)` : `At ${o.outside}` };
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
   if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
   return base;
@@ -175,8 +188,10 @@ export function fitActor(order) {
 
 // Whether an order is this location's to move now. A self-fit job still
 // waiting on its lenses can be started, but it is not asking for anything yet.
+// Nor is a frame at an outside cutter: it is waiting on the cutter.
 export const needsAction = (o, code) =>
-  canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o));
+  canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
+  && !(o.status === 'to_fitter' && isOutside(o));
 
 // ── Stock request state machine ──
 // Redesigned: a branch places a request, the office fulfils it. No review.

@@ -235,6 +235,26 @@ export const store = {
 
   async sendToFitter(id, fitter, by) { return (await this.sendOrdersToFitter([id], fitter, by))[0]; },
 
+  // Send frames to a 3rd-party cutter. Guarded like the above: only orders
+  // whose lenses are in and that nobody has sent anywhere yet.
+  sendOrdersOutside(ids, cutter, by) {
+    return run(['orders'], async () => {
+      const rows = ok(await supabase.from('orders')
+        .update({ outside_cutter: cutter, status: 'to_fitter' })
+        .in('id', ids).eq('status', 'lenses_in').is('fitter_code', null).is('outside_cutter', null)
+        .select('id, ref'));
+      if (!rows.length) return SKIP;
+      ok(await supabase.from('order_events').insert(rows.map(o => ({
+        order_id: o.id, by_code: by, text: `Sent outside to ${cutter} — 3rd-party cutting`,
+      }))));
+      return rows;
+    }, moved => ({
+      by, module: 'fitting',
+      title: moved.length === 1 ? `${by} · ${moved[0].ref} → sent outside to ${cutter}` : `${by} sent ${moved.length} orders outside to ${cutter}`,
+      sub: '3rd-party cutter', refs: moved.map(o => o.id),
+    })).then(moved => (moved ?? []).map(o => this.order(o.id)).filter(Boolean));
+  },
+
   // Each order's next status depends on where it is now, so these go one at a
   // time — in parallel, and each guarded on the status it was read at, so an
   // order someone else just moved is left alone instead of skipping a step.
@@ -564,6 +584,20 @@ export const store = {
     const list = (state.settings.disabledTabs ?? []).filter(k => k !== key);
     state.settings.disabledTabs = off ? [...list, key] : list;
     return saveSettings({ module: 'settings', title: `${label} ${off ? 'switched off — under maintenance' : 'switched back on'}` });
+  },
+
+  // ── Outside cutters: the 3rd parties "Send to fitter" offers ──
+  addCutter(name) {
+    name = String(name).trim();
+    const list = state.settings.outsideCutters ?? (state.settings.outsideCutters = []);
+    if (!name || list.some(n => n.toLowerCase() === name.toLowerCase())) return Promise.resolve(null);
+    list.push(name);
+    return saveSettings({ module: 'settings', title: `${name} added to the outside cutters` });
+  },
+
+  removeCutter(name) {
+    state.settings.outsideCutters = (state.settings.outsideCutters ?? []).filter(n => n !== name);
+    return saveSettings({ module: 'settings', title: `${name} removed from the outside cutters` });
   },
 
   // ── Insurers: the list Direct Insurance offers ──

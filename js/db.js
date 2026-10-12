@@ -30,7 +30,7 @@ const timeline = rows => (rows ?? [])
 
 const toOrder = r => ({
   id: r.id, ref: r.ref,
-  origin: r.origin_code, fitter: r.fitter_code ?? null,
+  origin: r.origin_code, fitter: r.fitter_code ?? null, outside: r.outside_cutter ?? null,
   customer: r.customer ?? '', phone: r.phone ?? '',
   urgent: !!r.urgent, note: r.note ?? '', status: r.status,
   createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
@@ -109,6 +109,7 @@ function toSettings(r) {
   return {
     brandGroups: groups, categories: cats, insurers: r?.insurers ?? [], hasInsurers: !!r && 'insurers' in r,
     disabledTabs: r?.disabled_tabs ?? [], hasDisabledTabs: !!r && 'disabled_tabs' in r,
+    outsideCutters: r?.outside_cutters ?? [], hasOutsideCutters: !!r && 'outside_cutters' in r,
   };
 }
 
@@ -246,6 +247,7 @@ export async function saveSettings(settings) {
     brand_groups: settings.brandGroups, categories: settings.categories,
     ...(settings.hasInsurers ? { insurers: settings.insurers } : {}),
     ...(settings.hasDisabledTabs ? { disabled_tabs: settings.disabledTabs } : {}),
+    ...(settings.hasOutsideCutters ? { outside_cutters: settings.outsideCutters } : {}),
   }).eq('id', 1);
   if (error) throw new Error(error.message);
 }

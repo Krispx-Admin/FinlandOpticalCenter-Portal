@@ -206,6 +206,19 @@ SHORT ROAD (SELF_FLOW) — fitter === origin (a fitting centre fits its own sale
   current status is on SELF_FLOW, so legacy self-fit orders mid-long-road
   finish the long way.
 
+OUTSIDE ROAD (OUT_FLOW) — sent to a 3rd-party cutter (added 2026-10-12, user):
+  pending -> lenses_in -> to_fitter -> delivered. In "Send to fitter" the picker
+  lists our centres, then "Outside — 3rd-party cutters": the names in
+  app_settings.outside_cutters (Settings › Fitting Log), or one "Outside cutter"
+  (OUTSIDE_DEFAULT) when none are named. store.sendOrdersOutside sets
+  orders.outside_cutter = name, status to_fitter (guard: lenses_in, fitter_code
+  null, outside_cutter null); fitter_code STAYS NULL. o.outside = the name;
+  isOutside(o). At the cutter: pill "At <name>" (purple), journey pins
+  origin-OUT-origin, own chip "Outside" (excluded from "In transit"), admin
+  fitter filter "Outside cutters". The cutter has no account, so the ORIGIN does
+  every step: "Received back" -> delivered. needsAction is false while it is at
+  the cutter (it waits on the cutter, not the branch).
+
 ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
   store.linkLensRequests() puts o.lensRequest = {status, fulfilment, ref} on
   each order after every load/pull; fitStep() reads it while status = pending:
@@ -412,10 +425,10 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 -------------------------
 Opens on a LIST (settings.js PAGES), grouped (user, 2026-10-11):
   GENERAL  — Tabs (on/off), Branch access
-  BY TAB   — Stock Requests (Categories + Brand groups on one page),
-             Direct Insurance (Insurers)
-  One page per sidebar tab that HAS settings; Fitting Log, Lens Stock,
-  Insurance Claims and Schedule have none yet — add a PAGES entry (group
+  BY TAB   — Fitting Log (Outside cutters), Stock Requests (Categories +
+             Brand groups on one page), Direct Insurance (Insurers)
+  One page per sidebar tab that HAS settings; Lens Stock, Insurance Claims
+  and Schedule have none yet — add a PAGES entry (group
   'By tab', the tab's icon/title, sections: [...]) when they do.
 Each entry: icon, title, one-line description, live summary ("2 under
 maintenance", "5 categories · 3 brand groups"), chevron. Clicking one shows its
@@ -527,6 +540,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              APPLIED 2026-10-11 by Claude.
   schema-17-tab-maintenance.sql  app_settings.disabled_tabs jsonb default '[]'.
                              APPLIED 2026-10-11 by Claude.
+  schema-18-outside-cutters.sql  orders.outside_cutter text; app_settings.
+                             outside_cutters jsonb default '[]'. APPLIED
+                             2026-10-12 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -873,6 +889,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Fitting Log: Send to fitter can go Outside, to a 3rd-party cutter
+             (named in Settings › Fitting Log, else "Outside cutter"); the
+             branch marks it "Received back". Own chip + admin filter. schema-18.
  2026-10-11  Settings list grouped General / By tab; Categories + Brand groups
              merged into one "Stock Requests" page; insurers page is "Direct
              Insurance".

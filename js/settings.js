@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff } from './data.js';
+import { UNITS, TABS, tabOff, OUTSIDE_DEFAULT } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime } from './ui.js';
@@ -94,6 +94,13 @@ export function settingsView(me) {
     }).join('')}</div>`;
   }
 
+  function cuttersHTML() {
+    const list = store.settings.outsideCutters ?? [];
+    if (!list.length) return `<div class="empty">${icons.glasses}<p>No outside cutters named yet — add the first below.</p></div>`;
+    return `<div class="set-brands">${list.map(n => `
+      <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-cutter="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`;
+  }
+
   function insurersHTML() {
     const list = store.settings.insurers ?? [];
     if (!list.length) return `<div class="empty">${icons.receipt}<p>No insurers yet — add the first below.</p></div>`;
@@ -158,6 +165,9 @@ export function settingsView(me) {
     { key: 'access', group: 'General', icon: 'logout', title: 'Branch access', sections: ['access'],
       desc: 'The 6-digit code each branch signs in with',
       sum: () => '' },
+    { key: 'fitting', group: 'By tab', icon: 'glasses', title: 'Fitting Log', sections: ['cutters'],
+      desc: 'The outside, 3rd-party cutters a frame can be sent to',
+      sum: () => { const n = (store.settings.outsideCutters ?? []).length; return n ? count(n, 'outside cutter') : 'No cutters named'; } },
     { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'],
       desc: 'Categories — the fields each needs, how it is counted — and the brand groups they offer',
       sum: () => `${count(store.settings.categories.length, 'category', 'categories')} · ${count(groups().length, 'brand group')}` },
@@ -203,6 +213,19 @@ export function settingsView(me) {
         <form class="set-add" id="add-group">
           <input name="name" placeholder="New brand group — e.g. Solution brands" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add group</button>
+        </form>
+      </section>`,
+    cutters: () => `
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.glasses} Outside cutters</h2>
+          <p class="muted">The 3rd-party cutters offered under “Outside” when a branch sends a frame to a fitter.
+             With none named, the branch simply picks “${OUTSIDE_DEFAULT}”. Taking one off leaves the frames already sent to it as they are.</p>
+        </div>
+        <div id="set-cutters">${cuttersHTML()}</div>
+        <form class="set-add" id="add-cutter">
+          <input name="name" placeholder="New outside cutter — e.g. the lab's name" required>
+          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add cutter</button>
         </form>
       </section>`,
     ins: () => `
@@ -293,6 +316,8 @@ export function settingsView(me) {
     if (ins) ins.innerHTML = insurersHTML();
     const tabs = root.querySelector('#set-tabs');
     if (tabs) tabs.innerHTML = tabsHTML();
+    const cut = root.querySelector('#set-cutters');
+    if (cut) cut.innerHTML = cuttersHTML();
     if (!page) { const ix = root.querySelector('.set-index'); if (ix) ix.outerHTML = listHTML(); }
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
@@ -328,6 +353,8 @@ export function settingsView(me) {
         });
       } else if (f.id === 'add-group') {
         store.addBrandGroup(val('name'));
+      } else if (f.id === 'add-cutter') {
+        store.addCutter(val('name'));
       } else if (f.id === 'add-ins') {
         store.addInsurer(val('name'));
       } else if (f.dataset.addBrand) {
@@ -351,6 +378,8 @@ export function settingsView(me) {
     root.addEventListener('click', e => {
       const go = e.target.closest('[data-page]');
       if (go) { page = go.dataset.page || null; render(); root.scrollIntoView?.({ block: 'start' }); return; }
+      const dcu = e.target.closest('[data-del-cutter]');
+      if (dcu) return store.removeCutter(dcu.dataset.delCutter);
       const di = e.target.closest('[data-del-ins]');
       if (di) return store.removeInsurer(di.dataset.delIns);
       const dc = e.target.closest('[data-del-cat]');
