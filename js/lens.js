@@ -1,7 +1,7 @@
 // ── Module 4: Lens Stock — holders keep shelves, every branch shops from them ──
 import {
   LENS_HOLDERS, FIRST_SHELF, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
-  LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll,
+  LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll, readOnly, fulfilmentSwitch,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer } from './ui.js';
@@ -301,6 +301,7 @@ export function lensView(me) {
 
   // ── drawer: request detail ──
   function drawerHTML() {
+    const viewOnlySwitch = readOnly(me.role);
     const r = store.lensRequest(drawerId);
     if (!r) return `<div class="pad">Request no longer exists.</div>`;
     const canAct = r.holder === me.code && r.status === 'requested';
@@ -327,6 +328,7 @@ export function lensView(me) {
           ${pill(LENSREQ_STATUS, r.status)}
           <span class="fulfil-chip ${r.fulfilment}">${esc(FULFILMENT[r.fulfilment]?.chip ?? '')}</span>
           <span class="dw-when">updated ${relTime(r.updatedAt)}</span>
+          ${(() => { const to = fulfilmentSwitch(r, store.order(r.orderId), me.code); return to && !viewOnlySwitch ? `<button class="btn btn-ghost btn-sm dw-switch" data-switch="${r.id}" data-to="${to}">${icons.history} ${to === 'send_frames' ? 'Change: send the frame instead' : 'Change: receive the lenses instead'}</button>` : ''; })()}
         </div>
         ${r.status === 'declined' && r.reason ? `<div class="review-hint decline-note">${icons.flag} ${esc(r.reason)}</div>` : ''}
         <table class="lines">
@@ -363,6 +365,8 @@ export function lensView(me) {
       if (e.target.closest('[data-close]')) return drawer.close();
       const sl = e.target.closest('[data-send-lenses]');
       if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
+      const sw = e.target.closest('[data-switch]');
+      if (sw) return switchFulfilment(sw.dataset.switch, sw.dataset.to);
       if (e.target.closest('[data-decline]')) { declining = true; return drawer.update(); }
       if (e.target.closest('[data-cancel-decline]')) { declining = false; return drawer.update(); }
       const dd = e.target.closest('[data-do-decline]');
@@ -372,6 +376,16 @@ export function lensView(me) {
         return store.declineLensRequest(dd.dataset.doDecline, why, me.code);
       }
     });
+  }
+
+  // The order went in the wrong way round: switch it while nothing has moved.
+  function switchFulfilment(id, to) {
+    const r = store.lensRequest(id);
+    if (!r) return;
+    const ask = to === 'send_frames'
+      ? `Change ${r.ref} to “Send the frame”?\n\nThe lenses stay set aside at ${locName(r.holder)} and the frame goes there to be cut.`
+      : `Change ${r.ref} to “Receive the lenses”?\n\n${locName(r.holder)} will send the lenses to ${locName(r.branch)}.`;
+    if (confirm(ask)) store.changeFulfilment(id, to, me.code);
   }
 
   // ── cart → request composer ──

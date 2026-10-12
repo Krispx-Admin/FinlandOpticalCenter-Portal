@@ -979,6 +979,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   border-radius: 999px; padding: 1px 7px; margin-left: 2px;
 }
 .shelf-tabs .tab-gap { flex: 1 0 14px; }
+.dw-switch { margin-left: auto; }
+.dw-switch svg { width: 14px; height: 14px; }
 #l-list .row-act .btn { white-space: nowrap; }
 .shelf-tabs .req-tab { min-width: 150px; }
 .shelf-tabs .req-tab.on { min-width: 180px; }

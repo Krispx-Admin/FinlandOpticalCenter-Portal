@@ -175,6 +175,18 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
+// Which way round a lens request goes can still be switched by the branch
+// that ordered (or the office) until something has moved: to "send the
+// frame" while the lenses are not yet marked delivered, to "receive the
+// lenses" while the frame has not been sent (schema-22).
+export function fulfilmentSwitch(r, o, code) {
+  if (!r || !o || r.status === 'declined') return null;
+  if (!(r.branch === code || loc(code)?.role === 'admin')) return null;
+  if (r.fulfilment === 'receive_lens' && o.status === 'pending') return 'send_frames';
+  if (r.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === r.holder) return 'receive_lens';
+  return null;
+}
+
 // A branch that asked to receive lenses reads "Waiting for Lenses" from the
 // moment it orders (user, 2026-10-12). Until the holder sends them the job is
 // the holder's: its Fitting Log shows "Send lenses" (canSendLenses) and the
@@ -189,7 +201,9 @@ export const canSendLenses = (o, code) =>
 // is heading for rather than the role, so a branch reads where its own frame
 // is. `long` spells the place out; the compact form uses the code, which is
 // what the journey chips next to it already show.
-export function fitStep(o, { long = false } = {}) {
+// `viewer` is the location looking: the holder whose shelf the lenses wait on
+// is waiting for the frame, not for lenses.
+export function fitStep(o, { long = false, viewer = null } = {}) {
   const base = (isOutside(o) && OUT_STATUS[o.status]) || (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
   // An order a lens request opened: lenses to receive wait for the holder to
@@ -203,7 +217,9 @@ export function fitStep(o, { long = false } = {}) {
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
-    return { ...base, label: `Lenses at ${where(o.lensRequest.holder ?? o.fitter)}` };
+    const holder = o.lensRequest.holder ?? o.fitter;
+    if (viewer && viewer === holder) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
+    return { ...base, label: `Lenses at ${where(holder)}` };
   }
   if (o.status === 'to_fitter' && isOutside(o)) return { ...base, label: long ? `At ${o.outside} (outside)` : `At ${o.outside}` };
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };

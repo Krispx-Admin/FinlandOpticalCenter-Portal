@@ -2,6 +2,7 @@
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
   locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
+  fulfilmentSwitch,
   isOutside, OUTSIDE_DEFAULT,
 } from './data.js';
 import { store } from './store.js';
@@ -128,7 +129,7 @@ export function fittingView(me) {
       const isNew = !ui.seen.has(o.id);
       const changed = ui.prevStatus.get(o.id) !== o.status;
       const can = canAdvanceOrder(o, me.code);
-      const st = fitStep(o);
+      const st = fitStep(o, { viewer: me.code });
       const selected = ui.selected.has(o.id);
       const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
       // Primary action: pick a fitter, advance, or show who we're waiting on.
@@ -151,7 +152,7 @@ export function fittingView(me) {
           <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
         </div>
         <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
-        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true }).label })}</div>
+        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
           <button class="icon-btn open-arrow" data-open="${o.id}" title="Open order">${icons.chevronRight}</button>
@@ -203,7 +204,7 @@ export function fittingView(me) {
     const o = store.order(drawerId);
     if (!o) return `<div class="pad">Order no longer exists.</div>`;
     const can = canAdvanceOrder(o, me.code);
-    const st = fitStep(o, { long: true });
+    const st = fitStep(o, { long: true, viewer: me.code });
     const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
     return `
       <div class="dw-head">
@@ -246,12 +247,14 @@ export function fittingView(me) {
   // will be cutting, so the fitter never has to go and look it up.
   function stockLensHTML(r) {
     if (!r) return '';
+    const viewOnlySwitch = viewOnly;
     return `
       <h3 class="tl-h">${icons.lens} Stock lens</h3>
       <div class="dw-status-row">
         ${pill(LENSREQ_STATUS, r.status)}
         <span class="fulfil-chip ${r.fulfilment}">${esc(FULFILMENT[r.fulfilment]?.chip ?? '')}</span>
         <span class="dw-when">${esc(r.ref)}</span>
+        ${(() => { const to = fulfilmentSwitch(r, store.order(r.orderId), me.code); return to && !viewOnlySwitch ? `<button class="btn btn-ghost btn-sm dw-switch" data-switch="${r.id}" data-to="${to}">${icons.history} ${to === 'send_frames' ? 'Change: send the frame instead' : 'Change: receive the lenses instead'}</button>` : ''; })()}
       </div>
       <table class="lines">
         <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th></tr></thead>
@@ -274,6 +277,8 @@ export function fittingView(me) {
       if (e.target.closest('[data-close]')) return drawer.close();
       const sl = e.target.closest('[data-send-lenses]');
       if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
+      const sw = e.target.closest('[data-switch]');
+      if (sw) return switchFulfilment(sw.dataset.switch, sw.dataset.to);
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
@@ -281,6 +286,16 @@ export function fittingView(me) {
       const urg = e.target.closest('[data-urgent]');
       if (urg) { const o = store.order(urg.dataset.urgent); store.setUrgent(o.id, !o.urgent, me.code); }
     });
+  }
+
+  // The order went in the wrong way round: switch it while nothing has moved.
+  function switchFulfilment(id, to) {
+    const r = store.lensRequest(id);
+    if (!r) return;
+    const ask = to === 'send_frames'
+      ? `Change ${r.ref} to “Send the frame”?\n\nThe lenses stay set aside at ${locName(r.holder)} and the frame goes there to be cut.`
+      : `Change ${r.ref} to “Receive the lenses”?\n\n${locName(r.holder)} will send the lenses to ${locName(r.branch)}.`;
+    if (confirm(ask)) store.changeFulfilment(id, to, me.code);
   }
 
   // ── fitter picker (assign + send, one order or a bulk selection) ──

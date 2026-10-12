@@ -462,6 +462,20 @@ export const store = {
     });
   },
 
+  // Switch a request between "send the frame" and "receive the lenses".
+  changeFulfilment(id, fulfilment, by) {
+    const r = this.lensRequest(id);
+    if (!r) return Promise.resolve(null);
+    return run(['lensRequests', 'orders'], async () => {
+      ok(await supabase.rpc('change_lens_fulfilment', { p_request: id, p_fulfilment: fulfilment }));
+      return r;
+    }, {
+      by, module: 'fitting',
+      title: fulfilment === 'send_frames' ? `${by} · ${r.ref}: the frame goes to ${r.holder}` : `${by} · ${r.ref}: ${r.holder} sends the lenses`,
+      sub: r.billNo ? `Bill ${r.billNo}` : '', refs: r.orderId ? [r.orderId] : [],
+    });
+  },
+
   // Before sending only; the lenses go back on the shelf.
   declineLensRequest(id, reason, by) {
     const r = this.lensRequest(id);

@@ -237,6 +237,15 @@ ORDERS OPENED BY A LENS REQUEST (reworked 2026-10-12, schema-21 — no confirm).
   them. fitStep():
     send_frames: order created at lenses_in, fitter = holder ->
                  "Lenses at <holder>" + Send to fitter (origin) -> normal road.
+                 The HOLDER reads it as "Waiting for frame from <origin>"
+                 (fitStep(o, {viewer}) — fitting.js passes viewer: me.code).
+    CHANGE HOW (schema-22): the ordering branch or the office can switch a
+                 request between send-the-frame and receive-the-lenses while
+                 nothing has moved (fulfilmentSwitch(): receive->send while the
+                 order is pending; send->receive while it is lenses_in at the
+                 holder) — button in the Stock lens section of the Fitting Log
+                 drawer and in the Lens Stock request drawer; RPC
+                 change_lens_fulfilment; both timelines record it.
     receive_lens, request 'requested' (pending) -> "Waiting for Lenses" from
                  the moment it is ordered (user, 2026-10-12; long form in
                  drawer/hover: "— <holder> to send them" / after: "— sent by
@@ -658,6 +667,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              rehearsed in a rolled-back transaction. It moved
                              5 send-frame orders to lenses_in and set aside
                              LR-1026's lenses (SAL shelf 5 -> 3).
+  schema-22-change-lens-fulfilment.sql  change_lens_fulfilment(); and switched
+                             wdwd/sg/FEF (Al Mouj from Salalah, recorded as
+                             receive under the old fitting-centre default) to
+                             send the frame. APPLIED 2026-10-12 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1002,6 +1015,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Al Mouj's three jobs from Salalah were recorded as "receive the
+             lenses" (the form used to pre-select that for fitting centres);
+             switched to "send the frame" (schema-22). New: the ordering branch
+             can change how while nothing has moved; the holder reads
+             "Waiting for frame from X" on frame-coming jobs.
  2026-10-12  Lens Stock redesigned to the user's drawing: folder tabs per shelf
              (Muscat Grand Mall first; the open one taller and joined to the
              panel), request lists as tabs at the right, search + Filters

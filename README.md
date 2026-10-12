@@ -104,6 +104,7 @@ Applied in order:
 | `supabase/schema-19-branches-editable.sql` | branches edited in Settings: `add_branch`, `save_branch`, open/closed, display order |
 | `supabase/schema-20-delete-branch-lens-holders.sql` | `delete_branch`, several lens-stock holders (`holder_code`, `set_lens_holder`) |
 | `supabase/schema-21-send-lenses.sql` | lens requests without confirming: reserve on order, `send_lens_request`, `decline_lens_request` |
+| `supabase/schema-22-change-lens-fulfilment.sql` | switch a lens request between sending the frame and receiving the lenses |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences
