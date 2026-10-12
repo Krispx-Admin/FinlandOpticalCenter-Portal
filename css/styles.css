@@ -962,14 +962,12 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .shelf-tab b svg { width: 15px; height: 15px; }
 .shelf-tab span { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .shelf-tab:hover { background: #e1e6ee; color: var(--ink); }
-/* the open tab: taller, white, a brand edge on top, and joined to the panel */
+/* the open tab: taller, white, joined to the panel, and outlined in the brand
+   colour up one side, round both top corners and down the other side */
 .shelf-tab.on {
-  min-width: 220px; padding: 15px 20px 16px; background: var(--surface); color: var(--ink);
+  min-width: 220px; padding: 13px 18px 16px; background: var(--surface); color: var(--ink);
+  border: 3px solid var(--brand); border-bottom: none;
   margin-bottom: -1px; box-shadow: 0 -4px 14px rgba(19,48,86,.07);
-}
-.shelf-tab.on::before {
-  content: ''; position: absolute; left: -1px; right: -1px; top: -1px; height: 3px;
-  background: var(--brand); border-radius: 12px 12px 0 0;
 }
 .shelf-tab.on b { font-size: 15.5px; font-weight: 700; color: var(--brand-ink); }
 .shelf-tab.on span { color: var(--brand); font-weight: 600; }

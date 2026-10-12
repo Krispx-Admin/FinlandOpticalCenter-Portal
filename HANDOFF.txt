@@ -286,7 +286,8 @@ TABS — one per shelf, Muscat Grand Mall ALWAYS FIRST (data.js FIRST_SHELF =
 'MGM'; the rest in branch order; a new holder just joins the row) — then, at
 the right end, the request tabs: "Incoming requests" (holder, with a count of
 lenses to send), "My requests" (anyone who orders), "All requests" (office).
-The open tab is taller, white, brand edge on top, and joins the panel below
+The open tab is taller, white, outlined in the brand colour (3px border up
+one side, round both top corners, down the other; user 2026-10-12), and joins the panel below
 (.shelf-tab.on, .shelf-panel; panel's top-left corner squares off when the
 first tab is open). Inside a shelf: search + a Filters button (type / index /
 coating / in stock, with a count of filters in use; .filter-row); then the
