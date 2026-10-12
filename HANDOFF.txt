@@ -230,20 +230,25 @@ OUTSIDE ROAD (OUT_FLOW) — sent to a 3rd-party cutter (added 2026-10-12, user):
   every step: "Received back" -> delivered. needsAction is false while it is at
   the cutter (it waits on the cutter, not the branch).
 
-ORDERS OPENED BY A LENS REQUEST wait on MGM's answer (user, 2026-10-08).
-  store.linkLensRequests() puts o.lensRequest = {status, fulfilment, ref} on
-  each order after every load/pull; fitStep() reads it while status = pending:
-    request 'requested' -> "Waiting Lens Confirmation" (amber), NO action,
-                           row says "waiting on <holder>" (actor 'lens' ->
-                           order.lensRequest.holder);
-                           canAdvanceOrder() is false, even for the warehouse
-    'confirmed', frame goes over (long road) -> "Lens Confirmed" (green) +
-                           Lenses delivered (then Send to fitter)
-    'confirmed', lenses come here (self-fit) -> "Waiting for Lenses" +
-                           Lenses delivered (then Start fitting)
-    'declined'          -> "Lens Declined" (red); the normal action stays
+ORDERS OPENED BY A LENS REQUEST (reworked 2026-10-12, schema-21 — no confirm).
+  store.linkLensRequests() puts o.lensRequest = {id, status, fulfilment, ref,
+  holder} on each order after every load/pull. The HOLDER can read these
+  orders (RLS orders_lens_holder_read; canSeeOrder) so its Fitting Log shows
+  them. fitStep():
+    send_frames: order created at lenses_in, fitter = holder ->
+                 "Lenses at <holder>" + Send to fitter (origin) -> normal road.
+    receive_lens, request 'requested' (pending) -> "Lenses Requested" (amber),
+                 actor 'lens' = holder: the holder's row/drawer has
+                 "Send lenses" (canSendLenses -> store.sendLenses -> RPC
+                 send_lens_request); everyone else "waiting on <holder>".
+                 canAdvanceOrder() is false.
+    'sent' -> plain "Waiting for Lenses" + Lenses delivered (origin), then:
+                 fitting centre = self-fit (fitter = itself) -> Start fitting;
+                 shop/clinic (fitter null) -> Send to fitter (picker/outside).
+    'declined' (pending) -> "Lens Declined" (red); the normal action stays.
   needsAction(o, code) (data.js) drives the nav badge and "Need your action":
-  any advanceable order except a self-fit job still pending.
+  any advanceable order except a self-fit job still pending, PLUS lenses this
+  holder has to send.
 
 Send to fitter: picker modal of FITTERS; if all selected orders came from one
 fitting centre, that centre leads the list ("Keep here — no transit").
@@ -285,21 +290,29 @@ the cog on the shelf tab; defaults in data.js).
 A value in use on the shelf can't be removed; "None" coating can't be removed;
 a list can't be emptied. LOW_LENS_STOCK = 4 (amber).
 
-Lens request statuses: requested "Awaiting answer" (amber) / confirmed (green) /
-declined (red, with reason).
+Lens request statuses (schema-21): reserved "Set aside" (send the frame) /
+requested "Lenses to send" (receive, not yet sent) / sent / declined (with
+reason) / confirmed (older requests only).
 
-FULFILMENT (schema-07) — every lens request also OPENS A FITTING ORDER, in one
-DB transaction (create_lens_request):
-  send_frames  "Send the frame over"  -> order fitter = MGM, long road
-  receive_lens "Receive the lenses"   -> order fitter = requester (self-fit);
-                only fitting centres/admin may choose this (checked in DB)
+FULFILMENT — every lens request also OPENS A FITTING ORDER, in one DB
+transaction (create_lens_request). EVERY branch chooses (user, 2026-10-12);
+the default is send_frames:
+  send_frames  "Send the frame"      -> order fitter = holder, status lenses_in
+  receive_lens "Receive the lenses"  -> order pending; fitter = requester if it
+                                        is a fitting centre (self-fit), else
+                                        null (it picks a fitter after delivery)
 Bill number + customer name required on the request (they become the order).
 
-MGM CONFIRMS (confirm_lens_request: deducts with row locks, ships what is
-there and logs "Short on: …") or DECLINES with a reason. An automatic-deduct
-version (schema-08) WAS applied by the user in the SQL editor on 2026-10-08,
-then they asked for confirmation back: schema-09 restores schema-07's
-create_lens_request. Don't bring auto-deduct back unasked.
+NO CONFIRMING (user, 2026-10-12, schema-21). The lenses come off the holder's
+shelf WHEN ORDERED (create_lens_request locks each row; not enough = refused,
+"Only N left of …"), so the shelf always shows what is free. send_frames
+requests are 'reserved' and need nothing from the holder. receive_lens
+requests are 'requested' until the holder presses SEND LENSES (Fitting Log or
+Lens Stock › Incoming requests) -> 'sent'. Before sending the holder may
+DECLINE (RPC decline_lens_request: lenses back on the shelf, reason kept).
+confirm_lens_request now only raises "no longer confirmed — reload".
+History: schema-07 confirm, schema-08 auto-deduct (user), schema-09 confirm
+back, schema-21 reserve-on-order + send (user chose these three decisions).
 
 STOCK LENS NOTE: a fitting order opened by a lens request (lens_requests.order_id)
 shows "Stock Lens" under its journey in the list (and in the row
@@ -621,6 +634,11 @@ Migrations are applied by hand, in order. Each file has a header with
                              (old overloads dropped); confirm checks holder;
                              set_lens_holder(). APPLIED 2026-10-12 by Claude,
                              rehearsed in a rolled-back transaction.
+  schema-21-send-lenses.sql  no confirming: reserve on order, send_lens_request,
+                             decline_lens_request (restocks), statuses
+                             reserved/sent; holder may read the orders its
+                             requests opened; open requests migrated.
+                             NOT YET APPLIED (token expired) — see change log.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -965,6 +983,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Lens requests: no confirming. Lenses come off the shelf when ordered;
+             every branch picks Send the frame (default) or Receive the lenses;
+             the holder presses "Send lenses" in its Fitting Log (it now sees
+             those jobs) or Lens Stock, or declines before sending. No "MGM"
+             left in the lens screens. schema-21 WRITTEN, NOT APPLIED: the
+             Supabase token expired — apply it, then push this commit.
  2026-10-12  Several branches can hold lens stock (schema-20); delete a branch
              (type its code; only one with no records); Settings › Employees
              (the schedule roster = salesperson list); outside cutters moved

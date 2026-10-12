@@ -172,10 +172,13 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
-// While MGM has yet to confirm the lenses, nobody moves the job: the action is
-// withheld and the row says who it is waiting on.
-const LENS_WAIT = { label: 'Waiting Lens Confirmation', color: 'amber', action: null, actor: 'lens' };
+// A branch that asked to receive lenses waits for the holder to send them.
+// Until then the job is the holder's: its Fitting Log shows "Send lenses"
+// (canSendLenses) and everyone else's row says who it is waiting on.
+const LENS_WAIT = { label: 'Lenses Requested', color: 'amber', action: 'Send lenses', actor: 'lens' };
 export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
+export const canSendLenses = (o, code) =>
+  awaitingLens(o) && (o.lensRequest.holder === code || loc(code)?.role === 'admin');
 
 // What one order's pill and button say. A frame on the road names the place it
 // is heading for rather than the role, so a branch reads where its own frame
@@ -184,14 +187,16 @@ export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status
 export function fitStep(o, { long = false } = {}) {
   const base = (isOutside(o) && OUT_STATUS[o.status]) || (onShortRoad(o) && SELF_STATUS[o.status]) || FIT_STATUS[o.status];
   const where = code => (long ? locName(code) : code);
-  // An order a lens request opened cannot start until MGM answers it. After a
-  // yes, a frame that travels says so and may go; one fitted here goes back to
-  // plain waiting for the lenses, which are now on their way.
+  // An order a lens request opened: lenses to receive wait for the holder to
+  // send them, then read plain "Waiting for Lenses" while they travel. Lenses
+  // set aside for a frame that goes over wait at the holder for it.
   if (o.status === 'pending' && o.lensRequest) {
     const ans = o.lensRequest.status;
     if (ans === 'requested') return { ...base, ...LENS_WAIT };
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
-    if (ans === 'confirmed' && !onShortRoad(o)) return { ...base, label: 'Lens Confirmed', color: 'green' };
+  }
+  if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
+    return { ...base, label: `Lenses at ${where(o.lensRequest.holder ?? o.fitter)}` };
   }
   if (o.status === 'to_fitter' && isOutside(o)) return { ...base, label: long ? `At ${o.outside} (outside)` : `At ${o.outside}` };
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
@@ -215,9 +220,11 @@ export function fitActor(order) {
 // Whether an order is this location's to move now. A self-fit job still
 // waiting on its lenses can be started, but it is not asking for anything yet.
 // Nor is a frame at an outside cutter: it is waiting on the cutter.
+// Sending lenses a branch is waiting for is the holder's to do.
 export const needsAction = (o, code) =>
-  canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
-  && !(o.status === 'to_fitter' && isOutside(o));
+  (canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
+   && !(o.status === 'to_fitter' && isOutside(o)))
+  || canSendLenses(o, code);
 
 // ── Stock request state machine ──
 // Redesigned: a branch places a request, the office fulfils it. No review.
@@ -245,27 +252,32 @@ export const DEFAULT_LENS_COATINGS = ['None', 'AR', 'Blue-cut', 'Photochromic'];
 export const BARE_COATING = 'None';
 export const LOW_LENS_STOCK = 4; // at or below this, flag it as running low
 
-// Asking for lenses is really asking for one of two things. A branch with no
-// bench can only mean the first; a fitting centre chooses.
+// Asking for lenses is asking for one of two things, and every branch
+// chooses; sending the frame is the default. Receiving: a fitting centre cuts
+// them itself; a shop or clinic sends the frame and lenses on to a fitter.
 export const FULFILMENT = {
   send_frames: {
-    label: 'Send the frame over',
-    sub: 'The frame travels there and is cut on their bench.',
+    label: 'Send the frame',
+    sub: 'The lenses wait at their shelf; your frame goes there and is cut on their bench.',
     chip: 'Frame goes over',
   },
   receive_lens: {
     label: 'Receive the lenses',
-    sub: 'The lenses travel here and you cut them yourself — no frame in transit.',
+    sub: 'The lenses are sent here and you cut them yourself — no frame in transit.',
+    subShop: 'The lenses are sent here; then you send the frame and the lenses to a fitter.',
     chip: 'Lenses come here',
   },
 };
 export const canCutOwnLenses = role => role === 'fitting' || role === 'admin';
 
-// A branch asks, MGM answers. Confirming ships the lenses and draws down stock.
+// The lenses come off the holder's shelf the moment they are asked for. A frame
+// going over finds them set aside; lenses to receive wait to be sent.
 export const LENSREQ_STATUS = {
-  requested: { label: 'Awaiting MGM', color: 'amber' },
-  confirmed: { label: 'Confirmed',    color: 'green' },
-  declined:  { label: 'Declined',     color: 'red'   },
+  reserved:  { label: 'Set aside',      color: 'blue'  },
+  requested: { label: 'Lenses to send', color: 'amber' },
+  sent:      { label: 'Sent',           color: 'green' },
+  confirmed: { label: 'Confirmed',      color: 'green' },
+  declined:  { label: 'Declined',       color: 'red'   },
 };
 
 // Optical notation: powers always carry an explicit sign, to two decimals.
@@ -333,8 +345,9 @@ export function normaliseRx(rx) {
 export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);
 
 // ── Permissions ──
+// The holder whose lenses a job is waiting for sees it too.
 export function canSeeOrder(o, code) {
-  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code;
+  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code || o.lensRequest?.holder === code;
 }
 export function canAdvanceOrder(o, code) {
   if (o.status === 'delivered' || awaitingLens(o)) return false;

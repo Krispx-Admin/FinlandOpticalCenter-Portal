@@ -7,8 +7,9 @@ import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer } from './ui.js';
 
 const REQ_CHIPS = [
-  { key: 'requested', label: 'Awaiting answer' },
-  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'requested', label: 'Lenses to send' },
+  { key: 'sent', label: 'Sent' },
+  { key: 'reserved', label: 'Set aside for a frame' },
   { key: 'declined', label: 'Declined' },
   { key: 'all', label: 'All' },
 ];
@@ -92,13 +93,13 @@ export function lensView(me) {
       list = list.filter(r => [r.ref, r.billNo, r.branch, locName(r.branch), ...r.lines.map(lensFull)]
         .some(v => String(v).toLowerCase().includes(q)));
     }
-    const rank = { requested: 0, confirmed: 1, declined: 2 };
+    const rank = { requested: 0, reserved: 1, sent: 2, confirmed: 3, declined: 4 };
     return list.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.updatedAt - a.updatedAt));
   }
 
   const reqCounts = () => {
     const all = scope();
-    const c = { requested: 0, confirmed: 0, declined: 0, all: all.length };
+    const c = { requested: 0, reserved: 0, sent: 0, confirmed: 0, declined: 0, all: all.length };
     for (const r of all) c[r.status]++;
     return c;
   };
@@ -112,15 +113,15 @@ export function lensView(me) {
     if (isOwner && ui.tab !== 'shop' && ui.tab !== 'mine') {
       const low = stock.filter(isLow).length;
       const out = stock.filter(i => i.qty === 0).length;
-      return t(c.requested, 'Awaiting your confirmation', 'stat-amber') + t(pcs, 'Lenses on the shelf', 'stat-brand')
+      return t(c.requested, 'Lenses to send', 'stat-amber') + t(pcs, 'Lenses on the shelf', 'stat-brand')
            + t(low, 'Running low', low ? 'stat-amber' : '') + t(out, 'Out of stock', out ? 'stat-red' : '');
     }
     if (isAdmin) {
-      return t(c.requested, 'Awaiting answer', 'stat-amber') + t(pcs, LENS_HOLDERS.length > 1 ? 'Lenses on all shelves' : `Lenses at ${LENS_HOLDERS[0]?.code ?? ''}`, 'stat-brand')
+      return t(c.requested, 'Lenses to send', 'stat-amber') + t(pcs, LENS_HOLDERS.length > 1 ? 'Lenses on all shelves' : `Lenses at ${LENS_HOLDERS[0]?.code ?? ''}`, 'stat-brand')
            + t(stock.length, 'Lens types') + t(c.all, 'All requests');
     }
     const avail = stock.filter(i => i.qty > 0).length;
-    return t(avail, 'Lens types available', 'stat-brand') + t(c.requested, 'Awaiting answer', 'stat-amber')
+    return t(avail, 'Lens types available', 'stat-brand') + t(c.requested, 'Waiting to be sent', 'stat-amber')
          + t(c.confirmed, 'Confirmed') + t(c.all, 'My requests');
   }
 
@@ -206,7 +207,7 @@ export function lensView(me) {
       const changed = ui.prevStatus.get(r.id) !== r.status;
       const quick = r.holder === me.code && r.status === 'requested'
         ? `<button class="btn btn-ghost btn-sm" data-decline="${r.id}">Decline</button>
-           <button class="btn btn-primary btn-sm" data-confirm="${r.id}">${icons.check} Confirm</button>` : '';
+           <button class="btn btn-primary btn-sm" data-send-lenses="${r.id}">${icons.send} Send lenses</button>` : '';
       const first = r.lines.slice(0, 2).map(lensLabel);
       const more = r.lines.length - first.length;
       return `
@@ -259,7 +260,7 @@ export function lensView(me) {
         <label class="check sm"><input type="checkbox" id="l-instock" ${ui.inStock ? 'checked' : ''}><i></i>Hide empty</label>
         ${canEditLists ? `<button class="icon-btn" id="l-cog" title="Edit lens types, indices and coatings">${icons.settings}</button>` : ''}
       </section>
-      ${mine ? `<div class="review-hint">${icons.box} Keep these counts matching the drawer. Confirming a request deducts from them automatically.</div>` : ''}
+      ${mine ? `<div class="review-hint">${icons.box} Keep these counts matching the drawer. Lenses come off them the moment a branch orders them.</div>` : ''}
       ${list.length ? `
         <table class="lines stock-table">
           <thead><tr>
@@ -293,12 +294,8 @@ export function lensView(me) {
            <button class="btn btn-ghost" data-cancel-decline>Cancel</button>
            <button class="btn btn-danger" data-do-decline="${r.id}">Decline request</button>
          </div>`
-      // Confirming means two different physical acts, so it says which one.
       : `<button class="btn btn-ghost btn-danger-text" data-decline="${r.id}">Decline</button>
-         <button class="btn btn-primary" data-confirm="${r.id}">${icons.check} ${
-           r.fulfilment === 'receive_lens'
-             ? `Send lenses to ${esc(locName(r.branch))}`
-             : 'Confirm &amp; deduct stock'}</button>`;
+         <button class="btn btn-primary" data-send-lenses="${r.id}">${icons.send} Send lenses to ${esc(locName(r.branch))}</button>`;
     return `
       <div class="dw-head">
         <div>
@@ -317,24 +314,18 @@ export function lensView(me) {
         </div>
         ${r.status === 'declined' && r.reason ? `<div class="review-hint decline-note">${icons.flag} ${esc(r.reason)}</div>` : ''}
         <table class="lines">
-          <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th>${canAct ? '<th class="num">On shelf</th>' : ''}</tr></thead>
+          <thead><tr><th>Lens</th><th>SPH</th><th>CYL</th><th class="num">Qty</th></tr></thead>
           <tbody>
-            ${r.lines.map(l => {
-              const item = store.lensItem(l.itemId);
-              const have = item?.qty ?? 0;
-              return `
+            ${r.lines.map(l => `
                 <tr>
                   <td><b>${esc(l.type)} ${esc(l.index)}</b>${l.coating && l.coating !== 'None' ? `<div class="line-note">${esc(l.coating)}</div>` : ''}</td>
                   <td class="pwr">${fmtPwr(l.sph)}</td>
                   <td class="pwr">${fmtPwr(l.cyl)}</td>
                   <td class="num"><b>${l.qty}</b> <span class="muted">pcs</span></td>
-                  ${canAct ? `<td class="num ${have < l.qty ? 'short' : ''}">${have}${have < l.qty ? ' ⚠' : ''}</td>` : ''}
-                </tr>`;
-            }).join('')}
+                </tr>`).join('')}
           </tbody>
         </table>
-        ${canAct && r.lines.some(l => (store.lensItem(l.itemId)?.qty ?? 0) < l.qty)
-          ? `<div class="review-hint">${icons.flag} Some lines exceed what's on the shelf — confirming sends what you actually have.</div>` : ''}
+        ${r.status === 'reserved' ? `<div class="review-hint">${icons.box} Set aside on ${esc(locName(r.holder))}’s shelf for the frame coming over — nothing to send. The frame’s journey is in the Fitting Log.</div>` : ''}
         <div class="dw-actions">${actions}</div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
@@ -354,8 +345,8 @@ export function lensView(me) {
     drawer = openLayer('drawer', drawerHTML, { onClose: () => { drawer = null; drawerId = null; declining = false; } });
     drawer.el.addEventListener('click', e => {
       if (e.target.closest('[data-close]')) return drawer.close();
-      const cf = e.target.closest('[data-confirm]');
-      if (cf) return store.confirmLensRequest(cf.dataset.confirm, me.code);
+      const sl = e.target.closest('[data-send-lenses]');
+      if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
       if (e.target.closest('[data-decline]')) { declining = true; return drawer.update(); }
       if (e.target.closest('[data-cancel-decline]')) { declining = false; return drawer.update(); }
       const dd = e.target.closest('[data-do-decline]');
@@ -369,13 +360,10 @@ export function lensView(me) {
 
   // ── cart → request composer ──
   function cartModal() {
-    // A branch with a bench can keep the job and have the lenses sent over;
-    // anywhere else the frame has to travel, so there is nothing to choose.
+    // Every branch chooses; sending the frame is the default. What happens to
+    // received lenses depends on whether this branch has a bench.
     const canCut = canCutOwnLenses(me.role);
-    const draft = {
-      customer: '', billNo: '',
-      fulfilment: canCut ? 'receive_lens' : 'send_frames',
-    };
+    const draft = { customer: '', billNo: '', fulfilment: 'send_frames' };
     const layer = openLayer('modal', () => {
       const rows = [...cart.entries()].map(([id, qty]) => {
         const i = store.lensItem(id);
@@ -410,16 +398,16 @@ export function lensView(me) {
             <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
             <label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>
           </div>
-          ${canCut ? `
-            <div class="fulfil">
-              ${Object.entries(FULFILMENT).map(([k, f]) => `
-                <label class="fulfil-opt ${draft.fulfilment === k ? 'on' : ''}">
-                  <input type="radio" name="fulfil" value="${k}" ${draft.fulfilment === k ? 'checked' : ''}>
-                  <b>${esc(f.label)}</b>
-                  <span>${esc(f.sub)}</span>
-                </label>`).join('')}
-            </div>` : ''}
-          <p class="muted">A fitting order opens for this bill either way. It waits for ${esc(locName(ui.holder))} to confirm the lenses before it can move.</p>
+          <div class="fulfil">
+            ${Object.entries(FULFILMENT).map(([k, f]) => `
+              <label class="fulfil-opt ${draft.fulfilment === k ? 'on' : ''}">
+                <input type="radio" name="fulfil" value="${k}" ${draft.fulfilment === k ? 'checked' : ''}>
+                <b>${esc(f.label)}</b>
+                <span>${esc(!canCut && f.subShop ? f.subShop : f.sub)}</span>
+              </label>`).join('')}
+          </div>
+          <p class="muted">The lenses come off ${esc(locName(ui.holder))}’s shelf as soon as you send this, and a fitting order opens for the bill.
+             ${draft.fulfilment === 'receive_lens' ? `It reads “Lenses Requested” until ${esc(locName(ui.holder))} sends them.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount()} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>
@@ -707,8 +695,8 @@ export function lensView(me) {
 
       const del = e.target.closest('[data-del]');
       if (del) { store.removeLensItem(del.dataset.del, me.code); return; }
-      const cf = e.target.closest('[data-confirm]');
-      if (cf) { e.stopPropagation(); store.confirmLensRequest(cf.dataset.confirm, me.code); return; }
+      const sl = e.target.closest('[data-send-lenses]');
+      if (sl) { e.stopPropagation(); store.sendLenses(sl.dataset.sendLenses, me.code); return; }
       const dc = e.target.closest('[data-decline]');
       if (dc) { e.stopPropagation(); openDrawer(dc.dataset.decline); declining = true; drawer?.update(); return; }
 

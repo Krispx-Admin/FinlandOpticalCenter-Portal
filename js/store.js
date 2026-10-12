@@ -43,14 +43,14 @@ async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLen
 // The branches came from the database: make them the portal's locations.
 function applyBranches() { if (state.branches?.length) setLocations(state.branches); }
 
-// An order opened by a lens request waits on MGM's answer to it, so each order
-// carries that answer: { status, fulfilment, ref }, or null. Orders and lens
+// An order opened by a lens request carries that request's state: { id,
+// status, fulfilment, ref, holder }, or null. Orders and lens
 // requests reload separately, so this runs after either comes back.
 function linkLensRequests() {
   const byOrder = new Map(state.lensRequests.filter(r => r.orderId).map(r => [r.orderId, r]));
   for (const o of state.orders) {
     const r = byOrder.get(o.id);
-    o.lensRequest = r ? { status: r.status, fulfilment: r.fulfilment, ref: r.ref, holder: r.holder } : null;
+    o.lensRequest = r ? { id: r.id, status: r.status, fulfilment: r.fulfilment, ref: r.ref, holder: r.holder } : null;
   }
 }
 
@@ -431,9 +431,9 @@ export const store = {
   // the part that can fail; doing this as three calls from here would leave a
   // lens request with no job behind it the first time someone retyped a bill
   // number. The function also decides the fitter, so a branch cannot name
-  // itself one. The order waits on MGM's confirmation before it can move.
+  // itself one. The lenses come off the holder's shelf in the same call.
   createLensRequest({ lines, billNo, customer, fulfilment, holder }, by) {
-    return run(['lensRequests', 'orders'], async () => {
+    return run(['lensRequests', 'orders', 'lensStock'], async () => {
       const row = ok(await supabase.rpc('create_lens_request', {
         p_bill: billNo, p_customer: customer, p_fulfilment: fulfilment, p_lines: lines, p_holder: holder,
       }));
@@ -448,37 +448,30 @@ export const store = {
     })).then(r => (r ? this.lensRequest(r.id) : null));
   },
 
-  // Confirming ships the lenses, so the shelf comes down with it. That happens
-  // inside one database function: two branches confirming at the same instant
-  // cannot both be given the last lens, which a browser could not guarantee.
-  confirmLensRequest(id, by) {
+  // The holder sends lenses a branch asked to receive. The branch's job then
+  // reads "Waiting for Lenses" until it marks them delivered.
+  sendLenses(id, by) {
     const r = this.lensRequest(id);
     if (!r || r.status !== 'requested') return Promise.resolve(null);
-    return run(['lensRequests', 'lensStock'], async () => {
-      ok(await supabase.rpc('confirm_lens_request', { p_request: id }));
+    return run(['lensRequests', 'orders'], async () => {
+      ok(await supabase.rpc('send_lens_request', { p_request: id }));
       return r;
     }, {
-      by, module: 'lens', title: `${by} confirmed ${r.ref}`,
-      sub: `→ ${locName(r.branch)}`, refs: [id],
+      by, module: 'fitting', title: `${by} sent the lenses for ${r.ref}`,
+      sub: `→ ${locName(r.branch)}`, refs: r.orderId ? [r.orderId] : [],
     });
   },
 
+  // Before sending only; the lenses go back on the shelf.
   declineLensRequest(id, reason, by) {
     const r = this.lensRequest(id);
     if (!r || r.status !== 'requested') return Promise.resolve(null);
-    const why = (reason || '').trim();
-    return run(['lensRequests'], async () => {
-      const rows = ok(await supabase.from('lens_requests')
-        .update({ status: 'declined', reason: why })
-        .eq('id', id).eq('status', 'requested').select('id'));
-      if (!rows.length) return SKIP;
-      ok(await supabase.from('lens_request_events').insert({
-        request_id: id, by_code: by, text: `Declined${why ? ` — ${why}` : ''}`,
-      }));
+    return run(['lensRequests', 'lensStock', 'orders'], async () => {
+      ok(await supabase.rpc('decline_lens_request', { p_request: id, p_reason: (reason || '').trim() }));
       return r;
     }, {
       by, module: 'lens', title: `${by} declined ${r.ref}`,
-      sub: `→ ${locName(r.branch)}`, refs: [id],
+      sub: `→ ${locName(r.branch)} · lenses back on the shelf`, refs: [id],
     });
   },
 

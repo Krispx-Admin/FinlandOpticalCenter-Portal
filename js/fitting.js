@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
   isOutside, OUTSIDE_DEFAULT,
 } from './data.js';
 import { store } from './store.js';
@@ -133,7 +133,8 @@ export function fittingView(me) {
       const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
-      if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
+      if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
+      else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       const title = o.customer || 'No customer name';
@@ -224,7 +225,8 @@ export function fittingView(me) {
         </div>
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
         <div class="dw-actions">
-          ${needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
+          ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
+            needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
           ${o.status !== 'delivered' && !viewOnly ? `<button class="btn btn-ghost" data-urgent="${o.id}">${icons.zap} ${o.urgent ? 'Remove urgent flag' : 'Flag urgent'}</button>` : ''}
         </div>
@@ -270,6 +272,8 @@ export function fittingView(me) {
     drawer = openLayer('drawer', drawerHTML, { onClose: () => { drawer = null; drawerId = null; } });
     drawer.el.addEventListener('click', e => {
       if (e.target.closest('[data-close]')) return drawer.close();
+      const sl = e.target.closest('[data-send-lenses]');
+      if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
@@ -504,6 +508,8 @@ export function fittingView(me) {
       // Open the detail drawer via the arrow button.
       const openBtn = e.target.closest('[data-open]');
       if (openBtn) { e.stopPropagation(); openDrawer(openBtn.dataset.open); return; }
+      const sl = e.target.closest('[data-send-lenses]');
+      if (sl) { e.stopPropagation(); store.sendLenses(sl.dataset.sendLenses, me.code); return; }
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');
