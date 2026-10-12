@@ -101,6 +101,7 @@ Applied in order:
 | `supabase/schema-16-lenses-delivered.sql` | the Fitting Log's `lenses_in` status |
 | `supabase/schema-17-tab-maintenance.sql` | `app_settings.disabled_tabs` — the tabs switched off for maintenance |
 | `supabase/schema-18-outside-cutters.sql` | `orders.outside_cutter`, `app_settings.outside_cutters` — frames sent to 3rd-party cutters |
+| `supabase/schema-19-branches-editable.sql` | branches edited in Settings: `add_branch`, `save_branch`, open/closed, display order |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

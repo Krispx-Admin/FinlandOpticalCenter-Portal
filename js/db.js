@@ -188,6 +188,7 @@ const SELECTS = {
   lensStock:    ['lens_stock', '*', { column: 'updated_at', asc: false }, toLensItem],
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
+  branches:     ['branches', 'code, name, role, active, position', { column: 'position', asc: true }, r => r],
 };
 
 export const COLLECTIONS = Object.keys(SELECTS);
@@ -199,6 +200,9 @@ async function fetchCollection(key) {
   if (error) throw new Error(`${table}: ${error.message}`);
   return data.map(map);
 }
+
+// Before anyone signs in, for the sign-in screen (readable without a session).
+export const fetchBranches = () => fetchCollection('branches');
 
 async function fetchDoc(key) {
   const [table, select, map] = DOCS[key];
@@ -264,6 +268,7 @@ const TABLE_COLLECTION = {
   // Confirming a request draws the shelf down, so the shelf has to come back too.
   claims: 'claims', claim_items: 'claims', claim_prescriptions: 'claims',
   app_settings: 'settings', lens_catalogue: 'lensCatalogue',
+  branches: 'branches',
 };
 
 // The *_events tables already hold a human sentence written by whoever acted

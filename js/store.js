@@ -17,6 +17,7 @@ import {
   locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   LENS_OWNER, BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
+  ROLES, loc, setLocations,
 } from './data.js';
 import { toast } from './ui.js';
 
@@ -25,7 +26,7 @@ import { toast } from './ui.js';
 let state = {
   settings: { brandGroups: [], categories: [] },
   lensCatalogue: { types: [], indices: [], coatings: [] },
-  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [],
+  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [], branches: [],
 };
 
 const subs = new Set();
@@ -37,7 +38,10 @@ function notify(event) { subs.forEach(fn => fn(event)); }
 // A local write: the rows are already refreshed, so just tell the UI.
 function commit(event) { notify(event ? { ...event, remote: false } : null); }
 
-async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLensRequests(); }
+async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLensRequests(); applyBranches(); }
+
+// The branches came from the database: make them the portal's locations.
+function applyBranches() { if (state.branches?.length) setLocations(state.branches); }
 
 // An order opened by a lens request waits on MGM's answer to it, so each order
 // carries that answer: { status, fulfilment, ref }, or null. Orders and lens
@@ -92,6 +96,7 @@ const LENS_OPTION_LABEL = { types: 'lens types', indices: 'indices', coatings: '
 const MODULE_OF = {
   orders: 'fitting', requests: 'stock', lensStock: 'lens',
   lensRequests: 'lens', lensCatalogue: 'lens', claims: 'claims', settings: 'settings',
+  branches: 'settings',
 };
 
 const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
@@ -114,6 +119,7 @@ export const store = {
     db.forgetLocalCopy();
     Object.assign(state, await db.loadAll());
     linkLensRequests();
+    applyBranches();
     loaded = true;
     unwatch?.();
     unwatch = db.watch(async (keys, notices) => {
@@ -584,6 +590,30 @@ export const store = {
     const list = (state.settings.disabledTabs ?? []).filter(k => k !== key);
     state.settings.disabledTabs = off ? [...list, key] : list;
     return saveSettings({ module: 'settings', title: `${label} ${off ? 'switched off — under maintenance' : 'switched back on'}` });
+  },
+
+  // ── Branches (office only; the database checks) ──
+  addBranch({ code, name, role, pin }) {
+    code = String(code ?? '').trim().toUpperCase();
+    name = String(name ?? '').trim();
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('add_branch', { p_code: code, p_name: name, p_role: role, p_pin: pin }));
+      return true;
+    }, { module: 'settings', title: `${code} · ${name} added`, sub: `${ROLES[role]?.label ?? role} — it can sign in now` });
+  },
+
+  // Rename, change what it is, close or reopen — one call with the whole row.
+  saveBranch(code, changes) {
+    const b = loc(code);
+    if (!b) return Promise.resolve(null);
+    const next = { name: b.name, role: b.role, active: b.active !== false, ...changes };
+    const title = 'active' in changes ? `${next.name} ${next.active ? 'reopened' : 'closed'}`
+      : 'role' in changes ? `${next.name} is now a ${ROLES[next.role]?.label.toLowerCase() ?? next.role}`
+      : `${code} renamed to ${next.name}`;
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('save_branch', { p_code: code, p_name: next.name, p_role: next.role, p_active: next.active }));
+      return true;
+    }, { module: 'settings', title });
   },
 
   // ── Outside cutters: the 3rd parties "Send to fitter" offers ──

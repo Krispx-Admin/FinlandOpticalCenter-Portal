@@ -1,6 +1,10 @@
 // ── Static domain data: locations, catalogues, status machines, seed state ──
 // Locations carry no credentials: sign-in is handled by Supabase Auth.
 
+// The locations live in the database (public.branches) and are edited in
+// Settings › Branches; setLocations() swaps them in at start-up and whenever
+// they change. This built-in list is only the fallback for a first paint that
+// cannot reach the server — it is not where branches are added.
 export const LOCATIONS = [
   // Retail branches
   { code: 'SCC',  name: 'Seeb City Centre',   role: 'retail' },
@@ -32,8 +36,26 @@ export const ROLES = {
 
 export const loc = code => LOCATIONS.find(l => l.code === code);
 export const locName = code => loc(code)?.name ?? code;
+// The kinds of branch the office can choose between (the office and Ghiath
+// are fixed). Closed branches stay in LOCATIONS, so old records keep their
+// names, but drop out of FITTERS and BRANCHES — the lists people pick from.
+export const BRANCH_KINDS = ['retail', 'fitting', 'clinic'];
+const isOpen = l => l.active !== false;
 export const FITTERS = LOCATIONS.filter(l => l.role === 'fitting');
-export const BRANCHES = LOCATIONS.filter(l => ['retail', 'fitting', 'clinic'].includes(l.role));
+export const BRANCHES = LOCATIONS.filter(l => BRANCH_KINDS.includes(l.role));
+
+// Replace the lists in place: every module imported these arrays, so they keep
+// their identity, and an existing location object is updated rather than
+// swapped — the signed-in session is one of them and sees its own changes.
+export function setLocations(rows) {
+  if (!rows?.length) return;
+  const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
+    code: r.code, name: r.name, role: r.role, active: r.active !== false,
+  }));
+  LOCATIONS.splice(0, LOCATIONS.length, ...next);
+  FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
+  BRANCHES.splice(0, BRANCHES.length, ...next.filter(l => isOpen(l) && BRANCH_KINDS.includes(l.role)));
+}
 
 // Who looks at the whole network. The office runs it; the schedule editor
 // reads every module but changes nothing outside the schedule.

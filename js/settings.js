@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, OUTSIDE_DEFAULT } from './data.js';
+import { UNITS, TABS, tabOff, OUTSIDE_DEFAULT, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime } from './ui.js';
@@ -108,35 +108,89 @@ export function settingsView(me) {
       <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-ins="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`;
   }
 
-  // Reads through a database function that checks the caller is the office,
-  // so a branch calling it directly gets nothing back.
-  async function loadAccess() {
-    const host = root.querySelector('#set-access');
+  // Every location: rename it, set what it is, close or reopen it, and give it
+  // a new sign-in code. Read through a database function that checks the
+  // caller is the office, so a branch calling it directly gets nothing back.
+  const kindOptions = sel => BRANCH_KINDS.map(k =>
+    `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('');
+
+  async function loadBranches() {
+    const host = root.querySelector('#set-branches');
     if (!host) return;
     const { rows, error } = await branchAccess();
-    if (error) { host.innerHTML = `<p class="muted sm">Could not load branch access — ${esc(error)}</p>`; return; }
-    host.innerHTML = rows.map(r => `
-      <div class="ba-row" data-branch="${esc(r.code)}">
-        <div class="ba-who">
-          <span class="loc-chip">${esc(r.code)}</span>
-          <b>${esc(r.name)}</b>
-          <span class="muted sm">${esc(r.role)}</span>
-        </div>
-        <div class="ba-seen muted sm">${r.has_account
+    if (!root.contains(host)) return;
+    if (error) { host.innerHTML = `<p class="muted sm">Could not load the branches — ${esc(error)}</p>`; return; }
+    host.innerHTML = rows.map(r => {
+      const fixed = !BRANCH_KINDS.includes(r.role);
+      const keep = fixed || r.holds_lens_stock;
+      return `
+      <div class="br-row ${r.active ? '' : 'is-closed'}" data-branch="${esc(r.code)}">
+        <span class="loc-chip">${esc(r.code)}</span>
+        <input class="br-name" data-br-name="${esc(r.code)}" value="${esc(r.name)}" aria-label="Name of ${esc(r.code)}" required>
+        ${fixed ? `<span class="br-fixed">${esc(ROLES[r.role]?.label ?? r.role)}</span>`
+          : `<select class="br-role" data-br-role="${esc(r.code)}" aria-label="What ${esc(r.code)} is"
+               ${r.holds_lens_stock ? 'disabled title="Holds the lens stock, so it stays a fitting centre"' : ''}>${kindOptions(r.role)}</select>`}
+        <div class="ba-seen muted sm">${!r.active ? 'closed — cannot sign in' : r.has_account
           ? (r.last_sign_in ? 'last signed in ' + relTime(Date.parse(r.last_sign_in)) : 'never signed in')
           : 'no account'}</div>
         <form class="ba-set" data-set="${esc(r.code)}">
           <input name="code" inputmode="numeric" maxlength="6" pattern="\\d{6}"
-                 placeholder="new 6-digit code" ${r.has_account ? '' : 'disabled'} autocomplete="off">
-          <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account ? '' : 'disabled'}>Set</button>
+                 placeholder="new code" ${r.has_account && r.active ? '' : 'disabled'} autocomplete="off">
+          <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account && r.active ? '' : 'disabled'}>Set</button>
         </form>
+        ${keep ? `<span class="br-open muted sm" title="${fixed ? 'The office and the schedule editor are always open' : 'Holds the lens stock'}">Always open</span>`
+          : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
         <div class="ba-msg"></div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+  }
+
+  async function addBranch(form) {
+    const d = new FormData(form);
+    const msg = root.querySelector('#add-branch-msg');
+    const pin = String(d.get('pin') ?? '').trim();
+    msg.className = 'ba-msg';
+    if (!/^\d{6}$/.test(pin)) { msg.classList.add('bad'); msg.textContent = 'The sign-in code is six digits.'; return; }
+    msg.textContent = 'Adding…';
+    const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: d.get('role'), pin });
+    if (!done) { msg.textContent = ''; return; }
+    form.reset();
+    msg.classList.add('good');
+    msg.textContent = 'Added — it is on the sign-in screen now.';
+    setTimeout(() => { msg.textContent = ''; msg.className = 'ba-msg'; }, 6000);
+  }
+
+  // Changing what a branch is, or closing it, changes what other people see:
+  // say what will happen first.
+  function saveRole(sel) {
+    const code = sel.dataset.brRole, b = LOCATIONS.find(l => l.code === code);
+    const role = sel.value;
+    if (!b || role === b.role) return;
+    const away = store.state.orders.filter(o => o.fitter === code && o.status !== 'delivered').length;
+    const what = ROLES[role].label.toLowerCase();
+    const note = role === 'fitting'
+      ? `${b.name} will be offered in “Send to fitter” from now on.`
+      : b.role === 'fitting'
+        ? `${b.name} will no longer be offered in “Send to fitter”.${away ? ` The ${away} frame${away === 1 ? '' : 's'} with it now will finish their journey as normal.` : ''}`
+        : '';
+    if (!confirm(`Make ${b.name} a ${what}?\n\n${note}`.trim())) { sel.value = b.role; return; }
+    store.saveBranch(code, { role });
+  }
+
+  function saveOpen(box) {
+    const code = box.dataset.brOpen, b = LOCATIONS.find(l => l.code === code);
+    if (!b) return;
+    const open = box.checked;
+    const ask = open
+      ? `Reopen ${b.name}? It comes back on the sign-in screen and can sign in again with its old code.`
+      : `Close ${b.name}?\n\nIt leaves the sign-in screen and the lists, and can no longer sign in. Everything it recorded stays.`;
+    if (!confirm(ask)) { box.checked = !open; return; }
+    store.saveBranch(code, { active: open });
   }
 
   async function applyCode(form) {
     const branch = form.dataset.set;
-    const row = form.closest('.ba-row');
+    const row = form.closest('.br-row, .ba-row');
     const msg = row.querySelector('.ba-msg');
     const input = form.querySelector('input');
     const value = input.value.trim();
@@ -162,9 +216,9 @@ export function settingsView(me) {
     { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'],
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
-    { key: 'access', group: 'General', icon: 'logout', title: 'Branch access', sections: ['access'],
-      desc: 'The 6-digit code each branch signs in with',
-      sum: () => '' },
+    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Branches', sections: ['branches', 'addBranch'],
+      desc: 'Add branches, rename them, set what each one is, close one, and the code each signs in with',
+      sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
     { key: 'fitting', group: 'By tab', icon: 'glasses', title: 'Fitting Log', sections: ['cutters'],
       desc: 'The outside, 3rd-party cutters a frame can be sent to',
       sum: () => { const n = (store.settings.outsideCutters ?? []).length; return n ? count(n, 'outside cutter') : 'No cutters named'; } },
@@ -241,15 +295,34 @@ export function settingsView(me) {
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add insurer</button>
         </form>
       </section>`,
-    access: () => `
+    branches: () => `
       <section class="set-card">
         <div class="set-card-head">
-          <h2>${icons.logout} Branch access</h2>
-          <p class="muted">Set the 6-digit code each branch signs in with. Codes are stored
-             hashed on the server — nobody, including you, can read an existing one, so
-             setting a new code is the way to recover a forgotten one.</p>
+          <h2>${icons.warehouse} Branches</h2>
+          <p class="muted">Every location in the portal. Rename one; change what it is — a shop that gets a
+             cutting machine becomes a <b>Fitting centre</b> and is offered in “Send to fitter” from then on; or
+             close one — it leaves the sign-in screen and the lists and can no longer sign in, and everything it
+             recorded stays. Sign-in codes are stored hashed: nobody can read one, so setting a new code is how a
+             forgotten one is recovered.</p>
         </div>
-        <div id="set-access"><p class="muted sm">Loading…</p></div>
+        <div id="set-branches"><p class="muted sm">Loading…</p></div>
+      </section>`,
+    addBranch: () => `
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.plus} Add a branch</h2>
+          <p class="muted">The code is what it signs in under and how it is shown across the portal — 2 to 10
+             letters or digits, e.g. NGM. It can sign in as soon as it is added, with the 6-digit code you give it
+             here. To put it on the staff schedule, add it in the Schedule tab as well.</p>
+        </div>
+        <form class="set-add br-add" id="add-branch" autocomplete="off">
+          <input name="code" class="br-code-in" placeholder="Code — e.g. NGM" maxlength="10" required>
+          <input name="name" placeholder="Name — e.g. Nizwa Grand Mall" required>
+          <select name="role" aria-label="What it is">${kindOptions('retail')}</select>
+          <input name="pin" class="br-pin-in" inputmode="numeric" maxlength="6" placeholder="Sign-in code" required>
+          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add branch</button>
+        </form>
+        <div class="ba-msg" id="add-branch-msg"></div>
       </section>`,
   };
 
@@ -283,7 +356,7 @@ export function settingsView(me) {
         </div>
       </header>
       ${listHTML()}`;
-    if (pg?.sections.includes('access')) loadAccess();
+    if (pg?.sections.includes('branches')) loadBranches();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group
@@ -318,6 +391,7 @@ export function settingsView(me) {
     if (tabs) tabs.innerHTML = tabsHTML();
     const cut = root.querySelector('#set-cutters');
     if (cut) cut.innerHTML = cuttersHTML();
+    if (root.querySelector('#set-branches')) loadBranches();
     if (!page) { const ix = root.querySelector('.set-index'); if (ix) ix.outerHTML = listHTML(); }
     // The add-category form sits outside both mount points, so its group list
     // would otherwise go stale after a group is added, renamed or removed.
@@ -353,6 +427,9 @@ export function settingsView(me) {
         });
       } else if (f.id === 'add-group') {
         store.addBrandGroup(val('name'));
+      } else if (f.id === 'add-branch') {
+        addBranch(f);
+        return;
       } else if (f.id === 'add-cutter') {
         store.addCutter(val('name'));
       } else if (f.id === 'add-ins') {
@@ -369,6 +446,13 @@ export function settingsView(me) {
     root.addEventListener('change', e => {
       const d = e.target.dataset;
       if (d.tab) return store.setTabOff(d.tab, !e.target.checked, d.tabLabel);
+      if (d.brName != null) {
+        const v = e.target.value.trim();
+        if (!v) { e.target.value = LOCATIONS.find(l => l.code === d.brName)?.name ?? ''; return; }
+        return store.saveBranch(d.brName, { name: v });
+      }
+      if (d.brRole) return saveRole(e.target);
+      if (d.brOpen) return saveOpen(e.target);
       if (d.flag) return store.updateCategory(d.cat, { [d.flag]: e.target.checked });
       if (d.catUnit) return store.updateCategory(d.catUnit, { unit: e.target.value });
       if (d.catGroup) return store.updateCategory(d.catGroup, { brandGroup: e.target.value });
@@ -472,7 +556,8 @@ export function settingsView(me) {
     // Only settings changes affect this screen. Redrawing for every fitting
     // order or stock request the network produces would throw away whatever
     // the admin is part-way through typing, for nothing.
-    onChange(event) { if (event?.module === 'settings') refresh(); },
+    // A failed save redraws too, so a field puts back what is really stored.
+    onChange(event) { if (event?.module === 'settings' || event?.failed) refresh(); },
     unmount() {},
   };
 }

@@ -136,10 +136,19 @@ app_metadata.branch_code (server-set, unforgeable); every RLS policy keys off it
   GHIATH  Ghiath               scheduler a person, not a place: reads every
                                          module, changes ONLY the schedule
 
-!! The location list exists TWICE: LOCATIONS in js/data.js AND the branches
-   table. Adding/renaming a location means changing both, plus the auth user
-   (email, app_metadata.branch_code, auth.identities email) — see schema-04 for
-   how a rename was done in one transaction.
+!! Since 2026-10-12 (schema-19) the locations come from the BRANCHES TABLE:
+   app boot fetches them (anon may read branches, for the sign-in screen),
+   store.load/pull fetch them as collection 'branches' (realtime), and
+   data.js setLocations(rows) refills LOCATIONS / FITTERS / BRANCHES IN PLACE
+   (same arrays, same objects — the signed-in session object updates too).
+   The LOCATIONS literal in data.js is only a fallback if the server is
+   unreachable — do NOT add branches there. Add / rename / change kind /
+   close in Settings › Branches (RPCs add_branch, save_branch — see 4.6).
+   branches gained `active` (closed = hidden from sign-in + pickers, sign-in
+   blocked via auth.users.banned_until; history kept) and `position` (order).
+   FITTERS/BRANCHES exclude closed ones; LOCATIONS keeps them for names.
+   If a signed-in branch is closed it is signed out; if its kind changes the
+   shell rebuilds (app.js subscribe).
 !! LENS_OWNER = 'MGM' is hard-coded in data.js; the DB uses
    branches.holds_lens_stock. Keep them in step.
 
@@ -424,7 +433,7 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 4.6 SETTINGS (admin only)
 -------------------------
 Opens on a LIST (settings.js PAGES), grouped (user, 2026-10-11):
-  GENERAL  — Tabs (on/off), Branch access
+  GENERAL  — Branches (list + add; replaced "Branch access"), Tabs (on/off)
   BY TAB   — Fitting Log (Outside cutters), Stock Requests (Categories +
              Brand groups on one page), Direct Insurance (Insurers)
   One page per sidebar tab that HAS settings; Lens Stock, Insurance Claims
@@ -454,9 +463,19 @@ access is opened.
   (same brand may sit in several groups).
 - Direct Insurance — insurers: pills with ×, add form (app_settings.insurers).
 (app_settings is read with select '*', so a column the app doesn't know is ignored.)
-- Branch access: set any location's 6-digit code via RPC set_branch_code
-  (rejects weak codes like 123456, 000000, <3 distinct runs). Codes cannot
-  be read back by anyone. Shows last sign-in.
+- Branches (2026-10-12): one row per location from RPC branch_access()
+  (code, name, role, active, position, holds_lens_stock, has_account,
+  last_sign_in): name input (save on change), kind select retail / fitting /
+  clinic (confirm text says what changes, e.g. offered in Send to fitter;
+  locked for the lens-stock branch), last sign-in, new 6-digit code (RPC
+  set_branch_code; rejects weak codes via assert_good_pin), Open/Closed
+  switch (confirm). Office & Ghiath: kind fixed, always open.
+  "Add a branch": code (2-10, A-Z/0-9, starts with a letter; upper-cased),
+  name, kind, 6-digit code -> RPC add_branch creates the branches row
+  (position = last) AND the auth account <code>@finlandoptical.om shaped like
+  the others (identity row, confirmed, app_metadata branch_code/branch_role).
+  All three RPCs check is_admin() server-side. A new branch is NOT added to
+  the staff schedule automatically (scheduler has its own branch list).
 Settings = one JSON row (app_settings id=1), written whole, optimistic UI,
 rolled back from server on refusal.
 
@@ -542,6 +561,11 @@ Migrations are applied by hand, in order. Each file has a header with
                              APPLIED 2026-10-11 by Claude.
   schema-18-outside-cutters.sql  orders.outside_cutter text; app_settings.
                              outside_cutters jsonb default '[]'. APPLIED
+                             2026-10-12 by Claude.
+  schema-19-branches-editable.sql  branches.active + position; anon read of
+                             branches; realtime; assert_good_pin(); add_branch,
+                             save_branch, branch_access (new columns),
+                             set_branch_code (shared pin check). APPLIED
                              2026-10-12 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
@@ -852,8 +876,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
     for a deliberate decision.
   - orders.phone and orders.note are never written by the UI (drawer shows
     them only if set).
-  - Location list duplicated (data.js LOCATIONS vs branches table);
-    LENS_OWNER hard-coded vs branches.holds_lens_stock.
+  - LENS_OWNER = 'MGM' is still hard-coded vs branches.holds_lens_stock
+    (save_branch keeps the lens-stock branch an open fitting centre).
   - In db.js TABLE_COLLECTION, the comment "Confirming a request draws the
     shelf down…" sits above the claims line (misplaced; the real handling is
     the lens_request_events special case in watch()).
@@ -889,6 +913,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-12  Branches editable in Settings › Branches (schema-19, applied and
+             trial-run in a rolled-back transaction): add a branch with its
+             sign-in account, rename, change kind (retail/fitting/clinic),
+             close/reopen, set codes. The app reads locations from the DB.
  2026-10-12  Fitting Log: Send to fitter can go Outside, to a 3rd-party cutter
              (named in Settings › Fitting Log, else "Outside cutter"); the
              branch marks it "Received back". Own chip + admin filter. schema-18.

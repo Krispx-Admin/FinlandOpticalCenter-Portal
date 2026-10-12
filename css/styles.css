@@ -998,6 +998,36 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .lines td.short { color: var(--st-red); font-weight: 700; }
 .decline-note { background: #fdecec; border-color: #f7cdcd; color: var(--st-red); }
 
+/* ── Settings › Branches ── */
+.br-row {
+  display: grid; align-items: center; gap: 10px 12px; padding: 10px 12px; margin-bottom: 8px;
+  grid-template-columns: 74px minmax(160px, 1.3fr) 150px minmax(120px, 1fr) auto 104px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--page);
+}
+.br-row .loc-chip { justify-self: start; }
+.br-row .ba-msg { grid-column: 1 / -1; min-width: 0; }
+.br-row .ba-msg:empty { display: none; }
+.br-name, .br-role {
+  width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px;
+  font-size: 13px; font-weight: 600; color: var(--ink); background-color: var(--surface); outline: none;
+}
+.br-role { padding-right: 30px; }
+.br-name:focus, .br-role:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
+.br-role:disabled { opacity: .6; cursor: not-allowed; }
+.br-fixed { font-size: 12.5px; font-weight: 600; color: var(--ink-3); padding-left: 2px; }
+.br-open { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+span.br-open { cursor: default; }
+.br-row.is-closed { background: var(--surface); border-style: dashed; }
+.br-row.is-closed .loc-chip, .br-row.is-closed .br-name, .br-row.is-closed .br-role { opacity: .55; }
+.br-row.is-closed .br-open { color: var(--st-amber); }
+.br-code-in { flex: 0 1 150px !important; text-transform: uppercase; }
+.br-code-in:placeholder-shown { text-transform: none; }
+.br-pin-in { flex: 0 1 170px !important; letter-spacing: .1em; font-family: ui-monospace, Consolas, monospace; }
+@media (max-width: 1100px) {
+  .br-row { grid-template-columns: 74px 1fr 150px; }
+  .br-row .ba-seen { grid-column: 1 / 2; }
+}
+
 /* ── Branch access (warehouse only) ── */
 .ba-row {
   display: grid; grid-template-columns: minmax(200px, 1.4fr) 1fr auto minmax(96px, auto);

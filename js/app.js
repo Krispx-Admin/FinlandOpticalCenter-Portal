@@ -1,5 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations } from './data.js';
+import { fetchBranches } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
@@ -30,7 +31,7 @@ function renderLogin(preselect = null) {
     <div class="lp-group ${extra}">
       <h3>${title}</h3>
       <div class="lp-grid">
-        ${LOCATIONS.filter(l => [].concat(roles).includes(l.role)).map(l => `
+        ${LOCATIONS.filter(l => l.active !== false && [].concat(roles).includes(l.role)).map(l => `
           <button class="loc-card role-${l.role}" data-loc="${l.code}">
             <span class="loc-code">${l.code}</span>
             <span class="loc-name">${esc(l.name)}</span>
@@ -320,7 +321,17 @@ function renderShell() {
   });
   mountModule(mod);
 
+  const shellRole = me.role;
   unsub = store.subscribe(event => {
+    // The office closed this branch, or changed what it is: sign out, or
+    // rebuild the portal for its new kind.
+    const now = store.session;
+    if (now && now.active === false) {
+      auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
+      toast({ title: 'This branch has been closed', sub: 'Ask the office if that is a mistake.', tone: 'stock' });
+      return;
+    }
+    if (now && now.role !== shellRole) { renderShell(); return; }
     // A tab switched off while someone is on it moves them to one still open.
     const next = currentModule();
     if (next !== mountedKey) mountModule(next);
@@ -440,6 +451,9 @@ async function switchBranch(code, pin) {
       .catch(e => console.error('presenter mode failed to load', e));
   }
   renderLoading('Checking your session…');
+  // The locations come from the database; if it cannot be reached, the
+  // built-in list stands in until it can.
+  try { setLocations(await fetchBranches()); } catch { /* fallback list */ }
   store.session = await auth.currentBranch();
   if (store.session) {
     if (isPublicRoute()) location.hash = '#/schedule';
