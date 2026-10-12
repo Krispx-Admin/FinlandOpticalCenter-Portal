@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════════
 --  21 · Lens requests: no confirming — lenses are reserved, then SENT
---  STATUS: NOT YET APPLIED — written 2026-10-12, waiting for a fresh token
+--  STATUS: applied 2026-10-12 (by Claude)
 --
 --  The user (2026-10-12): drop "confirm"; the holder presses "Send lenses",
 --  and every movement of lenses and frames is tracked in the Fitting Log.
@@ -229,8 +229,8 @@ begin
   -- Confirmed "frame goes over" jobs whose frame has not left: the lenses are
   -- at the holder, so the next step is sending the frame.
   update public.orders o set status = 'lenses_in'
-    from public.lens_requests r
-   where r.order_id = o.id and r.fulfilment = 'send_frames' and r.status = 'confirmed' and o.status = 'pending';
+    from public.lens_requests lr
+   where lr.order_id = o.id and lr.fulfilment = 'send_frames' and lr.status = 'confirmed' and o.status = 'pending';
 end $$;
 
 commit;

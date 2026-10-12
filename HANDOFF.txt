@@ -638,7 +638,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              decline_lens_request (restocks), statuses
                              reserved/sent; holder may read the orders its
                              requests opened; open requests migrated.
-                             NOT YET APPLIED (token expired) — see change log.
+                             APPLIED 2026-10-12 by Claude (new token), then
+                             rehearsed in a rolled-back transaction. It moved
+                             5 send-frame orders to lenses_in and set aside
+                             LR-1026's lenses (SAL shelf 5 -> 3).
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -987,8 +990,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
              every branch picks Send the frame (default) or Receive the lenses;
              the holder presses "Send lenses" in its Fitting Log (it now sees
              those jobs) or Lens Stock, or declines before sending. No "MGM"
-             left in the lens screens. schema-21 WRITTEN, NOT APPLIED: the
-             Supabase token expired — apply it, then push this commit.
+             left in the lens screens. schema-21 applied (after the user made
+             a new Supabase token) and pushed.
  2026-10-12  Several branches can hold lens stock (schema-20); delete a branch
              (type its code; only one with no records); Settings › Employees
              (the schedule roster = salesperson list); outside cutters moved
