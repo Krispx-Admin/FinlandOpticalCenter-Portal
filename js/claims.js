@@ -430,14 +430,14 @@ export function claimsView(me, kind = 'claim') {
   // the right, where printing lives.
   function directRowsHTML(list) {
     return `
-      <div class="dl-head"><span>Number</span><span>Customer name</span><span>Member ID</span><span>Insurer</span><span>Bill</span><span>Salesperson</span><span class="num">Amount</span><span></span></div>
+      <div class="dl-head"><span>Number</span><span>Bill</span><span>Customer name</span><span>Member ID</span><span>Insurer</span><span>Salesperson</span><span class="num">Amount</span><span></span></div>
       ${list.map(c => `
       <div class="row dl-row" data-open="${c.id}">
         <div class="dl-ref"><b>${esc(c.ref)}</b><span>${esc(fmtDay(c.date))}${isAdmin ? ` · ${esc(c.branch)}` : ''}</span></div>
+        <div class="dl-mono">${esc(c.billNo || '—')}</div>
         <div class="dl-strong">${esc(c.customer || '—')}</div>
         <div class="dl-mono">${esc(c.memberId || '—')}</div>
         <div>${c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : '<span class="muted">—</span>'}</div>
-        <div class="dl-mono">${esc(c.billNo || '—')}</div>
         <div class="dl-txt">${esc(c.employeeName || '—')}</div>
         <div class="num"><b>${money(claimTotal(c))}</b> <span class="muted">${CURRENCY}</span></div>
         <div class="row-act" data-stop><button class="icon-btn open-arrow" data-detail="${c.id}" title="Open">${icons.chevronRight}</button></div>
@@ -492,10 +492,10 @@ export function claimsView(me, kind = 'claim') {
       <div class="dw-body">
         <div class="dw-status-row">${c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : ''}<span class="dw-when">${esc(fmtDay(c.date))}</span></div>
         <div class="kv">
-          ${kv('Customer name', esc(c.customer || '—'), true)}
-          ${kv('Member ID', esc(c.memberId || '—'))}
-          ${kv('Insurer', esc(c.insurer || '—'))}
           ${kv('Bill number', esc(c.billNo || '—'))}
+          ${kv('Member ID', esc(c.memberId || '—'))}
+          ${kv('Customer name', esc(c.customer || '—'), true)}
+          ${kv('Insurer', esc(c.insurer || '—'))}
           ${kv('Salesperson', esc(c.employeeName || '—'))}
           ${kv('Branch', `${locChip(c.branch)} ${esc(locName(c.branch))}`)}
           ${kv('Date', esc(fmtDay(c.date)))}
@@ -664,8 +664,8 @@ export function claimsView(me, kind = 'claim') {
         </div>
         ${directHTML()}
         <div class="grid2">
-          <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
           <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
+          <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
         </div>
         <label>Full name<input id="f-cust" placeholder="Full name" value="${esc(draft.customer)}">
           <span class="field-note">Must be exactly the name on the insurance card.

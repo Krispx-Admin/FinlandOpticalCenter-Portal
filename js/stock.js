@@ -76,7 +76,7 @@ export function stockView(me) {
       const changed = ui.prevStatus.get(r.id) !== r.status;
       const quick = isAdmin && r.status === 'placed'
         ? `<button class="btn btn-ghost btn-sm" data-print="${r.id}">${icons.printer} Print</button>
-           <button class="btn btn-ghost btn-sm" data-complete="${r.id}">${icons.check} Complete</button>` : '';
+           <button class="btn btn-primary btn-sm" data-complete="${r.id}">${icons.check} Complete</button>` : '';
       return `
       <div class="row ${isNew ? 'row-enter' : ''}" data-open="${r.id}">
         <div class="row-main">

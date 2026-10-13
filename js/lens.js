@@ -431,8 +431,8 @@ export function lensView(me) {
             <tbody>${rows}</tbody>
           </table>
           <div class="grid2">
-            <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
             <label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>
+            <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
           </div>
           <div class="fulfil">
             ${Object.entries(FULFILMENT).map(([k, f]) => `
@@ -552,11 +552,14 @@ export function lensView(me) {
     return `<nav class="shelf-tabs" aria-label="Lens shelves">${shelves().map(shelfTab).join('')}<span class="tab-gap"></span>${reqTabs().map(reqTab).join('')}</nav>`;
   }
 
-  // The panel's top-left corner squares off when the first tab is open, so
-  // the tab and the panel read as one piece.
+  // The panel's top corner squares off under an open tab that sits at its
+  // edge — the first (left) or the last request tab (right) — so the tab and
+  // the panel read as one piece.
   const panelClass = () => {
     const first = shelves()[0]?.code;
-    return (ui.tab === 'shelf' && ui.holder === first) || (!first && ui.tab === reqTabs()[0]?.[0]) ? 'first-on' : '';
+    const last = reqTabs().at(-1)?.[0];
+    if ((ui.tab === 'shelf' && ui.holder === first) || (!first && ui.tab === reqTabs()[0]?.[0])) return 'first-on';
+    return ui.tab !== 'shelf' && ui.tab === last ? 'last-on' : '';
   };
 
   function render() {

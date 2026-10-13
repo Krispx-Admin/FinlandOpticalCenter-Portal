@@ -186,12 +186,12 @@ branch, not globally — index orders_ref_per_branch). Never auto-suggest it
 LONG ROAD (FIT_FLOW):
   pending -> lenses_in -> to_fitter -> at_fitter -> ready -> returning -> delivered -> collected
   status     label                 pill color  action button      who acts
-  pending    Waiting for Lenses    slate       Lenses delivered   origin
+  pending    Waiting for Lenses    slate       Lens received      origin
   lenses_in  Lenses Delivered      cyan        Send to fitter     origin
-  to_fitter  In transit to X       blue        Confirm arrival    fitter
+  to_fitter  In transit to X       blue        Frame received     fitter
   at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
   ready      Ready                 green       Send to branch     fitter
-  returning  Returning to X        teal        Confirm delivery   origin
+  returning  Returning to X        teal        Frame received     origin
   delivered  Ready for collection  green       Handed to customer origin
   collected  Collected             done(grey)  —                  —
   ('collected' added 2026-10-13, schema-31: when the glasses are back, the
@@ -994,6 +994,20 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 8.5 Components (reuse before inventing)
   Buttons .btn + .btn-primary (navy, shadow) | .btn-ghost (white, strong
   border) | .btn-danger | .btn-danger-text | .btn-sm ; .icon-btn 32px square.
+  WHICH ONE (user, 2026-10-13 — keep it the same everywhere):
+    navy .btn-primary = the step that is yours to do — in a row or a drawer
+      alike (Lens received, Frame received, Send to fitter, Send lenses,
+      Order lens, Confirm order, Complete), a page's own "New …" button, a
+      form's submit. On the dark bulk bar the main step is the white one.
+    white .btn-ghost = everything secondary: Undo, Decline, Change, Print,
+      Copy for WhatsApp, Clear, Cancel.
+    Words: whatever arrives is "Lens received" / "Frame received". Icons:
+      the send-plane on anything sent away, → on other steps, ✓ on a
+      confirm/complete.
+  BILL NUMBER FIRST: wherever a bill number and a customer name sit
+    together — form fields, drawer details, list columns — the bill number
+    comes first (Fitting Log, Lens Stock request form, Direct Insurance /
+    Reimbursement Invoice form, drawer and list, the printed invoice).
   Icons inline SVG in ui.js `icons` (Lucide paths, stroke 2, currentColor,
   18px default, 15px in buttons). Add new icons there, Lucide-style.
   Radii: cards 12, modal 16, buttons/inputs 9, small 8, chips/pills 999.
@@ -1125,6 +1139,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Consistency pass: buttons for an arrival read "Lens received" /
+             "Frame received" (were Lenses delivered / Lenses received /
+             Confirm arrival / Confirm delivery / Received back); every "your
+             step" button is navy, rows and drawers alike (8.5). Bill number
+             before the customer everywhere (lens request form, insurance
+             form, drawer, list — Bill is now the 2nd column). Outside Lens
+             Orders: Select all, "Confirm order" (was Ordered / Mark ordered,
+             no popup), selection kept through Copy. Lens Stock: the panel's
+             top-right corner squares off under the last tab; the open tab
+             lost its shadow (the scrolling tab row clipped it square).
  2026-10-13  Status chip bars wrap to a second line instead of scrolling. The
              outside-lens journey: lines named "Frame" / "Lens", the lens line
              full width in navy (no purple), and it stays after the lenses

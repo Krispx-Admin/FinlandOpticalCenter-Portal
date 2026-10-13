@@ -156,7 +156,7 @@ svg { width: 18px; height: 18px; flex: none; }
 /* ── Direct Insurance list: a table of rows, each opening its details ── */
 .dl-head, #c-list .row.dl-row {
   display: grid; align-items: center; gap: 14px;
-  grid-template-columns: 112px minmax(140px, 1.4fr) minmax(100px, 1fr) 92px minmax(70px, .7fr) minmax(100px, 1fr) 120px 34px;
+  grid-template-columns: 112px minmax(70px, .7fr) minmax(140px, 1.4fr) minmax(100px, 1fr) 92px minmax(100px, 1fr) 120px 34px;
 }
 .dl-head {
   padding: 0 16px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -171,13 +171,14 @@ svg { width: 18px; height: 18px; flex: none; }
 .dl-mono { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink-2);
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 1180px) {
-  .dl-head, #c-list .row.dl-row { grid-template-columns: 104px minmax(130px, 1.4fr) 88px minmax(90px, 1fr) 112px 34px; }
-  .dl-head > :nth-child(3), .dl-head > :nth-child(5), .dl-row > :nth-child(3), .dl-row > :nth-child(5) { display: none; }
+  /* narrower: Member ID and Salesperson go; the bill stays */
+  .dl-head, #c-list .row.dl-row { grid-template-columns: 104px minmax(70px, .8fr) minmax(130px, 1.4fr) 88px 112px 34px; }
+  .dl-head > :nth-child(4), .dl-head > :nth-child(6), .dl-row > :nth-child(4), .dl-row > :nth-child(6) { display: none; }
 }
 @media (max-width: 900px) {
   .dl-head { display: none; }
   #c-list .row.dl-row { grid-template-columns: 1fr auto 34px; }
-  .dl-row > :nth-child(2), .dl-row > :nth-child(4), .dl-row > :nth-child(6) { display: none; }
+  .dl-row > :nth-child(2), .dl-row > :nth-child(3), .dl-row > :nth-child(5) { display: none; }
 }
 .lines tfoot td { font-weight: 700; border-bottom: none; padding-top: 12px; }
 .rx-mini-tbl th, .rx-mini-tbl td { text-align: center; font-size: 11.5px; padding: 6px 4px; }
@@ -1042,9 +1043,11 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .shelf-tab:hover { background: #e1e6ee; color: var(--ink); }
 /* the open tab: taller and white, the same thin border as the panel, and no
    line along its bottom — it opens straight into the panel */
+/* no shadow: the tab row scrolls sideways, which would clip it into a
+   square halo around the open tab's rounded top */
 .shelf-tab.on {
   min-width: 220px; padding: 15px 20px 16px; background: var(--surface); color: var(--ink);
-  border-bottom-color: var(--surface); box-shadow: 0 -4px 14px rgba(19,48,86,.06);
+  border-bottom-color: var(--surface);
 }
 .shelf-tab.on b { font-size: 15.5px; font-weight: 700; color: var(--brand-ink); }
 .shelf-tab.on span { color: var(--brand); font-weight: 600; }
@@ -1064,6 +1067,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   padding: 18px; box-shadow: var(--shadow); position: relative; min-height: 320px;
 }
 .shelf-panel.first-on { border-top-left-radius: 0; }
+.shelf-panel.last-on { border-top-right-radius: 0; }
 .shelf-panel .empty { padding: 50px 0; }
 /* the shelf's toolbar: search, the filter button, and (own shelf) its tools */
 .shelf-toolbar .toolbar-gap { flex: 1; }

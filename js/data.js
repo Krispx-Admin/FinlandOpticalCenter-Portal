@@ -160,7 +160,7 @@ export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered', 'coll
 export const isOutside = o => !!o.outside;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
-  to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Received back', actor: 'origin', done: 'Received back from the outside cutter' },
+  to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame received', actor: 'origin', done: 'Received back from the outside cutter' },
   delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',         color: 'done',   action: null,            actor: null,     done: null },
 };
@@ -174,12 +174,12 @@ export const flowFor = o => (isOutside(o) ? OUT_FLOW : onShortRoad(o) ? SELF_FLO
 // then the road, then the bench. On the road the order names the centre it is heading for (see
 // fitStep); the chip keeps the generic word.
 export const FIT_STATUS = {
-  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lenses delivered', actor: 'origin', done: 'Lenses delivered at the branch' },
+  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lens received', actor: 'origin', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
-  to_fitter: { label: 'In transit',           color: 'blue',   action: 'Confirm arrival', actor: 'fitter', done: 'Frame received at fitting centre' },
+  to_fitter: { label: 'In transit',           color: 'blue',   action: 'Frame received', actor: 'fitter', done: 'Frame received at fitting centre' },
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
-  returning: { label: 'Returning',            color: 'teal',   action: 'Confirm delivery',actor: 'origin', done: 'Delivered back at origin branch' },
+  returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'origin', done: 'Delivered back at origin branch' },
   delivered: { label: 'Ready for collection', color: 'green',  action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',            color: 'done',   action: null,              actor: null,     done: null },
 };
@@ -189,7 +189,7 @@ export const FIT_STATUS = {
 const SELF_STATUS = {
   // Pending with the fitter already set is a job the lens request opened: the
   // bench is waiting on the lenses, not on anyone choosing where to send it.
-  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lenses delivered', actor: 'fitter', done: 'Lenses delivered at the branch' },
+  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens received', actor: 'fitter', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
   at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
   delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'fitter', done: 'Handed to the customer — collected' },
@@ -281,7 +281,7 @@ export function fulfilmentSwitch(r, o, code) {
 // moment it orders (user, 2026-10-12). Until the holder sends them the job is
 // the holder's: its Fitting Log shows "Send lenses" (canSendLenses) and the
 // branch's row says who it is waiting on; once sent, the branch gets
-// "Lenses delivered". The long form (drawer, hover) says which of the two.
+// "Lens received". The long form (drawer, hover) says which of the two.
 const LENS_WAIT = { label: 'Waiting for Lenses', color: 'slate', action: 'Send lenses', actor: 'lens' };
 export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
 export const canSendLenses = (o, code) =>

@@ -2,7 +2,7 @@
 // A branch logs a fitting order with "Outside lenses" on: the prescription and
 // the lens type, typed out. Here MGM copies them as WhatsApp text — one, a
 // selection, or everything shown (e.g. one branch's day) — sends them to the
-// supplier, and marks them Ordered so they move out of the way. The frame's
+// supplier, and confirms them ordered so they move out of the way. The frame's
 // own journey stays in the Fitting Log.
 import { outsideHandler, outsideCopyText, outsideRxLine, locName, readOnly, BRANCHES } from './data.js';
 import { store } from './store.js';
@@ -100,7 +100,7 @@ export function outsideView(me) {
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
-            ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Ordered</button>`
+            ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Confirm order</button>`
             : !x.sentAt && x.branch !== outsideHandler()
               ? `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
                  <button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses to ${esc(x.dest ?? x.branch)}</button>`
@@ -120,12 +120,25 @@ export function outsideView(me) {
     return `
       <div class="bulkbar ol-bulk">
         <span><b>${what}</b></span>
-        <button class="btn btn-primary btn-sm" data-copy-set>${icons.copy} Copy for WhatsApp</button>
+        <button class="btn btn-ghost btn-sm" data-copy-set>${icons.copy} Copy for WhatsApp</button>
         ${canMark && !viewOnly ? (ui.tab === 'to_order'
-          ? `<button class="btn btn-ghost btn-sm" data-mark-set="ordered">${icons.check} Mark ordered</button>`
+          ? `<button class="btn btn-primary btn-sm" data-mark-set="ordered">${icons.check} Confirm ${set.length > 1 ? `${set.length} orders` : 'order'}</button>`
           : `<button class="btn btn-ghost btn-sm" data-mark-set="to_order">Put back to To order</button>`) : ''}
         ${picked.length ? '<button class="btn btn-ghost btn-sm" data-clear>Clear selection</button>' : ''}
       </div>`;
+  }
+
+  // Select every order shown — copy them, then confirm them, still selected.
+  function selectAllHTML() {
+    if (viewOnly) return '';
+    const list = visible();
+    if (!list.length) return '';
+    const every = list.every(x => ui.selected.has(x.id));
+    return `
+      <label class="sel-all">
+        <span class="cbx"><input type="checkbox" data-sel-all ${every ? 'checked' : ''}><i></i></span>
+        <span>${every ? 'Clear selection' : `Select all ${list.length}`}</span>
+      </label>`;
   }
 
   const setOf = () => { const shown = visible(); const picked = shown.filter(x => ui.selected.has(x.id)); return picked.length ? picked : shown; };
@@ -140,7 +153,7 @@ export function outsideView(me) {
       <header class="mod-head">
         <div>
           <h1>Outside Lens Orders</h1>
-          <p class="mod-sub">Lenses from outside brands the branches need — copy them for the supplier, then mark them ordered</p>
+          <p class="mod-sub">Lenses from outside brands the branches need — copy them for the supplier, then confirm the order</p>
         </div>
         ${me.role === 'admin' ? `<label class="set-ctl ol-handler"><span>Ordered by</span>
           <select id="ol-handler">${BRANCHES.map(b => `<option value="${b.code}" ${b.code === outsideHandler() ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
@@ -152,6 +165,7 @@ export function outsideView(me) {
       </section>
       <section class="chips status-chips" id="ol-chips">${chipsHTML()}</section>
       <div id="ol-bulk">${bulkHTML()}</div>
+      <div id="ol-selall">${selectAllHTML()}</div>
       <section class="list" id="ol-list">${rowsHTML()}</section>`;
     root.querySelector('#ol-q').addEventListener('input', e => { ui.q = e.target.value; refresh(); });
     root.querySelector('#ol-branch').addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refresh(); });
@@ -168,6 +182,7 @@ export function outsideView(me) {
     s.innerHTML = statsHTML();
     root.querySelector('#ol-chips').innerHTML = chipsHTML();
     root.querySelector('#ol-bulk').innerHTML = bulkHTML();
+    root.querySelector('#ol-selall').innerHTML = selectAllHTML();
     root.querySelector('#ol-list').innerHTML = rowsHTML();
     const b = root.querySelector('#ol-branch');
     if (b && document.activeElement !== b) b.innerHTML = `<option value="all">All branches</option>${branchOptions()}`;
@@ -185,10 +200,11 @@ export function outsideView(me) {
       const m = e.target.closest('[data-mark]');
       if (m) { const x = all().find(y => y.id === m.dataset.mark); return x && mark([x], m.dataset.to); }
       const ms = e.target.closest('[data-mark-set]');
-      if (ms) {
-        const set = setOf();
-        if (ms.dataset.markSet === 'ordered' && set.length > 1 && !confirm(`Mark ${set.length} orders as ordered?`)) return;
-        return mark(set, ms.dataset.markSet);
+      if (ms) return mark(setOf(), ms.dataset.markSet);
+      const sa = e.target.closest('[data-sel-all]');
+      if (sa) {
+        for (const x of visible()) { if (sa.checked) ui.selected.add(x.id); else ui.selected.delete(x.id); }
+        return refresh();
       }
       if (e.target.closest('[data-clear]')) { ui.selected.clear(); return refresh(); }
       const sel = e.target.closest('[data-sel]');
