@@ -191,7 +191,7 @@ const SELECTS = {
   branches:     ['branches', 'code, name, role, active, position, holds_lens_stock', { column: 'position', asc: true }, r => r],
   outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
     id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
-    status: r.status, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
+    status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
     createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   })],
 };

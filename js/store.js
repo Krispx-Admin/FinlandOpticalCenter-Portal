@@ -619,13 +619,31 @@ export const store = {
   },
 
   // ── Outside lens orders (TRIAL) ──
-  createOutsideOrder({ ref, customer, rx, lensType }, by) {
+  createOutsideOrder({ ref, customer, rx, lensType, fulfilment }, by) {
     return run(['orders', 'outsideOrders'], async () => ok(await supabase.rpc('create_outside_lens_order', {
-      p_bill: ref, p_customer: customer, p_rx: rx, p_lens_type: lensType,
+      p_bill: ref, p_customer: customer, p_rx: rx, p_lens_type: lensType, p_fulfilment: fulfilment ?? 'send_frames',
     })), row => ({
       by, module: 'fitting', title: `${by} logged ${row.ref} with outside lenses`,
       sub: lensType, refs: [row.id],
     })).then(row => (row ? this.order(row.id) : null));
+  },
+
+  // MGM sends lenses a branch is receiving (only once ordered; the database checks).
+  sendOutsideLenses(id, by) {
+    const x = (state.outsideOrders ?? []).find(y => y.id === id);
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('send_outside_lenses', { p_id: id })), {
+      by, module: 'fitting', title: `${by} sent the outside lenses${x ? ` to ${x.branch}` : ''}`,
+      refs: x ? [x.orderId] : [],
+    });
+  },
+
+  changeOutsideFulfilment(id, fulfilment, by) {
+    const x = (state.outsideOrders ?? []).find(y => y.id === id);
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('change_outside_fulfilment', { p_id: id, p_fulfilment: fulfilment })), {
+      by, module: 'fitting',
+      title: fulfilment === 'send_frames' ? `${by}: the frame goes to MGM for the outside lenses` : `${by}: MGM sends the outside lenses`,
+      refs: x ? [x.orderId] : [],
+    });
   },
 
   setOutsideStatus(ids, status, by) {

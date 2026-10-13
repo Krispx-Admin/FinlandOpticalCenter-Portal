@@ -3,7 +3,8 @@ import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
   locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
   fulfilmentSwitch,
-  isOutside, OUTSIDE_DEFAULT, OUTSIDE_LENS_HANDLER, OUTSIDE_STATUS,
+  isOutside, OUTSIDE_DEFAULT, OUTSIDE_LENS_HANDLER, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
+  outsideTag, canSendOutside, outsideBlocked, outsideSwitch, canCutOwnLenses, awaitingOutside,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
@@ -23,7 +24,7 @@ for (const s of FIT_FLOW.filter(s => s !== 'delivered')) {
 }
 // Frames at an outside cutter have their own chip, not "In transit".
 for (const d of CHIP_DEFS) if (d.statuses?.includes('to_fitter')) d.test = o => d.statuses.includes(o.status) && !(o.status === 'to_fitter' && isOutside(o));
-CHIP_DEFS.push({ key: 'outside', label: 'Outside', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
+CHIP_DEFS.push({ key: 'outside', label: 'Outside cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
 CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] });
 const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 
@@ -32,7 +33,11 @@ const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 // journey it hangs below the middle pin rather than taking room, so the
 // journey stays centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
-const outsideTag = (cls = '') => `<span class="stock-tag outside-tag ${cls}">Outside Lens</span>`;
+// Under an order's status: how its outside lens order stands.
+const olTagHTML = (o, cls = '') => {
+  const t = outsideTag(o.outsideLens);
+  return t ? `<span class="ol-tag ol-${t.tone} ${cls}">${esc(t.text)}</span>` : '';
+};
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
 
@@ -153,6 +158,8 @@ export function fittingView(me) {
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
       if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
+      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses</button>`;
+      else if ((outsideBlocked(o) || (awaitingOutside(o) && o.outsideLens.status !== 'ordered')) && fitActor(o) === me.code) action = `<span class="row-actor">order the lenses first</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
@@ -166,10 +173,10 @@ export function fittingView(me) {
             <b>${esc(o.ref)}</b>
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens ? outsideTag('stock-tag-sub') : ''}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : olTagHTML(o, 'ol-tag-sub')}</div>
         </div>
-        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens ? outsideTag() : '')}</div>
-        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
+        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}${olTagHTML(o)}</div>
         <div class="row-act" data-stop>
           ${action}
           <button class="icon-btn open-arrow" data-open="${o.id}" title="Open order">${icons.chevronRight}</button>
@@ -245,9 +252,10 @@ export function fittingView(me) {
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
-        ${outsideLensHTML(o.outsideLens)}
+        ${outsideLensHTML(o)}
         <div class="dw-actions">
           ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
+            canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
         </div>
@@ -264,14 +272,19 @@ export function fittingView(me) {
   }
 
   // Outside lenses: the prescription and lens type MGM orders from the supplier.
-  function outsideLensHTML(x) {
+  function outsideLensHTML(o) {
+    const x = o.outsideLens;
     if (!x) return '';
     const eye = e => ['sph', 'cyl', 'axis', 'add'].map(k => `<td class="pwr">${esc(String(e?.[k] ?? '').trim() || '—')}</td>`).join('');
+    const to = viewOnly ? null : outsideSwitch(o, me.code);
+    const tag = outsideTag(x);
     return `
       <h3 class="tl-h">${icons.truck} Outside lenses</h3>
       <div class="dw-status-row">
-        ${pill(OUTSIDE_STATUS, x.status)}
-        <span class="dw-when">${x.status === 'ordered' ? `ordered ${relTime(x.orderedAt)}` : `${esc(OUTSIDE_LENS_HANDLER)} orders them from the supplier`}</span>
+        <span class="ol-tag ol-${tag.tone}">${esc(tag.text)}</span>
+        <span class="fulfil-chip ${x.fulfilment}">${esc(OUTSIDE_FULFILMENT[x.fulfilment]?.chip ?? '')}</span>
+        ${x.status === 'ordered' ? `<span class="dw-when">ordered ${relTime(x.orderedAt)}</span>` : ''}
+        ${to ? `<button class="btn btn-ghost btn-sm dw-switch" data-ol-switch="${x.id}" data-to="${to}">${icons.history} ${to === 'send_frames' ? 'Change: send the frame instead' : 'Change: receive the lenses instead'}</button>` : ''}
       </div>
       <div class="kv"><div class="kv-wide"><span>Lens type</span><b>${esc(x.lensType)}</b></div></div>
       <table class="lines">
@@ -314,6 +327,10 @@ export function fittingView(me) {
       if (e.target.closest('[data-close]')) return drawer.close();
       const sl = e.target.closest('[data-send-lenses]');
       if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
+      const so = e.target.closest('[data-send-outside]');
+      if (so) return store.sendOutsideLenses(so.dataset.sendOutside, me.code);
+      const ow = e.target.closest('[data-ol-switch]');
+      if (ow) return switchOutside(ow.dataset.olSwitch, ow.dataset.to);
       const sw = e.target.closest('[data-switch]');
       if (sw) return switchFulfilment(sw.dataset.switch, sw.dataset.to);
       const sf = e.target.closest('[data-send-fitter]');
@@ -332,6 +349,13 @@ export function fittingView(me) {
       ? `Change ${r.ref} to “Send the frame”?\n\nThe lenses stay set aside at ${locName(r.holder)} and the frame goes there to be cut.`
       : `Change ${r.ref} to “Receive the lenses”?\n\n${locName(r.holder)} will send the lenses to ${locName(r.branch)}.`;
     if (confirm(ask)) store.changeFulfilment(id, to, me.code);
+  }
+
+  function switchOutside(id, to) {
+    const ask = to === 'send_frames'
+      ? `Change to “Send the frame”?\n\nThe frame goes to ${locName(OUTSIDE_LENS_HANDLER)}, which cuts the lenses once ordered.`
+      : `Change to “Receive the lenses”?\n\n${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here once ordered.`;
+    if (confirm(ask)) store.changeOutsideFulfilment(id, to, me.code);
   }
 
   // ── fitter picker (assign + send, one order or a bulk selection) ──
@@ -451,6 +475,18 @@ export function fittingView(me) {
               `<td><input name="${eye}_${k}" inputmode="decimal" autocomplete="off" placeholder="${k === 'axis' ? '0–180' : '0.00'}"></td>`).join('')}</tr>`).join('')}</tbody>
           </table>
           <label>Lens type <input name="lensType" placeholder="e.g. 1.5 progressive blue UV" autocomplete="off"></label>
+          ${me.code === OUTSIDE_LENS_HANDLER ? '' : `
+          <div class="fulfil">
+            ${Object.entries(OUTSIDE_FULFILMENT).map(([k, f], i) => `
+              <label class="fulfil-opt ${i === 0 ? 'on' : ''}">
+                <input type="radio" name="olHow" value="${k}" ${i === 0 ? 'checked' : ''}>
+                <b>${esc(f.label)}</b>
+                <span>${esc(k === 'send_frames'
+                  ? `The frame goes to ${locName(OUTSIDE_LENS_HANDLER)}, which cuts the lenses.`
+                  : canCutOwnLenses(me.role) ? `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here and you cut them.`
+                  : `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here; then you send the frame and lenses to a fitter.`)}</span>
+              </label>`).join('')}
+          </div>`}
         </div>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
@@ -462,6 +498,10 @@ export function fittingView(me) {
     // The outside-lens fields open under the switch.
     const outsideBox = layer.el.querySelector('#nf-outside');
     outsideBox.addEventListener('change', () => { layer.el.querySelector('#nf-ol').hidden = !outsideBox.checked; });
+    layer.el.addEventListener('change', e => {
+      if (e.target.name !== 'olHow') return;
+      layer.el.querySelectorAll('.fulfil-opt').forEach(l => l.classList.toggle('on', l.contains(e.target)));
+    });
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -486,7 +526,7 @@ export function fittingView(me) {
         const lensType = val('lensType');
         if (!rx.r.sph && !rx.l.sph) { toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         if (!lensType) { toast({ title: 'Type the lens type', sub: 'e.g. 1.5 progressive blue UV', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
-        o = await store.createOutsideOrder({ ref, customer, rx, lensType }, me.code);
+        o = await store.createOutsideOrder({ ref, customer, rx, lensType, fulfilment: val('olHow') || 'send_frames' }, me.code);
       } else {
         o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
       }
@@ -618,6 +658,8 @@ export function fittingView(me) {
       if (openBtn) { e.stopPropagation(); openDrawer(openBtn.dataset.open); return; }
       const sl = e.target.closest('[data-send-lenses]');
       if (sl) { e.stopPropagation(); store.sendLenses(sl.dataset.sendLenses, me.code); return; }
+      const so = e.target.closest('[data-send-outside]');
+      if (so) { e.stopPropagation(); store.sendOutsideLenses(so.dataset.sendOutside, me.code); return; }
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');

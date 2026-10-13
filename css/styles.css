@@ -543,6 +543,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   }
   /* `translate`, not `transform`, so the status-change flash still plays */
   #f-list .row-status .pill { position: relative; left: var(--mid); translate: -50% 0; }
+  #f-list .row-status .ol-tag { position: relative; left: var(--mid); translate: -50% 0; }
 }
 .row-status .pill { max-width: 100%; }
 .pill-t { overflow: hidden; text-overflow: ellipsis; }
@@ -643,7 +644,16 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 }
 /* the copy in the subtitle only shows once the journey column is hidden */
 .stock-tag-sub { display: none; }
-.outside-tag { color: var(--st-purple); }
+/* outside lenses: a small tag under the status */
+.ol-tag { display: inline-block; width: fit-content; font-size: 9.5px; font-weight: 700; letter-spacing: .01em;
+  padding: 1px 7px; border-radius: 999px; margin-top: 3px; white-space: nowrap; border: 1px solid transparent; }
+.row-status .ol-tag { display: block; }
+.ol-to-order { color: #b45309; background: #fdf1e3; border-color: #f5dcbb; }
+.ol-ordered { color: #0e7490; background: #e0f3f8; border-color: #b8e2ee; }
+.ol-sent { color: var(--st-green); background: #e4f6ef; border-color: #bfe8d8; }
+.dw-status-row .ol-tag { font-size: 11px; padding: 3px 9px; margin-top: 0; }
+.ol-tag-sub { display: none; }
+.ol-type .fulfil-chip { width: fit-content; margin: 2px 0; }
 .journey-big .j-pin { font-size: 12px; padding: 4px 11px; }
 .journey-big .j-seg { height: 3px; }
 
@@ -1325,6 +1335,7 @@ table.rx-edit input:focus { background: var(--brand-soft); box-shadow: inset 0 0
   .row { grid-template-columns: 30px minmax(200px,1.6fr) 185px 170px; }
   .row-journey { display: none; }
   .stock-tag-sub { display: inline; position: static; translate: none; font-size: 10px; }
+  .ol-tag-sub { display: inline-block; margin: 0 0 0 6px; }
   #s-list .row, #l-list .row, #c-list .row { grid-template-columns: minmax(200px,1.6fr) minmax(110px,.7fr) 160px 70px 170px; }
 }
 @media (max-width: 900px) {

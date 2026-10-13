@@ -487,29 +487,48 @@ bars align. Built per the dataviz skill (one series per card → no legend).
 
 4.9 OUTSIDE LENS ORDERS (TRIAL, added 2026-10-13 — the user may drop it)
 -------------------------------------------------------------------------
-New fitting order: an "Outside lenses · other brands" switch under the bill
-number opens a prescription grid (R/L × SPH, CYL, AXIS, ADD) and a typed lens
-type. RPC create_outside_lens_order makes the fitting order (fitter = MGM,
-status lenses_in — the frame may go before or after the lenses arrive, user:
-"simultaneous") and an outside_lens_orders row (status to_order). Fitting
-Log: purple "Outside Lens" tag; label "Outside lenses · to order/ordered"
-(+ Send to fitter for the branch); MGM reads "Waiting for frame from X";
-drawer section shows the Rx, lens type and order status.
-Tab "Outside Lens Orders" (js/outside.js) — MGM (= OUTSIDE_LENS_HANDLER,
-data.js; outside_lens_handler() in SQL, fixed for the trial) and the office;
-Ghiath view-only; other branches don't see it. Stats, search, branch filter,
-chip bar To order (orange count for MGM) / Ordered, rows with Rx + lens
-type, per-row Copy (icon) and Ordered (or Undo), and a bulk bar acting on the
-SELECTED rows, or on everything shown when none are selected (e.g. one
-branch's day): "Copy for WhatsApp" + "Mark ordered". Copy text is exactly
-the user's format, orders separated by a blank line:
+New fitting order: "Outside lenses · other brands" switch under the bill
+number opens (only then) a prescription grid (R/L × SPH, CYL, AXIS, ADD), a
+typed lens type, and the branch's choice — SEND THE FRAME (default) or
+RECEIVE THE LENSES (MGM's own orders are always cut at MGM, no choice).
+RPC create_outside_lens_order(bill, customer, rx, lens_type, fulfilment).
+outside_lens_orders: status to_order|ordered, fulfilment, sent_at.
+
+THE FLOW (schema-25, user 2026-10-13: "think about what can and can't happen"):
+  status pill reads "Waiting for Lenses"; the outside state is a separate TAG
+  under it (.ol-tag): "Outside lenses · to order" (amber) / "· ordered"
+  (blue) / "· sent" (green) — data.js outsideTag().
+  SEND THE FRAME: order fitter = MGM, status lenses_in. The branch can Send to
+    fitter any time; MGM can Confirm arrival any time; MGM reads "Waiting for
+    frame from X". CUTTING (at_fitter -> ready; MGM's own: lenses_in ->
+    at_fitter -> delivered) is BLOCKED until Ordered ("order the lenses
+    first"; outsideBlocked()).
+  RECEIVE: order pending; fitter = branch if a fitting centre (cuts it), else
+    none (picks a fitter after delivery). MGM gets "Send lenses" in its Fitting
+    Log and the Outside tab ONLY once Ordered (canSendOutside; RPC
+    send_outside_lenses). The branch cannot mark delivered before sent
+    (awaitingOutside()). Then normal: Lenses delivered -> cut / Send to fitter.
+  CHANGE HOW: the branch (or office) switches while nothing moved — button in
+    the drawer's Outside lenses section (outsideSwitch(); RPC
+    change_outside_fulfilment).
+  UNDO "Ordered" is refused once lenses were sent or cutting began.
+  ENFORCED in the DB: trigger orders_outside_lens_gate (cutting before
+  ordered; delivered before sent). MGM may READ every order with outside
+  lenses (schema-26; canSeeOrder), so receive orders from shops show there.
+Tab "Outside Lens Orders" (js/outside.js) — MGM (OUTSIDE_LENS_HANDLER) and
+the office; Ghiath view-only. Stats To order / Lenses to send / Branches
+waiting / Ordered today; search; branch filter; chips To order (orange) /
+Ordered (orange = lenses to send); rows: Rx, lens type, how it travels
+("Frame goes to MGM" / "Lenses go to X"), Copy, Ordered | Undo + Send lenses.
+Bulk bar acts on the selected rows, or everything shown when none are
+selected: "Copy for WhatsApp" + "Mark ordered". Copy text = the user's format:
     *<branch name>*
     *<bill number>*
     R/ -2.00(-0.75) x 180 | Add: +2.00
     L/ ...
     *<lens type>*
-RPC set_outside_lens_status(ids, 'ordered'|'to_order') — MGM or office.
-Nav badge for MGM = to-order count. Switchable off in Settings › Tabs.
+The Fitting Log's old "Outside" chip (frames at 3rd-party cutters) is now
+"Outside cutter", so it isn't confused with outside lenses.
 
 4.6 SETTINGS (admin only)
 -------------------------
@@ -710,6 +729,11 @@ Migrations are applied by hand, in order. Each file has a header with
                              realtime), create_outside_lens_order,
                              set_outside_lens_status, outside_lens_handler()
                              = 'MGM'. APPLIED 2026-10-13 by Claude (TRIAL).
+  schema-25-outside-lens-flow.sql  fulfilment + sent_at; send_outside_lenses,
+                             change_outside_fulfilment, gate trigger; undo
+                             refused after send/cut. APPLIED 2026-10-13.
+  schema-26-outside-handler-sees-orders.sql  MGM reads every order with
+                             outside lenses. APPLIED 2026-10-13.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1054,6 +1078,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Outside lenses: real flow (schema-25/26, rehearsed rolled back):
+             "Waiting for Lenses" + outside tag; branch picks send-frame /
+             receive; MGM Send lenses only once ordered; no cutting before
+             ordered; no delivered before sent; switch while nothing moved;
+             MGM sees all outside orders. See 4.9.
  2026-10-13  Fix: the outside-lens prescription showed even with the switch off —
              .ol-fields' display:flex beat the hidden attribute. Global rule
              [hidden] { display: none !important } (top of styles.css).

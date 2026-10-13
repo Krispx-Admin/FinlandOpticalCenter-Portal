@@ -4,7 +4,7 @@
 // selection, or everything shown (e.g. one branch's day) — sends them to the
 // supplier, and marks them Ordered so they move out of the way. The frame's
 // own journey stays in the Fitting Log.
-import { OUTSIDE_LENS_HANDLER, outsideCopyText, outsideRxLine, locName, readOnly } from './data.js';
+import { OUTSIDE_LENS_HANDLER, OUTSIDE_FULFILMENT, outsideCopyText, outsideRxLine, locName, readOnly } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, toast, chipCount } from './ui.js';
 
@@ -59,16 +59,21 @@ export function outsideView(me) {
     const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
     const toOrder = all().filter(x => x.status === 'to_order');
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    const toSend = all().filter(x => x.status === 'ordered' && x.fulfilment === 'receive_lens' && !x.sentAt);
     return t(toOrder.length, 'To order', toOrder.length ? 'stat-amber' : '')
+      + t(toSend.length, 'Lenses to send', toSend.length ? 'stat-amber' : '')
       + t(new Set(toOrder.map(x => x.branch)).size, 'Branches waiting')
-      + t(all().filter(x => x.status === 'ordered' && x.orderedAt >= today.getTime()).length, 'Ordered today', 'stat-brand')
-      + t(all().filter(x => x.status === 'ordered').length, 'Ordered in all');
+      + t(all().filter(x => x.status === 'ordered' && x.orderedAt >= today.getTime()).length, 'Ordered today', 'stat-brand');
   }
 
   function chipsHTML() {
     const n = k => all().filter(x => x.status === k && (ui.branch === 'all' || x.branch === ui.branch)).length;
+    // Orange: to order, and — on Ordered — lenses still to send.
+    const toSend = all().filter(x => x.status === 'ordered' && x.fulfilment === 'receive_lens' && !x.sentAt
+      && (ui.branch === 'all' || x.branch === ui.branch)).length;
+    const act = k => (!canMark || viewOnly ? 0 : k === 'to_order' ? n(k) : toSend);
     return TABS.map(d => `<button class="chip ${ui.tab === d.key ? 'on' : ''}" data-tab="${d.key}">${esc(d.label)}${
-      chipCount(n(d.key), d.key === 'to_order' && canMark && !viewOnly ? n(d.key) : 0)}</button>`).join('');
+      chipCount(n(d.key), act(d.key))}</button>`).join('');
   }
 
   function rowsHTML() {
@@ -89,12 +94,18 @@ export function outsideView(me) {
           <span>${esc(outsideRxLine('R', x.rx?.r))}</span>
           <span>${esc(outsideRxLine('L', x.rx?.l))}</span>
         </div>
-        <div class="ol-type"><b>${esc(x.lensType)}</b>${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.orderedBy ? ` by ${esc(x.orderedBy)}` : ''}</span>` : ''}</div>
+        <div class="ol-type"><b>${esc(x.lensType)}</b>
+          <span class="fulfil-chip ${x.fulfilment}">${esc(x.fulfilment === 'receive_lens' ? `Lenses go to ${x.branch}` : OUTSIDE_FULFILMENT.send_frames.chip)}</span>
+          ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}</span>` : ''}</div>
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
             ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Ordered</button>`
-            : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>`}
+            : x.fulfilment === 'receive_lens' && !x.sentAt
+              ? `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
+                 <button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses</button>`
+              : x.sentAt ? '<span class="row-actor">sent</span>'
+              : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>`}
         </div>
       </div>`;
     }).join('');
@@ -162,6 +173,8 @@ export function outsideView(me) {
       const c = e.target.closest('[data-copy]');
       if (c) { const x = all().find(y => y.id === c.dataset.copy); return x && copy([x]); }
       if (e.target.closest('[data-copy-set]')) return copy(setOf());
+      const sd = e.target.closest('[data-send]');
+      if (sd) return store.sendOutsideLenses(sd.dataset.send, me.code);
       const m = e.target.closest('[data-mark]');
       if (m) { const x = all().find(y => y.id === m.dataset.mark); return x && mark([x], m.dataset.to); }
       const ms = e.target.closest('[data-mark-set]');

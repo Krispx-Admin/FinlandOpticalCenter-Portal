@@ -107,6 +107,8 @@ Applied in order:
 | `supabase/schema-22-change-lens-fulfilment.sql` | switch a lens request between sending the frame and receiving the lenses |
 | `supabase/schema-23-public-tab-maintenance.sql` | the sign-in page and public schedule respect a switched-off Schedule tab |
 | `supabase/schema-24-outside-lens-orders.sql` | (trial) outside-lens orders that MGM copies to the supplier and marks ordered |
+| `supabase/schema-25-outside-lens-flow.sql` | (trial) send the frame or receive the lenses; nothing cut or sent before ordered |
+| `supabase/schema-26-outside-handler-sees-orders.sql` | (trial) MGM reads every order with outside lenses |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

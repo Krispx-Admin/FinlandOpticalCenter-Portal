@@ -185,6 +185,32 @@ export const OUTSIDE_STATUS = {
   to_order: { label: 'Lenses to order', color: 'amber' },
   ordered:  { label: 'Lenses ordered',  color: 'green' },
 };
+export const OUTSIDE_FULFILMENT = {
+  send_frames:  { label: 'Send the frame', chip: 'Frame goes to MGM' },
+  receive_lens: { label: 'Receive the lenses', chip: 'Lenses come to the branch' },
+};
+// The small tag under the status: where the outside order stands.
+export const outsideTag = ol => !ol ? null
+  : ol.sentAt ? { text: 'Outside lenses · sent', tone: 'sent' }
+  : ol.status === 'ordered' ? { text: 'Outside lenses · ordered', tone: 'ordered' }
+  : { text: 'Outside lenses · to order', tone: 'to-order' };
+// Lenses a branch is receiving, not yet sent: the job waits on MGM.
+export const awaitingOutside = o =>
+  !!o.outsideLens && o.status === 'pending' && o.outsideLens.fulfilment === 'receive_lens' && !o.outsideLens.sentAt;
+// Cutting waits until the lenses are ordered.
+export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.status !== 'ordered'
+  && (o.status === 'at_fitter' || (o.status === 'lenses_in' && !!o.fitter && o.fitter === o.origin));
+export const canSendOutside = (o, code) => awaitingOutside(o) && o.outsideLens.status === 'ordered'
+  && (code === OUTSIDE_LENS_HANDLER || loc(code)?.role === 'admin');
+// Send the frame ⇄ receive the lenses, while nothing has moved.
+export function outsideSwitch(o, code) {
+  const ol = o?.outsideLens;
+  if (!ol || ol.branch === OUTSIDE_LENS_HANDLER) return null;
+  if (!(ol.branch === code || loc(code)?.role === 'admin')) return null;
+  if (ol.fulfilment === 'receive_lens' && !ol.sentAt && o.status === 'pending') return 'send_frames';
+  if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === OUTSIDE_LENS_HANDLER) return 'receive_lens';
+  return null;
+}
 const rxNum = v => {
   const s = String(v ?? '').trim();
   const n = parseFloat(s);
@@ -246,12 +272,20 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (ans === 'sent' && long && from) return { ...base, label: `Waiting for Lenses — sent by ${locName(from)}` };
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
   }
-  // Outside lenses: the frame can go to MGM whenever; the label says how the
-  // lens order stands (MGM itself reads it as waiting for the frame).
-  if (o.status === 'lenses_in' && o.outsideLens) {
-    const st = o.outsideLens.status === 'ordered' ? 'ordered' : 'to order';
+  // Outside lenses (schema-25). The status reads "Waiting for Lenses"; how the
+  // outside order stands is a separate tag (outsideTag). Receiving: MGM sends
+  // them once ordered, then the branch marks them delivered. Sending the
+  // frame: it may travel any time; MGM itself reads "Waiting for frame".
+  const ol = o.outsideLens;
+  if (ol && o.status === 'pending' && ol.fulfilment === 'receive_lens') {
+    const h = locName(OUTSIDE_LENS_HANDLER);
+    if (!ol.sentAt) return { ...base, label: long ? `Waiting for Lenses — ${h} to ${ol.status === 'ordered' ? 'send' : 'order'} them` : 'Waiting for Lenses',
+      color: 'slate', action: ol.status === 'ordered' ? 'Send lenses' : null, actor: 'outside' };
+    if (long) return { ...base, label: `Waiting for Lenses — sent by ${h}` };
+  }
+  if (ol && o.status === 'lenses_in' && ol.fulfilment === 'send_frames') {
     if (viewer && viewer === o.fitter && o.fitter !== o.origin) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
-    return { ...base, label: `Outside lenses · ${st}`, color: o.outsideLens.status === 'ordered' ? 'cyan' : 'amber' };
+    return { ...base, label: 'Waiting for Lenses', color: 'slate' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;
@@ -274,7 +308,8 @@ export const nextFitStatus = o => {
 export function fitActor(order) {
   const a = fitStep(order).actor;
   return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter
-    : a === 'lens' ? (order.lensRequest?.holder ?? LENS_HOLDERS[0]?.code ?? null) : null;
+    : a === 'lens' ? (order.lensRequest?.holder ?? LENS_HOLDERS[0]?.code ?? null)
+    : a === 'outside' ? OUTSIDE_LENS_HANDLER : null;
 }
 
 // Whether an order is this location's to move now. A self-fit job still
@@ -284,7 +319,7 @@ export function fitActor(order) {
 export const needsAction = (o, code) =>
   (canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
    && !(o.status === 'to_fitter' && isOutside(o)))
-  || canSendLenses(o, code);
+  || canSendLenses(o, code) || canSendOutside(o, code);
 
 // ── Stock request state machine ──
 // Redesigned: a branch places a request, the office fulfils it. No review.
@@ -407,10 +442,11 @@ export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.pr
 // ── Permissions ──
 // The holder whose lenses a job is waiting for sees it too.
 export function canSeeOrder(o, code) {
-  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code || o.lensRequest?.holder === code;
+  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code || o.lensRequest?.holder === code
+    || (!!o.outsideLens && code === OUTSIDE_LENS_HANDLER);
 }
 export function canAdvanceOrder(o, code) {
-  if (o.status === 'delivered' || awaitingLens(o)) return false;
+  if (o.status === 'delivered' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
   const me = loc(code);
   return me?.role === 'admin' || fitActor(o) === code;
 }
