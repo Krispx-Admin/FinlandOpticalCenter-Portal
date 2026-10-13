@@ -473,9 +473,12 @@ export function normaliseRx(rx) {
 export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);
 
 // ── Permissions ──
-// The holder whose lenses a job is waiting for sees it too.
+// The holder whose stock lenses a job is waiting for sees it until it has
+// sent them — after that, where the job goes is not its concern (user,
+// 2026-10-13); the request stays in its Lens Stock tab.
 export function canSeeOrder(o, code) {
-  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code || o.lensRequest?.holder === code
+  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code
+    || (o.lensRequest?.holder === code && o.lensRequest.status === 'requested')
     || (!!o.outsideLens && code === OUTSIDE_LENS_HANDLER);
 }
 export function canAdvanceOrder(o, code) {

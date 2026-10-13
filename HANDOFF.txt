@@ -234,7 +234,8 @@ ORDERS OPENED BY A LENS REQUEST (reworked 2026-10-12, schema-21 — no confirm).
   store.linkLensRequests() puts o.lensRequest = {id, status, fulfilment, ref,
   holder} on each order after every load/pull. The HOLDER can read these
   orders (RLS orders_lens_holder_read; canSeeOrder) so its Fitting Log shows
-  them. fitStep():
+  them — only while the lenses are still to send (user 2026-10-13: once sent,
+  where the job goes is not the holder's concern; it stays in Lens Stock). fitStep():
     send_frames: order created at lenses_in, fitter = holder ->
                  "Lenses at <holder>" + Send to fitter (origin) -> normal road.
                  The HOLDER reads it as "Waiting for frame from <origin>"
@@ -1112,6 +1113,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  A stock-lens holder stops seeing a receive job in its Fitting Log
+             once it has sent the lenses (canSeeOrder).
  2026-10-13  Stock lenses received by a branch: no fitter fixed — after delivery
              cut here or send to a fitter, like outside lenses (schema-29,
              applied + rehearsed). Closed holders can't be sent frames.
