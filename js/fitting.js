@@ -3,8 +3,8 @@ import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
   locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
   fulfilmentSwitch,
-  isOutside, OUTSIDE_DEFAULT, OUTSIDE_LENS_HANDLER, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
-  outsideTag, canSendOutside, outsideBlocked, outsideSwitch, canCutOwnLenses, awaitingOutside,
+  isOutside, OUTSIDE_DEFAULT, outsideHandler, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
+  outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
   isBenchClosed, benchNote,
 } from './data.js';
 import { store } from './store.js';
@@ -94,7 +94,28 @@ export function fittingView(me) {
   };
 
   // ── journey mini-diagram ──
+  // An outside-lens job whose lenses are still on their way shows two lines:
+  // the frame's journey, and the lenses' road from the handler to where they
+  // are going — so the fitter can see where everything is.
   function journey(o, big = false, tail = '') {
+    const ol = o.outsideLens, H = outsideHandler();
+    if (!ol || ol.branch === H || o.status === 'delivered' || ol.receivedAt) return frameJourney(o, big, tail);
+    const seg = ol.sentAt ? 'moving' : '';
+    const pin = (code, cls) => `<div class="j-node ${cls}"><span class="j-pin">${esc(code)}</span>${big ? `<span class="j-lbl">${esc(locName(code))}</span>` : ''}</div>`;
+    return `
+      <div class="journey-2">
+        ${frameJourney(o, big, '')}
+        <div class="journey journey-lensline ${big ? 'journey-big' : ''}" title="Outside lenses: ${esc(locName(H))} → ${esc(locName(ol.dest))} · ${esc(outsideLensState(ol))}">
+          ${pin(H, ol.status === 'ordered' ? 'done' : '')}
+          <i class="j-seg ${seg}"></i>
+          ${pin(ol.dest, 'j-mid')}
+          <i class="j-seg j-ghost"></i>
+          <div class="j-node j-ghost"><span class="j-pin">${esc(o.origin)}</span></div>
+        </div>
+      </div>`;
+  }
+
+  function frameJourney(o, big = false, tail = '') {
     // By name, not position: waiting for the lenses and having them in both
     // sit at the branch, so the drawing is the same for the two.
     const stage = FIT_FLOW.indexOf(o.status);
@@ -142,9 +163,6 @@ export function fittingView(me) {
 
   function lensLeg(o) {
     if (o.status !== 'pending') return null;
-    const ol = o.outsideLens;
-    if (ol && ol.fulfilment === 'receive_lens' && me.code === OUTSIDE_LENS_HANDLER && o.origin !== me.code)
-      return { from: me.code, to: o.origin, moving: !!ol.sentAt };
     const lr = o.lensRequest;
     if (lr && lr.fulfilment === 'receive_lens' && me.code === lr.holder && o.origin !== me.code)
       return { from: me.code, to: o.origin, moving: ['sent', 'confirmed'].includes(lr.status) };
@@ -177,16 +195,21 @@ export function fittingView(me) {
       const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
-      // MGM's first job on another branch's outside order: order the lens — the button opens the list.
-      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === OUTSIDE_LENS_HANDLER && o.origin !== me.code && o.status !== 'delivered' && !viewOnly)
+      // The handler's first job on any outside order: order the lens — the button opens the list.
+      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && o.status !== 'delivered' && !viewOnly)
         action = `<a class="btn btn-ghost btn-sm" href="#/outside">Order lens ${icons.arrowRight}</a>`;
       else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
-      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses</button>`;
-      else if ((outsideBlocked(o) || (awaitingOutside(o) && o.outsideLens.status !== 'ordered')) && fitActor(o) === me.code) action = `<span class="row-actor">order the lenses first</span>`;
+      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(o.outsideLens.dest)}</button>`;
+      else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} closed — fitter on leave</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
+      // The fitter marks the outside lenses received — alongside the frame's own step.
+      if (canReceiveOutside(o, me.code) && !viewOnly) {
+        const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">${icons.check} Lenses received</button>`;
+        action = action.startsWith('<span') ? lens : `${lens}${action}`;
+      }
       const title = o.customer || 'No customer name';
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
@@ -278,8 +301,9 @@ export function fittingView(me) {
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
         ${outsideLensHTML(o)}
         <div class="dw-actions">
+          ${canReceiveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-recv-outside="${o.outsideLens.id}">${icons.check} Lenses received</button>` : ''}
           ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
-            canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
+            canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(locName(o.outsideLens.dest))}</button>` :
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
         </div>
@@ -300,15 +324,13 @@ export function fittingView(me) {
     const x = o.outsideLens;
     if (!x) return '';
     const eye = e => ['sph', 'cyl', 'axis', 'add'].map(k => `<td class="pwr">${esc(String(e?.[k] ?? '').trim() || '—')}</td>`).join('');
-    const to = viewOnly ? null : outsideSwitch(o, me.code);
-    const tag = outsideTag(x);
+    const canChange = !viewOnly && outsideCanChange(o, me.code);
     return `
       <h3 class="tl-h">${icons.truck} Outside lenses</h3>
       <div class="dw-status-row">
-        <span class="ol-tag ol-${tag.tone}">${esc(tag.text)}</span>
-        <span class="fulfil-chip ${x.fulfilment}">${esc(OUTSIDE_FULFILMENT[x.fulfilment]?.chip ?? '')}</span>
-        ${x.status === 'ordered' ? `<span class="dw-when">ordered ${relTime(x.orderedAt)}</span>` : ''}
-        ${to ? `<button class="btn btn-ghost btn-sm dw-switch" data-ol-switch="${x.id}" data-to="${to}">${icons.history} ${to === 'send_frames' ? 'Change: send the frame instead' : 'Change: receive the lenses instead'}</button>` : ''}
+        <span class="ol-tag ol-${x.receivedAt ? 'sent' : x.status === 'ordered' ? 'ordered' : 'to-order'}">${esc(outsideLensState(x))}</span>
+        <span class="fulfil-chip ${x.fulfilment}">${esc(x.branch === outsideHandler() ? 'Arrive here' : `Lenses go to ${x.dest}`)}</span>
+        ${canChange ? `<button class="btn btn-ghost btn-sm dw-switch" data-ol-change="${o.id}">${icons.history} Change</button>` : ''}
       </div>
       <div class="kv"><div class="kv-wide"><span>Lens type</span><b>${esc(x.lensType)}</b></div></div>
       <table class="lines">
@@ -353,8 +375,10 @@ export function fittingView(me) {
       if (sl) return store.sendLenses(sl.dataset.sendLenses, me.code);
       const so = e.target.closest('[data-send-outside]');
       if (so) return store.sendOutsideLenses(so.dataset.sendOutside, me.code);
-      const ow = e.target.closest('[data-ol-switch]');
-      if (ow) return switchOutside(ow.dataset.olSwitch, ow.dataset.to);
+      const oc = e.target.closest('[data-ol-change]');
+      if (oc) return changeOutsideModal(oc.dataset.olChange);
+      const ro = e.target.closest('[data-recv-outside]');
+      if (ro) return store.receiveOutsideLenses(ro.dataset.recvOutside, me.code);
       const sw = e.target.closest('[data-switch]');
       if (sw) return switchFulfilment(sw.dataset.switch, sw.dataset.to);
       const sf = e.target.closest('[data-send-fitter]');
@@ -375,11 +399,54 @@ export function fittingView(me) {
     if (confirm(ask)) store.changeFulfilment(id, to, me.code);
   }
 
-  function switchOutside(id, to) {
-    const ask = to === 'send_frames'
-      ? `Change to “Send the frame”?\n\nThe frame goes to ${locName(OUTSIDE_LENS_HANDLER)}, which cuts the lenses once ordered.`
-      : `Change to “Receive the lenses”?\n\n${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here once ordered.`;
-    if (confirm(ask)) store.changeOutsideFulfilment(id, to, me.code);
+  // The way an outside order goes — the same two choices as when ordering.
+  function outsideWayHTML(pickHow, pickDest) {
+    const H = outsideHandler(), hName = locName(H);
+    const open = FITTERS.filter(f => f.code !== me.code && !isBenchClosed(f.code));
+    const dest = open.some(f => f.code === pickDest) ? pickDest : (open.find(f => f.code === 'MGM') ?? open[0])?.code;
+    const how = open.length ? pickHow : 'receive_lens';
+    return `<div class="fulfil">
+      <label class="fulfil-opt ${how === 'send_frames' ? 'on' : ''} ${open.length ? '' : 'is-off'}">
+        <input type="radio" name="olHow" value="send_frames" ${how === 'send_frames' ? 'checked' : ''} ${open.length ? '' : 'disabled'}>
+        <b>${esc(OUTSIDE_FULFILMENT.send_frames.label)}</b>
+        <span>${open.length ? `Your frame and ${hName}'s lenses both go there to be cut.` : 'No fitter is open right now.'}</span>
+        ${open.length ? `<select name="olDest" class="ol-dest" aria-label="Fitter">${open.map(f => `<option value="${f.code}" ${f.code === dest ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>` : ''}
+      </label>
+      <label class="fulfil-opt ${how === 'receive_lens' ? 'on' : ''}">
+        <input type="radio" name="olHow" value="receive_lens" ${how === 'receive_lens' ? 'checked' : ''}>
+        <b>${esc(OUTSIDE_FULFILMENT.receive_lens.label)}</b>
+        <span>${esc(`${hName} sends the lenses here; then ${canCutOwnLenses(me.role) ? 'cut here or send to a fitter' : 'send frame and lenses to a fitter'}.`)}</span>
+      </label>
+    </div>`;
+  }
+  const wireWay = el => el.addEventListener('change', e => {
+    if (e.target.name === 'olHow') el.querySelectorAll('.fulfil-opt').forEach(l => l.classList.toggle('on', l.contains(e.target)));
+    if (e.target.name === 'olDest') { const r = el.querySelector('[name="olHow"][value="send_frames"]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+
+  function changeOutsideModal(orderId) {
+    const o = store.order(orderId), x = o?.outsideLens;
+    if (!x) return;
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Outside lenses · ${esc(o.ref)}</div><h2>Where do the frame and lenses go?</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form" id="ol-change">
+        ${outsideWayHTML(x.fulfilment, x.dest)}
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} Save</button>
+        </div>
+      </form>`);
+    wireWay(layer.el);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.querySelector('#ol-change').addEventListener('submit', async e => {
+      e.preventDefault();
+      const d = new FormData(e.target);
+      const how = String(d.get('olHow') || 'receive_lens');
+      if (await store.changeOutsideFulfilment(x.id, how, how === 'send_frames' ? String(d.get('olDest') || '') : null, me.code)) layer.close();
+    });
   }
 
   // ── fitter picker (assign + send, one order or a bulk selection) ──
@@ -500,24 +567,9 @@ export function fittingView(me) {
               `<td><input name="${eye}_${k}" inputmode="decimal" autocomplete="off" placeholder="${k === 'axis' ? '0–180' : '0.00'}"></td>`).join('')}</tr>`).join('')}</tbody>
           </table>
           <label>Lens type <input name="lensType" placeholder="e.g. 1.5 progressive blue UV" autocomplete="off"></label>
-          ${me.code === OUTSIDE_LENS_HANDLER ? '' : (() => {
-            const h = OUTSIDE_LENS_HANDLER, hName = locName(h);
-            const hShut = isBenchClosed(h);
-            // A branch with an open bench cuts its own by default; the rest send the frame to MGM.
-            const pick = hShut || (canCutOwnLenses(me.role) && !isBenchClosed(me.code)) ? 'receive_lens' : 'send_frames';
-            const opt = (k, sub, off = false) => `
-              <label class="fulfil-opt ${pick === k ? 'on' : ''} ${off ? 'is-off' : ''}">
-                <input type="radio" name="olHow" value="${k}" ${pick === k ? 'checked' : ''} ${off ? 'disabled' : ''}>
-                <b>${esc(k === 'send_frames' ? `Frame goes to ${h}` : OUTSIDE_FULFILMENT.receive_lens.label)}</b>
-                <span>${esc(sub)}</span>
-              </label>`;
-            return `<div class="fulfil">
-              ${opt('send_frames', hShut ? `${hName}: ${benchNote(h).toLowerCase()}` : `Send your frame to ${hName}; they cut it.`, hShut)}
-              ${opt('receive_lens', canCutOwnLenses(me.role)
-                ? `${hName} sends the lenses here; then cut here or send to a fitter.`
-                : `${hName} sends the lenses here; then send frame and lenses to a fitter.`)}
-            </div>`;
-          })()}
+          ${me.code === outsideHandler() ? '' :
+            // A branch with an open bench of its own receives by default; the rest send the frame to a fitter.
+            outsideWayHTML(canCutOwnLenses(me.role) && !isBenchClosed(me.code) ? 'receive_lens' : 'send_frames', 'MGM')}
         </div>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
@@ -529,10 +581,7 @@ export function fittingView(me) {
     // The outside-lens fields open under the switch.
     const outsideBox = layer.el.querySelector('#nf-outside');
     outsideBox.addEventListener('change', () => { layer.el.querySelector('#nf-ol').hidden = !outsideBox.checked; });
-    layer.el.addEventListener('change', e => {
-      if (e.target.name !== 'olHow') return;
-      layer.el.querySelectorAll('.fulfil-opt').forEach(l => l.classList.toggle('on', l.contains(e.target)));
-    });
+    wireWay(layer.el);
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -557,7 +606,8 @@ export function fittingView(me) {
         const lensType = val('lensType');
         if (!rx.r.sph && !rx.l.sph) { toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         if (!lensType) { toast({ title: 'Type the lens type', sub: 'e.g. 1.5 progressive blue UV', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
-        o = await store.createOutsideOrder({ ref, customer, rx, lensType, fulfilment: val('olHow') || 'send_frames' }, me.code);
+        const how = val('olHow') || 'receive_lens';
+        o = await store.createOutsideOrder({ ref, customer, rx, lensType, fulfilment: how, dest: how === 'send_frames' ? val('olDest') : null }, me.code);
       } else {
         o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
       }
@@ -731,6 +781,8 @@ export function fittingView(me) {
       if (sl) { e.stopPropagation(); store.sendLenses(sl.dataset.sendLenses, me.code); return; }
       const so = e.target.closest('[data-send-outside]');
       if (so) { e.stopPropagation(); store.sendOutsideLenses(so.dataset.sendOutside, me.code); return; }
+      const ro = e.target.closest('[data-recv-outside]');
+      if (ro) { e.stopPropagation(); store.receiveOutsideLenses(ro.dataset.recvOutside, me.code); return; }
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');

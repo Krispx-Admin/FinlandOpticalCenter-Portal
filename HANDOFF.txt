@@ -492,66 +492,64 @@ name | single-hue navy bar on a #eef1f5 track (8px, 4px radius, scaled to the
 card's max) | amount | count; hover title gives the share. Fixed columns so
 bars align. Built per the dataviz skill (one series per card → no legend).
 
-4.9 OUTSIDE LENS ORDERS (TRIAL, added 2026-10-13 — the user may drop it)
--------------------------------------------------------------------------
-New fitting order: "Outside lenses · other brands" switch under the bill
-number opens (only then) a prescription grid (R/L × SPH, CYL, AXIS, ADD), a
-typed lens type, and the branch's choice — SEND THE FRAME (default) or
-RECEIVE THE LENSES (MGM's own orders are always cut at MGM, no choice).
-RPC create_outside_lens_order(bill, customer, rx, lens_type, fulfilment).
-outside_lens_orders: status to_order|ordered, fulfilment, sent_at.
+4.9 OUTSIDE LENS ORDERS (TRIAL — the user may drop it; reworked 2026-10-13, schema-30)
+-------------------------------------------------------------------------------------
+WHO ORDERS: the HANDLER = AVENUES MALL (AV), a retail branch — a setting
+(app_settings.outside_lens_handler, default 'AV'; SQL outside_lens_handler();
+client data.js OUTSIDE.handler / outsideHandler(), kept in step by the store;
+the office changes it with "Ordered by" in the Outside Lens Orders header).
+The handler orders by WhatsApp, the lenses arrive at it, it sends them on.
 
-THE FLOW (schema-28, agreed with the user 2026-10-13 after ideation):
-  Everything gathers at ONE place first — never two parties sending separately
-  to a third. Two ways, chosen on the order (changeable while nothing moved):
-  · FRAME GOES TO MGM (send_frames): fitter = MGM, lenses_in; the branch's
-    button reads "Send frame to MGM"; MGM reads "Waiting for frame from X".
-    Not offered (greyed) while MGM's bench is closed.
-  · LENSES COME HERE (receive_lens): fitter NONE, pending. MGM marks Ordered,
-    then "Send lenses" (Fitting Log + Outside tab); the branch can't mark them
-    delivered before that. Then the branch holds frame + lenses and uses Send
-    to fitter: "Keep here" (cut in-house, if it has an open bench) or any open
-    fitting centre / outside cutter — both travel together.
-  · MGM's own orders: no fitter, lenses_in → Send to fitter (keep or send on).
-  Defaults on the form: a branch with an open bench → Lenses come here; any
-  other → Frame goes to MGM; MGM closed → Lenses come here (the only choice).
-  Status wording (user 2026-10-13), one pill, no extra tags:
-    branch, frame goes to MGM: "Lenses being ordered" (amber) → "Lenses at
-      MGM" (green), button "Send frame to MGM".
-    branch, lenses come here: "Waiting for Lenses" (→ Lenses delivered).
-    MGM: "Order lens" (amber) until ordered; then "Waiting for frame from X"
-      (frame goes over) or "Lenses ordered" (green) + Send lenses → "Lenses
-      sent to X"; its own orders "Order lens" → "Lenses ordered".
-  Journey: the sender of lenses (MGM for outside, a stock holder for stock)
-  sees the LENS road while it is pending — MGM → MOUJ, moving once sent
-  (fitting.js lensLeg()). The order is marked by an "Outside Lens" label
-  under its journey (like "Stock Lens", purple).
-  FINISHING THE CUT (at_fitter -> ready/delivered) waits for Ordered.
-  Enforced in the DB: orders_outside_lens_gate + create/change functions.
-BENCH LOCK (schema-28): branches.bench_closed (+ bench_closed_until, reopens
-  by itself after that date, Muscat time). A fitting centre toggles its own
-  from the Fitting Log header ("Bench open" / "Closed — fitter on leave until
-  …", modal with optional date); the office toggles any in Settings ›
-  Branches. RPC set_bench. While closed: no frame may be sent there and it
-  can't keep one in-house (trigger orders_bench_lock); the Send to fitter
-  picker greys it; frame-to-it orders show "<code> closed — fitter on leave";
-  a closed lens holder can't take frames (stock lens cart: send-the-frame
-  greyed). Frames already on the way still arrive. data.js isBenchClosed /
-  benchNote.
-Tab "Outside Lens Orders" (js/outside.js) — MGM (OUTSIDE_LENS_HANDLER) and
-the office; Ghiath view-only. Stats To order / Lenses to send / Branches
-waiting / Ordered today; search; branch filter; chips To order (orange) /
-Ordered (orange = lenses to send); rows: Rx, lens type, how it travels
-("Frame goes to MGM" / "Lenses go to X"), Copy, Ordered | Undo + Send lenses.
-Bulk bar acts on the selected rows, or everything shown when none are
-selected: "Copy for WhatsApp" + "Mark ordered". Copy text = the user's format:
+NEW ORDER: "Outside lenses · other brands" switch (fields only when on):
+R/L × SPH/CYL/AXIS/ADD, typed lens type, and the way:
+  · SEND THE FRAME TO A FITTER — a select of OPEN fitting centres (not the
+    branch itself; default MGM) — the frame goes from the branch AND the
+    lenses go from AV, two legs to that one fitter (dest).
+  · RECEIVE THE LENSES HERE — AV sends the lenses to the branch.
+  Default: a branch with its own open bench → receive; others → send.
+  The handler's own orders: no choice; the lenses arrive at AV.
+  RPC create_outside_lens_order(bill, customer, rx, lens_type, fulfilment, dest).
+outside_lens_orders: status to_order|ordered, fulfilment, dest_code, sent_at,
+received_at.
+
+FLOW / WHO DOES WHAT
+  AV (Outside tab + Fitting Log): "Order lens" (amber, button opens the tab)
+    → mark Ordered → "Lenses ordered" (green) + "Send lenses to <dest>" →
+    sent; after sending the job leaves AV's Fitting Log.
+  SEND THE FRAME: order fitter = dest, status lenses_in. Branch: "Lenses
+    being ordered" / "Lenses ordered at AV" / "Lenses on the way to MGM" /
+    "Lenses at MGM" + "Send frame to MGM" (any time). Fitter: "Waiting for
+    frame from X"; "Lenses received" button once AV sent them (RPC
+    receive_outside_lenses); with the frame there but no lenses: "Lenses on
+    the way from AV" / "Waiting for lenses from AV" and it CANNOT finish the
+    cut (at_fitter -> ready) until received. Then normal: Ready → Returning →
+    back to the branch.
+  RECEIVE: order pending, no fitter. Branch: "Waiting for Lenses"; once AV sent
+    them, "Lenses delivered" (that also records received_at); then Send to
+    fitter — Keep here / any open fitter / outside cutter.
+  AV's own: pending; "Order lens" → "Lenses ordered" → Lenses delivered.
+  CHANGE: the branch (or office) can switch the way or the fitter while
+    nothing has moved (drawer "Change" → same choices; RPC
+    change_outside_fulfilment(id, fulfilment, dest)).
+JOURNEY: while the lenses are travelling, TWO lines — the frame's journey and,
+  under it in purple, the lenses' road AV → dest (moving once sent); once
+  received, back to one line with the purple "Outside Lens" label.
+GATES in the DB (outside_lens_gate trigger + functions): no finishing the cut
+  before the lenses are received; no "delivered" before sent; only AV/office
+  order and send; only the dest receives; dest must be an open fitting
+  centre (bench lock). Visibility: the dest is the fitter; AV reads all
+  outside orders (RLS) and shows them until sent (canSeeOrder).
+Outside Lens Orders tab (js/outside.js): stats, search, branch filter, chips
+To order / Ordered (orange counts), rows with Rx, lens type, "Lenses go to X",
+Copy, Ordered / Undo + "Send lenses to X"; bulk Copy for WhatsApp / Mark
+ordered. Copy text = the user's WhatsApp format:
     *<branch name>*
     *<bill number>*
     R/ -2.00(-0.75) x 180 | Add: +2.00
     L/ ...
     *<lens type>*
-The Fitting Log's old "Outside" chip (frames at 3rd-party cutters) is now
-"Outside cutter", so it isn't confused with outside lenses.
+The Fitting Log's "Outside cutter" chip (3rd-party cutters) is a different
+thing.
 
 4.6 SETTINGS (admin only)
 -------------------------
@@ -768,6 +766,11 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-29-stock-receive-pick-fitter.sql  create_lens_request /
                              change_lens_fulfilment: receive -> no fitter;
                              send-the-frame refused to a closed holder.
+                             APPLIED 2026-10-13 by Claude.
+  schema-30-outside-two-legs.sql  app_settings.outside_lens_handler ('AV');
+                             dest_code + received_at; create(…, dest),
+                             send/receive_outside_lenses, change(…, dest),
+                             open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
@@ -1113,6 +1116,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Outside lenses reworked (schema-30): Avenues Mall orders them (a
+             setting); send-the-frame picks the fitter and the frame and the
+             lenses travel separately to it (two-line journey); the fitter
+             marks lenses received and can't finish before; receive goes AV →
+             branch. Rehearsed rolled back. See 4.9.
  2026-10-13  A stock-lens holder stops seeing a receive job in its Fitting Log
              once it has sent the lenses (canSeeOrder).
  2026-10-13  Stock lenses received by a branch: no fitter fixed — after delivery

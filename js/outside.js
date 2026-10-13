@@ -4,7 +4,7 @@
 // selection, or everything shown (e.g. one branch's day) — sends them to the
 // supplier, and marks them Ordered so they move out of the way. The frame's
 // own journey stays in the Fitting Log.
-import { OUTSIDE_LENS_HANDLER, OUTSIDE_FULFILMENT, outsideCopyText, outsideRxLine, locName, readOnly } from './data.js';
+import { outsideHandler, outsideCopyText, outsideRxLine, locName, readOnly, BRANCHES } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, toast, chipCount } from './ui.js';
 
@@ -15,7 +15,7 @@ const TABS = [
 
 export function outsideView(me) {
   // MGM marks them ordered; the office can too. Ghiath only looks.
-  const canMark = me.code === OUTSIDE_LENS_HANDLER || me.role === 'admin';
+  const canMark = me.code === outsideHandler() || me.role === 'admin';
   const viewOnly = readOnly(me.role);
   const ui = { tab: 'to_order', q: '', branch: 'all', selected: new Set() };
   let root;
@@ -59,7 +59,7 @@ export function outsideView(me) {
     const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
     const toOrder = all().filter(x => x.status === 'to_order');
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const toSend = all().filter(x => x.status === 'ordered' && x.fulfilment === 'receive_lens' && !x.sentAt);
+    const toSend = all().filter(x => x.status === 'ordered' && !x.sentAt && x.branch !== outsideHandler());
     return t(toOrder.length, 'To order', toOrder.length ? 'stat-amber' : '')
       + t(toSend.length, 'Lenses to send', toSend.length ? 'stat-amber' : '')
       + t(new Set(toOrder.map(x => x.branch)).size, 'Branches waiting')
@@ -69,7 +69,7 @@ export function outsideView(me) {
   function chipsHTML() {
     const n = k => all().filter(x => x.status === k && (ui.branch === 'all' || x.branch === ui.branch)).length;
     // Orange: to order, and — on Ordered — lenses still to send.
-    const toSend = all().filter(x => x.status === 'ordered' && x.fulfilment === 'receive_lens' && !x.sentAt
+    const toSend = all().filter(x => x.status === 'ordered' && !x.sentAt && x.branch !== outsideHandler()
       && (ui.branch === 'all' || x.branch === ui.branch)).length;
     const act = k => (!canMark || viewOnly ? 0 : k === 'to_order' ? n(k) : toSend);
     return TABS.map(d => `<button class="chip ${ui.tab === d.key ? 'on' : ''}" data-tab="${d.key}">${esc(d.label)}${
@@ -95,15 +95,15 @@ export function outsideView(me) {
           <span>${esc(outsideRxLine('L', x.rx?.l))}</span>
         </div>
         <div class="ol-type"><b>${esc(x.lensType)}</b>
-          <span class="fulfil-chip ${x.fulfilment}">${esc(x.fulfilment === 'receive_lens' ? `Lenses go to ${x.branch}` : OUTSIDE_FULFILMENT.send_frames.chip)}</span>
-          ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}</span>` : ''}</div>
+          <span class="fulfil-chip ${x.fulfilment}">${esc(x.branch === outsideHandler() ? 'Stays here' : `Lenses go to ${x.dest ?? x.branch}`)}</span>
+          ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}${x.receivedAt ? ` · received` : ''}</span>` : ''}</div>
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
             ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Ordered</button>`
-            : x.fulfilment === 'receive_lens' && !x.sentAt
+            : !x.sentAt && x.branch !== outsideHandler()
               ? `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
-                 <button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses</button>`
+                 <button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses to ${esc(x.dest ?? x.branch)}</button>`
               : x.sentAt ? '<span class="row-actor">sent</span>'
               : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>`}
         </div>
@@ -142,6 +142,8 @@ export function outsideView(me) {
           <h1>Outside Lens Orders</h1>
           <p class="mod-sub">Lenses from outside brands the branches need — copy them for the supplier, then mark them ordered</p>
         </div>
+        ${me.role === 'admin' ? `<label class="set-ctl ol-handler"><span>Ordered by</span>
+          <select id="ol-handler">${BRANCHES.map(b => `<option value="${b.code}" ${b.code === outsideHandler() ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
       </header>
       <section class="stats" id="ol-stats">${statsHTML()}</section>
       <section class="toolbar">
@@ -153,6 +155,11 @@ export function outsideView(me) {
       <section class="list" id="ol-list">${rowsHTML()}</section>`;
     root.querySelector('#ol-q').addEventListener('input', e => { ui.q = e.target.value; refresh(); });
     root.querySelector('#ol-branch').addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refresh(); });
+    root.querySelector('#ol-handler')?.addEventListener('change', e => {
+      const b = BRANCHES.find(x => x.code === e.target.value);
+      if (!confirm(`${b?.name ?? e.target.value} orders the outside lenses from now on?`)) { e.target.value = outsideHandler(); return; }
+      store.setOutsideHandler(e.target.value);
+    });
   }
 
   function refresh() {

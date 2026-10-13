@@ -17,7 +17,7 @@ import {
   locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
-  ROLES, loc, setLocations,
+  ROLES, loc, setLocations, OUTSIDE,
 } from './data.js';
 import { toast } from './ui.js';
 
@@ -40,8 +40,12 @@ function commit(event) { notify(event ? { ...event, remote: false } : null); }
 
 async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLensRequests(); applyBranches(); }
 
-// The branches came from the database: make them the portal's locations.
-function applyBranches() { if (state.branches?.length) setLocations(state.branches); }
+// The branches came from the database: make them the portal's locations —
+// and the settings say who orders outside lenses.
+function applyBranches() {
+  if (state.branches?.length) setLocations(state.branches);
+  if (state.settings?.outsideLensHandler) OUTSIDE.handler = state.settings.outsideLensHandler;
+}
 
 // An order opened by a lens request carries that request's state: { id,
 // status, fulfilment, ref, holder }, or null. Orders and lens
@@ -619,9 +623,9 @@ export const store = {
   },
 
   // ── Outside lens orders (TRIAL) ──
-  createOutsideOrder({ ref, customer, rx, lensType, fulfilment }, by) {
+  createOutsideOrder({ ref, customer, rx, lensType, fulfilment, dest }, by) {
     return run(['orders', 'outsideOrders'], async () => ok(await supabase.rpc('create_outside_lens_order', {
-      p_bill: ref, p_customer: customer, p_rx: rx, p_lens_type: lensType, p_fulfilment: fulfilment ?? 'send_frames',
+      p_bill: ref, p_customer: customer, p_rx: rx, p_lens_type: lensType, p_fulfilment: fulfilment ?? 'send_frames', p_dest: dest ?? null,
     })), row => ({
       by, module: 'fitting', title: `${by} logged ${row.ref} with outside lenses`,
       sub: lensType, refs: [row.id],
@@ -637,13 +641,29 @@ export const store = {
     });
   },
 
-  changeOutsideFulfilment(id, fulfilment, by) {
+  changeOutsideFulfilment(id, fulfilment, dest, by) {
     const x = (state.outsideOrders ?? []).find(y => y.id === id);
-    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('change_outside_fulfilment', { p_id: id, p_fulfilment: fulfilment })), {
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('change_outside_fulfilment', { p_id: id, p_fulfilment: fulfilment, p_dest: dest ?? null })), {
       by, module: 'fitting',
-      title: fulfilment === 'send_frames' ? `${by}: the frame goes to MGM for the outside lenses` : `${by}: MGM sends the outside lenses`,
+      title: fulfilment === 'send_frames' ? `${by}: the frame and lenses go to ${dest}` : `${by}: the outside lenses come here`,
       refs: x ? [x.orderId] : [],
     });
+  },
+
+  // The fitter marks outside lenses received.
+  receiveOutsideLenses(id, by) {
+    const x = (state.outsideOrders ?? []).find(y => y.id === id);
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('receive_outside_lenses', { p_id: id })), {
+      by, module: 'fitting', title: `${by} received the outside lenses`, refs: x ? [x.orderId] : [],
+    });
+  },
+
+  // Who orders outside lenses (the office).
+  setOutsideHandler(code) {
+    if (!code || code === state.settings.outsideLensHandler) return Promise.resolve(null);
+    state.settings.outsideLensHandler = code;
+    OUTSIDE.handler = code;
+    return saveSettings({ module: 'outside', title: `${code} now orders outside lenses` });
   },
 
   setOutsideStatus(ids, status, by) {

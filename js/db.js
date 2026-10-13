@@ -110,6 +110,7 @@ function toSettings(r) {
     brandGroups: groups, categories: cats, insurers: r?.insurers ?? [], hasInsurers: !!r && 'insurers' in r,
     disabledTabs: r?.disabled_tabs ?? [], hasDisabledTabs: !!r && 'disabled_tabs' in r,
     outsideCutters: r?.outside_cutters ?? [], hasOutsideCutters: !!r && 'outside_cutters' in r,
+    outsideLensHandler: r?.outside_lens_handler || 'AV', hasOutsideHandler: !!r && 'outside_lens_handler' in r,
   };
 }
 
@@ -191,7 +192,8 @@ const SELECTS = {
   branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until', { column: 'position', asc: true }, r => r],
   outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
     id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
-    status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
+    status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null,
+    dest: r.dest_code ?? null, receivedAt: r.received_at ? ts(r.received_at) : null, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
     createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   })],
 };
@@ -264,6 +266,7 @@ export async function saveSettings(settings) {
     ...(settings.hasInsurers ? { insurers: settings.insurers } : {}),
     ...(settings.hasDisabledTabs ? { disabled_tabs: settings.disabledTabs } : {}),
     ...(settings.hasOutsideCutters ? { outside_cutters: settings.outsideCutters } : {}),
+    ...(settings.hasOutsideHandler ? { outside_lens_handler: settings.outsideLensHandler } : {}),
   }).eq('id', 1);
   if (error) throw new Error(error.message);
 }

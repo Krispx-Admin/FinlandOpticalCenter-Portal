@@ -645,6 +645,14 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* the copy in the subtitle only shows once the journey column is hidden */
 .stock-tag-sub { display: none; }
 .stock-tag.outside-tag { color: var(--st-purple); }
+/* outside lenses still travelling: the frame's line, and the lenses' line under it */
+.journey-2 { display: flex; flex-direction: column; gap: 7px; }
+.journey-lensline .j-pin { color: var(--st-purple); border-color: #f0cdf4; background: #faeafc; }
+.journey-lensline .j-node.done .j-pin { color: #fff; background: var(--st-purple); border-color: var(--st-purple); }
+.journey-lensline .j-seg.moving { background: #f0cdf4; }
+.journey-lensline .j-ghost { visibility: hidden; }
+.fulfil-opt .ol-dest { margin-top: 6px; width: 100%; }
+.ol-handler { margin-left: auto; }
 /* a closed bench: greyed in the picker, amber on its own header button */
 .picker-card.is-closed { opacity: .5; cursor: not-allowed; background: var(--page); }
 .picker-card.is-closed:hover { border-color: var(--border); box-shadow: none; transform: none; }

@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, OUTSIDE_LENS_HANDLER } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
 import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
@@ -242,7 +242,7 @@ const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
   stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
   lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
-  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === OUTSIDE_LENS_HANDLER || seesAll(me?.role) },
+  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me?.role) },
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
@@ -296,7 +296,9 @@ function badgeCounts(me) {
     ? s.lensRequests.filter(r => r.holder === me.code && r.status === 'requested').length
     : 0;
   // Outside lenses waiting to be ordered are MGM's to do.
-  const outside = me.code === OUTSIDE_LENS_HANDLER ? (s.outsideOrders ?? []).filter(x => x.status === 'to_order').length : 0;
+  // Outside lenses to order, and to send on, are the handler's to do.
+  const outside = me.code === outsideHandler() ? (s.outsideOrders ?? []).filter(x =>
+    x.status === 'to_order' || (!x.sentAt && x.branch !== me.code)).length : 0;
   return { fitting, stock, lens, outside };
 }
 
