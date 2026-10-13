@@ -197,9 +197,8 @@ export const outsideTag = ol => !ol ? null
 // Lenses a branch is receiving, not yet sent: the job waits on MGM.
 export const awaitingOutside = o =>
   !!o.outsideLens && o.status === 'pending' && o.outsideLens.fulfilment === 'receive_lens' && !o.outsideLens.sentAt;
-// Cutting waits until the lenses are ordered.
-export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.status !== 'ordered'
-  && (o.status === 'at_fitter' || (o.status === 'lenses_in' && !!o.fitter && o.fitter === o.origin));
+// Finishing the cut waits until the lenses are ordered.
+export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.status !== 'ordered' && o.status === 'at_fitter';
 export const canSendOutside = (o, code) => awaitingOutside(o) && o.outsideLens.status === 'ordered'
   && (code === OUTSIDE_LENS_HANDLER || loc(code)?.role === 'admin');
 // Send the frame ⇄ receive the lenses, while nothing has moved.
@@ -208,7 +207,7 @@ export function outsideSwitch(o, code) {
   if (!ol || ol.branch === OUTSIDE_LENS_HANDLER) return null;
   if (!(ol.branch === code || loc(code)?.role === 'admin')) return null;
   if (ol.fulfilment === 'receive_lens' && !ol.sentAt && o.status === 'pending') return 'send_frames';
-  if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === OUTSIDE_LENS_HANDLER) return 'receive_lens';
+  if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && !o.fitter) return 'receive_lens';
   return null;
 }
 const rxNum = v => {
@@ -283,11 +282,10 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
       color: 'slate', action: ol.status === 'ordered' ? 'Send lenses' : null, actor: 'outside' };
     if (long) return { ...base, label: `Waiting for Lenses — sent by ${h}` };
   }
+  // Send the frame (schema-27): "Waiting for Lenses", and Send to fitter lets
+  // the branch choose the fitter whenever the frame is ready.
   if (ol && o.status === 'lenses_in' && ol.fulfilment === 'send_frames') {
-    // The lenses' own state is the tag underneath; the status is about the frame.
-    if (o.fitter === o.origin) return { ...base, label: 'Waiting for Lenses', color: 'slate' };   // MGM's own: waiting to cut
-    if (viewer && viewer === o.fitter) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
-    return { ...base, label: `Frame to send to ${where(o.fitter)}`, color: 'slate' };
+    return { ...base, label: 'Waiting for Lenses', color: 'slate' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;

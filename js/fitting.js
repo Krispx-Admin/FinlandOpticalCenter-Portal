@@ -33,11 +33,7 @@ const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 // journey it hangs below the middle pin rather than taking room, so the
 // journey stays centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
-// Under an order's status: how its outside lens order stands.
-const olTagHTML = (o, cls = '') => {
-  const t = outsideTag(o.outsideLens);
-  return t ? `<span class="ol-tag ol-${t.tone} ${cls}">${esc(t.text)}</span>` : '';
-};
+
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
 
@@ -173,10 +169,10 @@ export function fittingView(me) {
             <b>${esc(o.ref)}</b>
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : olTagHTML(o, 'ol-tag-sub')}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
         </div>
         <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
-        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}${olTagHTML(o)}</div>
+        <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
           <button class="icon-btn open-arrow" data-open="${o.id}" title="Open order">${icons.chevronRight}</button>
@@ -482,7 +478,7 @@ export function fittingView(me) {
                 <input type="radio" name="olHow" value="${k}" ${i === 0 ? 'checked' : ''}>
                 <b>${esc(f.label)}</b>
                 <span>${esc(k === 'send_frames'
-                  ? `The frame goes to ${locName(OUTSIDE_LENS_HANDLER)}, which cuts the lenses.`
+                  ? 'You send the frame to the fitter you choose when it is ready.'
                   : canCutOwnLenses(me.role) ? `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here and you cut them.`
                   : `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here; then you send the frame and lenses to a fitter.`)}</span>
               </label>`).join('')}

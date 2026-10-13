@@ -496,16 +496,15 @@ RECEIVE THE LENSES (MGM's own orders are always cut at MGM, no choice).
 RPC create_outside_lens_order(bill, customer, rx, lens_type, fulfilment).
 outside_lens_orders: status to_order|ordered, fulfilment, sent_at.
 
-THE FLOW (schema-25, user 2026-10-13: "think about what can and can't happen"):
-  status pill reads "Waiting for Lenses"; the outside state is a separate TAG
-  under it (.ol-tag): "Outside lenses · to order" (amber) / "· ordered"
-  (blue) / "· sent" (green) — data.js outsideTag().
-  SEND THE FRAME: order fitter = MGM, status lenses_in. The branch reads
-    "Frame to send to MGM" (NOT "Waiting for Lenses" — the tag carries the
-    lens state; user 2026-10-13) and can Send to fitter any time; MGM can
-    Confirm arrival any time; MGM reads "Waiting for frame from X". CUTTING (at_fitter -> ready; MGM's own: lenses_in ->
-    at_fitter -> delivered) is BLOCKED until Ordered ("order the lenses
-    first"; outsideBlocked()).
+THE FLOW (schema-25/27, user 2026-10-13: "think about what can and can't happen"):
+  status pill reads "Waiting for Lenses"; NO tag under it in the list (user
+  removed it, 2026-10-13) — the outside state shows in the drawer's Outside
+  lenses section and in MGM's Outside Lens Orders tab.
+  SEND THE FRAME (schema-27): order created at lenses_in with NO fitter; the
+    branch presses Send to fitter whenever the frame is ready and CHOOSES the
+    fitter in the normal picker (MGM normally — the lenses arrive there — or
+    keep it in-house). FINISHING THE CUT (at_fitter -> ready / delivered) is
+    BLOCKED until Ordered ("order the lenses first"; outsideBlocked()).
   RECEIVE: order pending; fitter = branch if a fitting centre (cuts it), else
     none (picks a fitter after delivery). MGM gets "Send lenses" in its Fitting
     Log and the Outside tab ONLY once Ordered (canSendOutside; RPC
@@ -737,6 +736,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              refused after send/cut. APPLIED 2026-10-13.
   schema-26-outside-handler-sees-orders.sql  MGM reads every order with
                              outside lenses. APPLIED 2026-10-13.
+  schema-27-outside-pick-fitter.sql  send-the-frame orders start with no
+                             fitter (branch picks); gate = finishing the cut;
+                             change_outside_fulfilment updated. APPLIED.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1081,6 +1083,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Outside lenses, send the frame: no fitter preset — the branch picks
+             one with Send to fitter; list tag removed, status "Waiting for
+             Lenses"; gate only on finishing the cut (schema-27; open order "1"
+             at MOUJ cleared of its MGM preset).
  2026-10-13  Outside lenses: real flow (schema-25/26, rehearsed rolled back):
              "Waiting for Lenses" + outside tag; branch picks send-frame /
              receive; MGM Send lenses only once ordered; no cutting before
