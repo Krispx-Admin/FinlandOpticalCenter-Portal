@@ -1139,6 +1139,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  The bench lock is now a "Lab" switch in the Fitting Log header of a
+             fitting centre (On / Off, amber when off; no modal, no date). Off
+             reads "Lab off" everywhere (pickers, rows, Settings > Branches).
+             Same DB (branches.bench_closed, set_bench).
+ 2026-10-13  DATA WIPED again at the user's request (no backup): fitting orders
+             + events, outside lens orders, stock requests, lens stock rows,
+             lens requests, claims + Direct Insurance. Numbering restarted
+             (requests 1001, LR-1001, INV-/DI-3001). KEPT: branches + accounts,
+             app_settings, lens type lists, employees, schedule.
  2026-10-13  Consistency pass: buttons for an arrival read "Lens received" /
              "Frame received" (were Lenses delivered / Lenses received /
              Confirm arrival / Confirm delivery / Received back); every "your

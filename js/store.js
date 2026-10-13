@@ -677,7 +677,7 @@ export const store = {
     return run(['branches'], async () => {
       ok(await supabase.rpc('set_bench', { p_code: code, p_closed: closed, p_until: until || null }));
       return true;
-    }, { module: 'fitting', title: closed ? `${name} closed — fitter on leave` : `${name} is open again` });
+    }, { module: 'fitting', title: closed ? `${name}: lab off` : `${name}: lab on` });
   },
 
   // Gone for good — only a branch with nothing recorded; the database checks.

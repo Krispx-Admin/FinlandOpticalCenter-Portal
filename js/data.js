@@ -59,7 +59,7 @@ export const isBenchClosed = code => {
 };
 export const benchNote = code => {
   const until = LOCATIONS.find(x => x.code === code)?.benchUntil;
-  return `Closed — fitter on leave${until ? ` until ${new Date(until + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}`;
+  return `Lab off${until ? ` until ${new Date(until + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}`;
 };
 
 // Replace the lists in place: every module imported these arrays, so they keep

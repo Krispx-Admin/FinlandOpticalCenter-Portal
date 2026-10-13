@@ -136,9 +136,9 @@ export function settingsView(me) {
           : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
         ${fixed ? '<span></span>' : `<button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${r.holds_lens_stock ? 'Holds lens stock — stop that first' : 'Delete this branch'}" ${r.holds_lens_stock ? 'disabled' : ''}>${icons.trash}</button>`}
         ${r.role === 'fitting' && r.active ? `
-        <label class="br-lens br-bench" title="Closed while the fitter is on leave: no frames can be sent there">
+        <label class="br-lens br-bench" title="Lab off: no frames can be sent there">
           <span class="sw"><input type="checkbox" data-br-bench="${esc(r.code)}" ${isBenchClosed(r.code) ? '' : 'checked'}><i></i></span>
-          <span>${isBenchClosed(r.code) ? esc(benchNote(r.code)) : 'Bench open'}</span>
+          <span>${isBenchClosed(r.code) ? esc(benchNote(r.code)) : 'Lab on'}</span>
         </label>
         <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
           <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>

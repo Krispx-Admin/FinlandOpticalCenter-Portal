@@ -204,7 +204,7 @@ export function fittingView(me) {
       else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
       else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(o.outsideLens.dest)}</button>`;
       else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
-      else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} closed — fitter on leave</span>`;
+      else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} lab off</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
@@ -672,38 +672,17 @@ export function fittingView(me) {
     drawer?.update();
   }
 
-  // A fitting centre opens or closes its own bench (fitter on leave).
+  // A fitting centre turns its own lab on or off (off: fitter on leave —
+  // nothing can be sent there). One switch, no questions (user, 2026-10-13).
   function benchBtnHTML() {
     if (me.role !== 'fitting' || viewOnly) return '';
-    const shut = isBenchClosed(me.code);
-    return shut
-      ? `<button class="btn btn-ghost bench-btn is-closed" data-bench title="Press to open the bench again">${icons.wrench} ${esc(benchNote(me.code))}</button>`
-      : `<button class="btn btn-ghost bench-btn" data-bench title="Close the bench while the fitter is on leave">${icons.wrench} Bench open</button>`;
-  }
-  function benchModal() {
-    if (isBenchClosed(me.code)) {
-      if (confirm('Open the bench again? Frames can be sent here from now on.')) store.setBench(me.code, false);
-      return;
-    }
-    const layer = openLayer('modal', () => `
-      <div class="dw-head">
-        <div><div class="dw-kicker">Fitting bench</div><h2>Close the bench — fitter on leave</h2></div>
-        <button class="icon-btn" data-close>${icons.x}</button>
-      </div>
-      <form class="form" id="bench-form">
-        <label>Reopens on <span class="opt">optional — leave empty to reopen by hand</span>
-          <input type="date" name="until" min="${new Date().toISOString().slice(0, 10)}"></label>
-        <div class="form-foot">
-          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-          <button type="submit" class="btn btn-primary">${icons.check} Close the bench</button>
-        </div>
-      </form>`);
-    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
-    layer.el.querySelector('#bench-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const until = new FormData(e.target).get('until') || null;
-      if (await store.setBench(me.code, true, until)) layer.close();
-    });
+    const on = !isBenchClosed(me.code);
+    return `
+      <label class="lab-switch ${on ? '' : 'is-off'}" title="${on ? 'Turn off while the fitter is on leave — frames can’t be sent here' : esc(benchNote(me.code))}">
+        <span>Lab</span>
+        <span class="sw"><input type="checkbox" data-lab ${on ? 'checked' : ''}><i></i></span>
+        <em>${on ? 'On' : 'Off'}</em>
+      </label>`;
   }
 
   function branchOptions() {
@@ -745,7 +724,7 @@ export function fittingView(me) {
     root.querySelector('#f-branch')?.addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refreshLists(); });
     root.querySelector('[data-new]')?.addEventListener('click', newOrderModal);
     root.querySelector('[data-cutters]')?.addEventListener('click', cuttersModal);
-    root.querySelector('#f-bench')?.addEventListener('click', e => { if (e.target.closest('[data-bench]')) benchModal(); });
+    root.querySelector('#f-bench')?.addEventListener('change', e => { if (e.target.matches('[data-lab]')) store.setBench(me.code, !e.target.checked); });
     root.querySelector('#f-origin')?.addEventListener('change', e => { ui.origin = e.target.value; refreshLists(); });
     root.querySelector('#f-fitter')?.addEventListener('change', e => { ui.fitter = e.target.value; refreshLists(); });
 

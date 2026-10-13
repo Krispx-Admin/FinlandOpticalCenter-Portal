@@ -663,7 +663,15 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .picker-card.is-closed { opacity: .5; cursor: not-allowed; background: var(--page); }
 .picker-card.is-closed:hover { border-color: var(--border); box-shadow: none; transform: none; }
 .mod-head-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.bench-btn.is-closed { color: #b45309; border-color: #f5dcbb; background: #fdf1e3; }
+/* a fitting centre's Lab switch, the size of the header buttons; amber when off */
+.lab-switch {
+  display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--brand-ink);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+}
+.lab-switch em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--st-green); min-width: 22px; }
+.lab-switch.is-off { color: #b45309; border-color: #f5dcbb; background: #fdf1e3; }
+.lab-switch.is-off em { color: #b45309; }
 .fulfil-opt.is-off { opacity: .5; cursor: not-allowed; }
 .br-lens.br-bench { grid-column: 2 / -1; }
 /* outside lenses: a small tag under the status */
