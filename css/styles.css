@@ -432,8 +432,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .chip.on .chip-n { background: rgba(255,255,255,.22); }
 /* Status filters: one tidy bar of chips rather than loose pills */
 .status-chips {
-  flex-wrap: nowrap; gap: 2px; padding: 4px; width: fit-content; max-width: 100%;
-  overflow-x: auto; scrollbar-width: none;
+  /* wraps to a second line rather than scrolling (user, 2026-10-13) */
+  flex-wrap: wrap; gap: 2px; padding: 4px; width: fit-content; max-width: 100%;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
 }
 .status-chips::-webkit-scrollbar { display: none; }
@@ -645,12 +645,17 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* the copy in the subtitle only shows once the journey column is hidden */
 .stock-tag-sub { display: none; }
 .stock-tag.outside-tag { color: var(--st-purple); }
-/* outside lenses still travelling: the frame's line, and the lenses' line under it */
+/* outside lenses: the frame's line, and the lenses' line under it — same
+   navy design, each named in a faded italic word, both the full width */
 .journey-2 { display: flex; flex-direction: column; gap: 7px; }
-.journey-lensline .j-pin { color: var(--st-purple); border-color: #f0cdf4; background: #faeafc; }
-.journey-lensline .j-node.done .j-pin { color: #fff; background: var(--st-purple); border-color: var(--st-purple); }
-.journey-lensline .j-seg.moving { background: #f0cdf4; }
-.journey-lensline .j-ghost { visibility: hidden; }
+.row-journey > .journey-2 { flex: 1 1 auto; justify-content: center; }
+.j-line { display: flex; align-items: center; gap: 8px; }
+.j-line > .journey { flex: 1 1 auto; }
+.j-line-lbl { flex: none; width: 34px; font-size: 10.5px; font-style: italic; color: var(--ink-3); opacity: .75; }
+.journey-2-big { margin: 16px 0 4px; gap: 12px; }
+.journey-2-big .journey-big { margin: 0; }
+.journey-2-big .j-line { align-items: flex-start; }
+.journey-2-big .j-line-lbl { font-size: 12px; width: 40px; padding-top: 5px; }
 .fulfil-opt .ol-dest { margin-top: 6px; width: 100%; }
 .ol-handler { margin-left: auto; }
 /* a closed bench: greyed in the picker, amber on its own header button */

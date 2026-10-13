@@ -94,23 +94,26 @@ export function fittingView(me) {
   };
 
   // ── journey mini-diagram ──
-  // An outside-lens job whose lenses are still on their way shows two lines:
-  // the frame's journey, and the lenses' road from the handler to where they
-  // are going — so the fitter can see where everything is.
+  // An outside-lens job the handler sends lenses for shows two lines, each
+  // named: the frame's journey, and under it the lenses' road from the
+  // handler to where they are going, drawn the full width. The lens line
+  // stays once they arrive — its end pin simply turns navy (user, 2026-10-13).
   function journey(o, big = false, tail = '') {
     const ol = o.outsideLens, H = outsideHandler();
-    if (!ol || ol.branch === H || isBack(o) || ol.receivedAt) return frameJourney(o, big, tail);
-    const seg = ol.sentAt ? 'moving' : '';
+    if (!ol || ol.branch === H) return frameJourney(o, big, tail);
+    const dest = ol.dest ?? o.origin;
+    const seg = ol.receivedAt ? 'done' : ol.sentAt ? 'moving' : '';
     const pin = (code, cls) => `<div class="j-node ${cls}"><span class="j-pin">${esc(code)}</span>${big ? `<span class="j-lbl">${esc(locName(code))}</span>` : ''}</div>`;
+    const name = t => `<span class="j-line-lbl">${t}</span>`;
     return `
-      <div class="journey-2">
-        ${frameJourney(o, big, '')}
-        <div class="journey journey-lensline ${big ? 'journey-big' : ''}" title="Outside lenses: ${esc(locName(H))} → ${esc(locName(ol.dest))} · ${esc(outsideLensState(ol))}">
-          ${pin(H, ol.status === 'ordered' ? 'done' : '')}
-          <i class="j-seg ${seg}"></i>
-          ${pin(ol.dest, 'j-mid')}
-          <i class="j-seg j-ghost"></i>
-          <div class="j-node j-ghost"><span class="j-pin">${esc(o.origin)}</span></div>
+      <div class="journey-2 ${big ? 'journey-2-big' : ''}">
+        <div class="j-line">${name('Frame')}${frameJourney(o, big, '')}</div>
+        <div class="j-line">${name('Lens')}
+          <div class="journey ${big ? 'journey-big' : ''}" title="Outside lenses: ${esc(locName(H))} → ${esc(locName(dest))} · ${esc(outsideLensState(ol))}">
+            ${pin(H, ol.status === 'ordered' ? 'done' : '')}
+            <i class="j-seg ${seg}"></i>
+            ${pin(dest, `${ol.receivedAt ? 'done' : ''} j-mid`)}
+          </div>
         </div>
       </div>`;
   }

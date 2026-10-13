@@ -537,9 +537,10 @@ FLOW / WHO DOES WHAT
   CHANGE: the branch (or office) can switch the way or the fitter while
     nothing has moved (drawer "Change" → same choices; RPC
     change_outside_fulfilment(id, fulfilment, dest)).
-JOURNEY: while the lenses are travelling, TWO lines — the frame's journey and,
-  under it in purple, the lenses' road AV → dest (moving once sent); once
-  received, back to one line with the purple "Outside Lens" label.
+JOURNEY: TWO lines, each named in a faded italic word — "Frame" (the frame's
+  journey) and "Lens" (AV → dest, drawn the full width). Same navy design as
+  every journey, no purple: AV navy once ordered, the line moves once sent,
+  and on arrival the line stays — it turns solid and the dest pin turns navy.
 GATES in the DB (outside_lens_gate trigger + functions): no finishing the cut
   before the lenses are received; no "delivered" before sent; only AV/office
   order and send; only the dest receives; dest must be an open fitting
@@ -1124,6 +1125,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Status chip bars wrap to a second line instead of scrolling. The
+             outside-lens journey: lines named "Frame" / "Lens", the lens line
+             full width in navy (no purple), and it stays after the lenses
+             arrive (the dest pin turns navy).
  2026-10-13  Last step: Ready for collection → "Handed to customer" → Collected
              (status 'collected', schema-31; existing delivered → collected).
  2026-10-13  Outside lenses reworked (schema-30): Avenues Mall orders them (a
@@ -1172,8 +1177,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
              kept: page subtitles, errors, empty states, the insurance-card
              name note, a one-line "reload the Schedule tab" warning.
  2026-10-13  Status chips (Fitting Log, Stock Requests, Lens Stock requests) are
-             one tidy bar (.status-chips: rounded strip, no wrapping — scrolls
-             sideways when narrow, divider before Completed/All, 0 counts
+             one tidy bar (.status-chips: rounded strip; wraps to a second line
+             when narrow, never scrolls — divider before Completed/All, 0 counts
              faded). A chip's count turns the sidebar-badge orange (#f59e0b)
              when it holds something waiting on whoever is looking (ui.js
              chipCount(n, act); fitting: needsAction, stock: office + placed,
