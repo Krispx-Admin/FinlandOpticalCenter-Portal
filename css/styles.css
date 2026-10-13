@@ -1002,27 +1002,28 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .tabs-row { margin-bottom: 16px; }
 
 /* ── Lens Stock: folder tabs (one per shelf, then the request lists) ── */
+/* The row overlaps the panel's top border by 1px, so a tab's bottom edge
+   can sit on it: grey under the others, white (gone) under the open one. */
 .shelf-tabs {
-  display: flex; align-items: flex-end; gap: 6px; padding: 0 2px; margin-top: 4px;
+  display: flex; align-items: flex-end; gap: 6px; padding: 0; margin: 4px 0 -1px;
   overflow-x: auto; scrollbar-width: thin; position: relative; z-index: 1;
 }
 .shelf-tab {
   flex: 0 0 auto; min-width: 176px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   padding: 9px 16px 10px; margin-bottom: 0; position: relative; cursor: pointer; text-align: left;
   font: inherit; color: var(--ink-2); background: #e9edf3;
-  border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0;
+  border: 1px solid var(--border); border-radius: 12px 12px 0 0;
   transition: background var(--speed), color var(--speed), padding var(--speed);
 }
 .shelf-tab b { font-size: 13px; font-weight: 650; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .shelf-tab b svg { width: 15px; height: 15px; }
 .shelf-tab span { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .shelf-tab:hover { background: #e1e6ee; color: var(--ink); }
-/* the open tab: taller, white, joined to the panel, and outlined in the brand
-   colour up one side, round both top corners and down the other side */
+/* the open tab: taller and white, the same thin border as the panel, and no
+   line along its bottom — it opens straight into the panel */
 .shelf-tab.on {
-  min-width: 220px; padding: 13px 18px 16px; background: var(--surface); color: var(--ink);
-  border: 3px solid var(--brand); border-bottom: none;
-  margin-bottom: -1px; box-shadow: 0 -4px 14px rgba(19,48,86,.07);
+  min-width: 220px; padding: 15px 20px 16px; background: var(--surface); color: var(--ink);
+  border-bottom-color: var(--surface); box-shadow: 0 -4px 14px rgba(19,48,86,.06);
 }
 .shelf-tab.on b { font-size: 15.5px; font-weight: 700; color: var(--brand-ink); }
 .shelf-tab.on span { color: var(--brand); font-weight: 600; }
