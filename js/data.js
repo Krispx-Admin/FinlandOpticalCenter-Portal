@@ -391,7 +391,7 @@ export const FULFILMENT = {
   },
   receive_lens: {
     label: 'Receive the lenses',
-    sub: 'The lenses are sent here and you cut them yourself — no frame in transit.',
+    sub: 'The lenses are sent here; then cut here or send to a fitter.',
     subShop: 'The lenses are sent here; then you send the frame and the lenses to a fitter.',
     chip: 'Lenses come here',
   },

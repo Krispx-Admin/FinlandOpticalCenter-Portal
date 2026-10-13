@@ -326,9 +326,13 @@ FULFILMENT — every lens request also OPENS A FITTING ORDER, in one DB
 transaction (create_lens_request). EVERY branch chooses (user, 2026-10-12);
 the default is send_frames:
   send_frames  "Send the frame"      -> order fitter = holder, status lenses_in
-  receive_lens "Receive the lenses"  -> order pending; fitter = requester if it
-                                        is a fitting centre (self-fit), else
-                                        null (it picks a fitter after delivery)
+  receive_lens "Receive the lenses"  -> order pending, fitter NONE (schema-29;
+                                        was self-fit for fitting centres). After
+                                        Lenses delivered the branch uses Send to
+                                        fitter: Keep here (open bench) or any
+                                        open fitter / outside cutter.
+  A holder whose bench is closed cannot be sent the frame (create and change
+  refuse; the cart greys "Send the frame").
 Bill number + customer name required on the request (they become the order).
 
 NO CONFIRMING (user, 2026-10-12, schema-21). The lenses come off the holder's
@@ -760,6 +764,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              trigger; outside: frame-to-MGM presets MGM again,
                              receive has no fitter; open orders reshaped.
                              APPLIED 2026-10-13 by Claude.
+  schema-29-stock-receive-pick-fitter.sql  create_lens_request /
+                             change_lens_fulfilment: receive -> no fitter;
+                             send-the-frame refused to a closed holder.
+                             APPLIED 2026-10-13 by Claude.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1104,6 +1112,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Stock lenses received by a branch: no fitter fixed — after delivery
+             cut here or send to a fitter, like outside lenses (schema-29,
+             applied + rehearsed). Closed holders can't be sent frames.
  2026-10-13  Outside-lens wording per viewer: branch "Lenses being ordered" /
              "Lenses at MGM"; MGM "Order lens" (amber) → "Lenses ordered"
              (green) → Send lenses. Lens senders see the lens road (MGM → MOUJ,
