@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses, isBack,
   fulfilmentSwitch,
   isOutside, OUTSIDE_DEFAULT, outsideHandler, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
@@ -18,7 +18,7 @@ const DAY_FILTERS = [0, 1, 3, 7, 14, 30];
 // to the fitter and on the bench are both "Waiting to be Fitted" — share a chip
 // rather than showing the same words twice. A chip's key is its first status.
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
-for (const s of FIT_FLOW.filter(s => s !== 'delivered')) {
+for (const s of FIT_FLOW.filter(s => s !== 'collected')) {
   const same = CHIP_DEFS.find(d => d.label === FIT_STATUS[s].label);
   if (same) same.statuses.push(s);
   else CHIP_DEFS.push({ key: s, label: FIT_STATUS[s].label, statuses: [s] });
@@ -26,7 +26,7 @@ for (const s of FIT_FLOW.filter(s => s !== 'delivered')) {
 // Frames at an outside cutter have their own chip, not "In transit".
 for (const d of CHIP_DEFS) if (d.statuses?.includes('to_fitter')) d.test = o => d.statuses.includes(o.status) && !(o.status === 'to_fitter' && isOutside(o));
 CHIP_DEFS.push({ key: 'outside', label: 'Outside cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
-CHIP_DEFS.push({ key: 'delivered', label: 'Completed', statuses: ['delivered'] });
+CHIP_DEFS.push({ key: 'collected', label: 'Completed', statuses: ['collected'] });
 const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 
 // Orders a lens request opened wear this under their journey, and in the list
@@ -60,7 +60,7 @@ export function fittingView(me) {
     let list = store.ordersFor(me.code);
     if (ui.days) {
       const from = Date.now() - ui.days * 864e5;
-      list = list.filter(o => (o.status === 'delivered' ? o.updatedAt : o.createdAt) >= from);
+      list = list.filter(o => (o.status === 'collected' ? o.updatedAt : o.createdAt) >= from);
     }
     if (!isAdmin && ui.branch !== 'all') list = list.filter(o => o.origin === ui.branch || o.fitter === ui.branch);
     if (isAdmin && ui.origin !== 'all') list = list.filter(o => o.origin === ui.origin);
@@ -75,7 +75,7 @@ export function fittingView(me) {
   }
   function visible() {
     let list = filtered();
-    if (ui.chip === 'active') list = list.filter(o => o.status !== 'delivered');
+    if (ui.chip === 'active') list = list.filter(o => o.status !== 'collected');
     else {
       const chip = CHIP_DEFS.find(d => d.key === ui.chip);
       list = list.filter(o => chip && onChip(chip, o));
@@ -88,7 +88,7 @@ export function fittingView(me) {
     .sort((a, b) => locName(a).localeCompare(locName(b)));
   const counts = () => {
     const all = filtered();
-    const c = { active: all.filter(o => o.status !== 'delivered').length };
+    const c = { active: all.filter(o => o.status !== 'collected').length };
     for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => onChip(d, o)).length;
     return c;
   };
@@ -99,7 +99,7 @@ export function fittingView(me) {
   // are going — so the fitter can see where everything is.
   function journey(o, big = false, tail = '') {
     const ol = o.outsideLens, H = outsideHandler();
-    if (!ol || ol.branch === H || o.status === 'delivered' || ol.receivedAt) return frameJourney(o, big, tail);
+    if (!ol || ol.branch === H || isBack(o) || ol.receivedAt) return frameJourney(o, big, tail);
     const seg = ol.sentAt ? 'moving' : '';
     const pin = (code, cls) => `<div class="j-node ${cls}"><span class="j-pin">${esc(code)}</span>${big ? `<span class="j-lbl">${esc(locName(code))}</span>` : ''}</div>`;
     return `
@@ -148,8 +148,8 @@ export function fittingView(me) {
     // about why the rest of the diagram is missing.
     if (onShortRoad(o)) return `
       <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
-        ${node(o.fitter, `${o.status === 'delivered' ? 'ready' : 'done'} j-mid`, fitterName, tail)}
-        <span class="j-inhouse">${o.status === 'delivered' ? 'Fitted in-house' : 'In-house — no transit'}</span>
+        ${node(o.fitter, `${isBack(o) ? 'ready' : 'done'} j-mid`, fitterName, tail)}
+        <span class="j-inhouse">${isBack(o) ? 'Fitted in-house' : 'In-house — no transit'}</span>
       </div>`;
     return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
@@ -172,9 +172,9 @@ export function fittingView(me) {
   // ── stats tiles ──
   function statsHTML() {
     const all = store.ordersFor(me.code);
-    const active = all.filter(o => o.status !== 'delivered');
+    const active = all.filter(o => o.status !== 'collected');
     const mine = active.filter(o => needsAction(o, me.code));
-    const week = all.filter(o => o.status === 'delivered' && Date.now() - o.updatedAt < 7 * 864e5);
+    const week = all.filter(o => o.status === 'collected' && Date.now() - o.updatedAt < 7 * 864e5);
     const t = (n, lbl, cls = '') => `
       <div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
     return t(active.length, 'Active orders')
@@ -196,7 +196,7 @@ export function fittingView(me) {
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
       // The handler's first job on any outside order: order the lens — the button opens the list.
-      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && o.status !== 'delivered' && !viewOnly)
+      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && !isBack(o) && !viewOnly)
         action = `<a class="btn btn-ghost btn-sm" href="#/outside">Order lens ${icons.arrowRight}</a>`;
       else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
       else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(o.outsideLens.dest)}</button>`;
@@ -204,7 +204,7 @@ export function fittingView(me) {
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} closed — fitter on leave</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
-      else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
+      else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       // The fitter marks the outside lenses received — alongside the frame's own step.
       if (canReceiveOutside(o, me.code) && !viewOnly) {
         const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">${icons.check} Lenses received</button>`;
@@ -214,7 +214,7 @@ export function fittingView(me) {
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
-        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' || viewOnly ? 'disabled' : ''}><i></i></label>
+        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
@@ -265,9 +265,9 @@ export function fittingView(me) {
   function chipsHTML() {
     const c = counts();
     // How many in each chip are waiting on this location.
-    const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'delivered' && needsAction(o, me.code));
+    const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'collected' && needsAction(o, me.code));
     const act = d => (d.key === 'active' ? mine.length : mine.filter(o => onChip(d, o)).length);
-    return CHIP_DEFS.map(d => `${d.key === 'delivered' ? '<span class="chip-sep"></span>' : ''}
+    return CHIP_DEFS.map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
       <button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">
         ${esc(d.label)}${chipCount(c[d.key] ?? 0, act(d))}
       </button>`).join('');
@@ -713,7 +713,7 @@ export function fittingView(me) {
 
   // Select every order on the open chip — not on "All active", where they need
   // different things done. Completed orders cannot be selected.
-  const selectable = () => visible().filter(o => o.status !== 'delivered');
+  const selectable = () => visible().filter(o => o.status !== 'collected');
   function selectAllHTML() {
     if (viewOnly || ui.chip === 'active') return '';
     const list = selectable();
@@ -732,7 +732,7 @@ export function fittingView(me) {
 
   function toggleSelect(id) {
     const o = store.order(id);
-    if (!o || o.status === 'delivered' || viewOnly) return;
+    if (!o || o.status === 'collected' || viewOnly) return;
     if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
     refreshLists();
   }

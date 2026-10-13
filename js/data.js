@@ -134,14 +134,17 @@ export const brandsFor = (settings, cat) =>
 // The long road: a branch sells the frame, it travels to a fitting centre for
 // its lenses, and it travels back to be collected where it was bought.
 // The lenses arrive at the branch first; the frame goes when the driver comes.
-export const FIT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'at_fitter', 'ready', 'returning', 'delivered'];
+// …and when it is back, the customer collects it (user, 2026-10-13).
+export const FIT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'at_fitter', 'ready', 'returning', 'delivered', 'collected'];
+// Back at the branch (or past it): nothing travels any more.
+export const isBack = o => o.status === 'delivered' || o.status === 'collected';
 
 // The short road. A fitting centre that sells a frame it will glaze itself has
 // nothing to put in a van: the frame never leaves the building and the customer
 // collects from the same counter. So both road legs drop out, and with them the
 // hand-over at each end — there is no arrival to confirm and no delivery back.
 // The lenses still have to arrive, so that step stays.
-export const SELF_FLOW = ['pending', 'lenses_in', 'at_fitter', 'delivered'];
+export const SELF_FLOW = ['pending', 'lenses_in', 'at_fitter', 'delivered', 'collected'];
 export const isSelfFit = o => !!o.fitter && o.fitter === o.origin;
 
 // An order already on the road finishes the way it started, even if its fitter
@@ -153,12 +156,13 @@ export const onShortRoad = o => isSelfFit(o) && SELF_FLOW.includes(o.status);
 // The outside road. A frame sent to a 3rd-party cutter goes to someone with no
 // account here, so the branch that sent it does every step: it goes, and it
 // comes back. The cutter's name is on the order (outside); fitter stays empty.
-export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered'];
+export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered', 'collected'];
 export const isOutside = o => !!o.outside;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
   to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Received back', actor: 'origin', done: 'Received back from the outside cutter' },
-  delivered: { label: 'Delivered',         color: 'done',   action: null,            actor: null,     done: null },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
+  collected: { label: 'Collected',         color: 'done',   action: null,            actor: null,     done: null },
 };
 
 export const flowFor = o => (isOutside(o) ? OUT_FLOW : onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
@@ -176,7 +180,8 @@ export const FIT_STATUS = {
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
   returning: { label: 'Returning',            color: 'teal',   action: 'Confirm delivery',actor: 'origin', done: 'Delivered back at origin branch' },
-  delivered: { label: 'Delivered',            color: 'done',   action: null,              actor: null,     done: null },
+  delivered: { label: 'Ready for collection', color: 'green',  action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
+  collected: { label: 'Collected',            color: 'done',   action: null,              actor: null,     done: null },
 };
 
 // A self-fit order's own vocabulary: nothing is "at the fitter" when the fitter
@@ -187,7 +192,8 @@ const SELF_STATUS = {
   pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lenses delivered', actor: 'fitter', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
   at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
-  delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'fitter', done: 'Handed to the customer — collected' },
+  collected: { label: 'Collected',          color: 'done',   action: null,            actor: null,     done: null },
 };
 
 // ── Outside lens orders (TRIAL; schema-24 … 30) ──
@@ -223,7 +229,7 @@ export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.fulfilment =
   && !o.outsideLens.receivedAt && o.status === 'at_fitter';
 export const canSendOutside = (o, code) => {
   const ol = o.outsideLens, H = outsideHandler();
-  return !!ol && ol.status === 'ordered' && !ol.sentAt && ol.branch !== H && o.status !== 'delivered'
+  return !!ol && ol.status === 'ordered' && !ol.sentAt && ol.branch !== H && !isBack(o)
     && (code === H || loc(code)?.role === 'admin');
 };
 export const canReceiveOutside = (o, code) => {
@@ -302,7 +308,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
   }
   // Outside lenses (schema-30): each viewer reads its own next step.
   const ol = o.outsideLens;
-  if (ol && o.status !== 'delivered') {
+  if (ol && !isBack(o)) {
     const H = outsideHandler();
     const ordered = ol.status === 'ordered';
     // The handler (Avenues): order the lens, then send it on.
@@ -487,7 +493,7 @@ export function canSeeOrder(o, code) {
     || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.sentAt);   // the handler, until it has sent them
 }
 export function canAdvanceOrder(o, code) {
-  if (o.status === 'delivered' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
+  if (o.status === 'collected' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
   // A frame cannot be sent to a closed bench.
   if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) return false;
   const me = loc(code);

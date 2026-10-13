@@ -184,7 +184,7 @@ branch, not globally — index orders_ref_per_branch). Never auto-suggest it
 (that was removed on purpose). Customer name is REQUIRED (trimmed).
 
 LONG ROAD (FIT_FLOW):
-  pending -> lenses_in -> to_fitter -> at_fitter -> ready -> returning -> delivered
+  pending -> lenses_in -> to_fitter -> at_fitter -> ready -> returning -> delivered -> collected
   status     label                 pill color  action button      who acts
   pending    Waiting for Lenses    slate       Lenses delivered   origin
   lenses_in  Lenses Delivered      cyan        Send to fitter     origin
@@ -192,7 +192,13 @@ LONG ROAD (FIT_FLOW):
   at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
   ready      Ready                 green       Send to branch     fitter
   returning  Returning to X        teal        Confirm delivery   origin
-  delivered  Delivered             done(grey)  —                  —
+  delivered  Ready for collection  green       Handed to customer origin
+  collected  Collected             done(grey)  —                  —
+  ('collected' added 2026-10-13, schema-31: when the glasses are back, the
+   branch marks them handed to the customer. "Completed" chip = collected;
+   "All active" = everything not collected; isBack(o) = delivered|collected.
+   SELF and outside-cutter roads end the same way. The 37 orders that were
+   'delivered' then became 'collected' with their dates kept.)
   (Labels chosen by the user on 2026-10-08; they briefly made to_fitter
    "Waiting to be Fitted" too, then asked for "In transit" back.
    fitStep(o) names the place: "In transit to MGM", "Returning to SCC" — code
@@ -772,6 +778,8 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-31-collected.sql    orders.status gains 'collected'; delivered →
+                             collected (dates kept). APPLIED 2026-10-13.
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1116,6 +1124,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Last step: Ready for collection → "Handed to customer" → Collected
+             (status 'collected', schema-31; existing delivered → collected).
  2026-10-13  Outside lenses reworked (schema-30): Avenues Mall orders them (a
              setting); send-the-frame picks the fitter and the frame and the
              lenses travel separately to it (two-line journey); the fitter

@@ -170,7 +170,7 @@ export function settingsView(me) {
     const code = sel.dataset.brRole, b = LOCATIONS.find(l => l.code === code);
     const role = sel.value;
     if (!b || role === b.role) return;
-    const away = store.state.orders.filter(o => o.fitter === code && o.status !== 'delivered').length;
+    const away = store.state.orders.filter(o => o.fitter === code && !['delivered', 'collected'].includes(o.status)).length;
     const what = ROLES[role].label.toLowerCase();
     const note = role === 'fitting'
       ? `${b.name} will be offered in “Send to fitter” from now on.`

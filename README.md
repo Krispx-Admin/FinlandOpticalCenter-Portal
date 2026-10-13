@@ -113,6 +113,7 @@ Applied in order:
 | `supabase/schema-28-bench-lock-outside-flow.sql` | fitting centres close their bench while the fitter is on leave; outside lenses: frame to MGM, or lenses to the branch |
 | `supabase/schema-29-stock-receive-pick-fitter.sql` | stock lenses received by a branch: cut here or send to a fitter |
 | `supabase/schema-30-outside-two-legs.sql` | (trial) Avenues orders outside lenses; frame and lenses travel separately to the chosen fitter |
+| `supabase/schema-31-collected.sql` | the last step: the customer collects the glasses |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences
