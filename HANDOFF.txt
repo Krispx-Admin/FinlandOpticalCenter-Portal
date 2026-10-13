@@ -500,9 +500,10 @@ THE FLOW (schema-25, user 2026-10-13: "think about what can and can't happen"):
   status pill reads "Waiting for Lenses"; the outside state is a separate TAG
   under it (.ol-tag): "Outside lenses · to order" (amber) / "· ordered"
   (blue) / "· sent" (green) — data.js outsideTag().
-  SEND THE FRAME: order fitter = MGM, status lenses_in. The branch can Send to
-    fitter any time; MGM can Confirm arrival any time; MGM reads "Waiting for
-    frame from X". CUTTING (at_fitter -> ready; MGM's own: lenses_in ->
+  SEND THE FRAME: order fitter = MGM, status lenses_in. The branch reads
+    "Frame to send to MGM" (NOT "Waiting for Lenses" — the tag carries the
+    lens state; user 2026-10-13) and can Send to fitter any time; MGM can
+    Confirm arrival any time; MGM reads "Waiting for frame from X". CUTTING (at_fitter -> ready; MGM's own: lenses_in ->
     at_fitter -> delivered) is BLOCKED until Ordered ("order the lenses
     first"; outsideBlocked()).
   RECEIVE: order pending; fitter = branch if a fitting centre (cuts it), else

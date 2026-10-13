@@ -284,8 +284,10 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (long) return { ...base, label: `Waiting for Lenses — sent by ${h}` };
   }
   if (ol && o.status === 'lenses_in' && ol.fulfilment === 'send_frames') {
-    if (viewer && viewer === o.fitter && o.fitter !== o.origin) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
-    return { ...base, label: 'Waiting for Lenses', color: 'slate' };
+    // The lenses' own state is the tag underneath; the status is about the frame.
+    if (o.fitter === o.origin) return { ...base, label: 'Waiting for Lenses', color: 'slate' };   // MGM's own: waiting to cut
+    if (viewer && viewer === o.fitter) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
+    return { ...base, label: `Frame to send to ${where(o.fitter)}`, color: 'slate' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;
