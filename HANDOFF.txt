@@ -28,7 +28,7 @@ Seven modules (sidebar order):
   2. Stock Requests     — branch asks the office for stock (office and Ghiath see
                           it as "Office Queue" with a warehouse icon)
   3. Lens Stock         — MGM holds the loose-lens shelf; everyone else shops it
-  4. Insurance Claims   — printable A4 invoice (products, Rx grid, payment)
+  4. Reimbursement Invoice (was Insurance Claims) — printable A4 invoice (products, Rx grid, payment)
   5. Direct Insurance   — same record + insurer (OQIC/LIVA/Mednet) + salesperson;
                           office & Ghiath get a "paid by insurance" dashboard. 4.8
   6. Schedule           — the staff scheduler (scheduler.html), unchanged, inside
@@ -485,6 +485,32 @@ name | single-hue navy bar on a #eef1f5 track (8px, 4px radius, scaled to the
 card's max) | amount | count; hover title gives the share. Fixed columns so
 bars align. Built per the dataviz skill (one series per card → no legend).
 
+4.9 OUTSIDE LENS ORDERS (TRIAL, added 2026-10-13 — the user may drop it)
+-------------------------------------------------------------------------
+New fitting order: an "Outside lenses · other brands" switch under the bill
+number opens a prescription grid (R/L × SPH, CYL, AXIS, ADD) and a typed lens
+type. RPC create_outside_lens_order makes the fitting order (fitter = MGM,
+status lenses_in — the frame may go before or after the lenses arrive, user:
+"simultaneous") and an outside_lens_orders row (status to_order). Fitting
+Log: purple "Outside Lens" tag; label "Outside lenses · to order/ordered"
+(+ Send to fitter for the branch); MGM reads "Waiting for frame from X";
+drawer section shows the Rx, lens type and order status.
+Tab "Outside Lens Orders" (js/outside.js) — MGM (= OUTSIDE_LENS_HANDLER,
+data.js; outside_lens_handler() in SQL, fixed for the trial) and the office;
+Ghiath view-only; other branches don't see it. Stats, search, branch filter,
+chip bar To order (orange count for MGM) / Ordered, rows with Rx + lens
+type, per-row Copy (icon) and Ordered (or Undo), and a bulk bar acting on the
+SELECTED rows, or on everything shown when none are selected (e.g. one
+branch's day): "Copy for WhatsApp" + "Mark ordered". Copy text is exactly
+the user's format, orders separated by a blank line:
+    *<branch name>*
+    *<bill number>*
+    R/ -2.00(-0.75) x 180 | Add: +2.00
+    L/ ...
+    *<lens type>*
+RPC set_outside_lens_status(ids, 'ordered'|'to_order') — MGM or office.
+Nav badge for MGM = to-order count. Switchable off in Settings › Tabs.
+
 4.6 SETTINGS (admin only)
 -------------------------
 Opens on a LIST (settings.js PAGES), grouped (user, 2026-10-11):
@@ -680,6 +706,10 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-23-public-tab-maintenance.sql  disabled_tabs() for anon; schedule_view()
                              returns nothing while the Schedule tab is off
                              (office excepted). APPLIED 2026-10-12 by Claude.
+  schema-24-outside-lens-orders.sql  outside_lens_orders table (+RLS,
+                             realtime), create_outside_lens_order,
+                             set_outside_lens_status, outside_lens_handler()
+                             = 'MGM'. APPLIED 2026-10-13 by Claude (TRIAL).
 
 Tables (public): branches, orders, order_events, stock_requests,
 stock_request_lines, stock_request_events, lens_stock, lens_requests,
@@ -1024,6 +1054,21 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Outside Lens Orders (TRIAL, schema-24) — see 4.9. Insurance Claims
+             renamed "Reimbursement Invoice" (sidebar, page, Settings › Tabs).
+             Fitting Log: Urgent removed everywhere (DB column left, unused);
+             day filters Any time / 1 / 3 / 7 / 14 / 30 days (by logged date;
+             Completed by completed date; chip counts follow); "Select all N"
+             above the list on any chip except All active; a branch filter for
+             every branch (the office keeps origin + fitter, origin now reads
+             "All branches"). Sign out now signs out THIS device only
+             (supabase signOut scope 'local'; the default 'global' logged every
+             device of the branch out). Chip-bar design applied site-wide:
+             Direct Insurance periods, schedule week chips. Help paragraphs and
+             hint boxes removed across the site (Settings card descriptions,
+             modal explanations, shelf/pick-sheet hints, dashboard footnote);
+             kept: page subtitles, errors, empty states, the insurance-card
+             name note, a one-line "reload the Schedule tab" warning.
  2026-10-13  Status chips (Fitting Log, Stock Requests, Lens Stock requests) are
              one tidy bar (.status-chips: rounded strip, no wrapping — scrolls
              sideways when narrow, divider before Completed/All, 0 counts

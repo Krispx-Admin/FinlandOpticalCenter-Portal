@@ -279,7 +279,6 @@ export function lensView(me) {
     const mine = ownShelf();
     return `
       ${shelfToolbarHTML()}
-      ${mine ? `<div class="review-hint">${icons.box} Keep these counts matching the drawer. Lenses come off them the moment a branch orders them.</div>` : ''}
       ${list.length ? `
         <table class="lines stock-table">
           <thead><tr>
@@ -346,7 +345,6 @@ export function lensView(me) {
                 </tr>`).join('')}
           </tbody>
         </table>
-        ${r.status === 'reserved' ? `<div class="review-hint">${icons.box} Set aside on ${esc(locName(r.holder))}’s shelf for the frame coming over — nothing to send. The frame’s journey is in the Fitting Log.</div>` : ''}
         <div class="dw-actions">${actions}</div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
@@ -441,8 +439,6 @@ export function lensView(me) {
                 <span>${esc(!canCut && f.subShop ? f.subShop : f.sub)}</span>
               </label>`).join('')}
           </div>
-          <p class="muted">The lenses come off ${esc(locName(holder))}’s shelf as soon as you send this, and a fitting order opens for the bill.
-             ${draft.fulfilment === 'receive_lens' ? `It reads “Waiting for Lenses” straight away; ${esc(locName(holder))} sends them from its Fitting Log.` : `Send the frame from the Fitting Log when the driver comes.`}</p>
           <div class="form-foot">
             <span class="muted">${cart.size} type${cart.size === 1 ? '' : 's'} · ${cartCount(holder)} pcs</span>
             <button class="btn btn-ghost" data-close>Cancel</button>
@@ -618,7 +614,6 @@ export function lensView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
-        <p class="muted">These three lists fill the dropdowns here and on every branch's lens screen. A value still on the shelf cannot be removed — clear its stock first.</p>
         <div class="lens-lists">
           ${LENS_LISTS.map(([kind, title, hint]) => {
             const list = store.state.lensCatalogue[kind];

@@ -1,5 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations } from './data.js';
+import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, OUTSIDE_LENS_HANDLER } from './data.js';
+import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
@@ -241,7 +242,8 @@ const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
   stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
   lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
-  claims:   { label: 'Insurance Claims', icon: 'receipt', make: me => claimsView(me, 'claim') },
+  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === OUTSIDE_LENS_HANDLER || seesAll(me?.role) },
+  claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
   settings: { label: 'Settings', icon: 'settings', make: settingsView, adminOnly: true },
@@ -252,7 +254,7 @@ const homeOf = me => (me?.role === 'scheduler' ? '#/schedule' : '#/fitting');
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
-  return m && (!m.adminOnly || me?.role === 'admin');
+  return m && (!m.adminOnly || me?.role === 'admin') && (!m.only || m.only(me));
 }
 
 // A tab the office switched off in Settings is closed to everyone else; the
@@ -293,7 +295,9 @@ function badgeCounts(me) {
   const lens = isLensOwner(me.code)
     ? s.lensRequests.filter(r => r.holder === me.code && r.status === 'requested').length
     : 0;
-  return { fitting, stock, lens };
+  // Outside lenses waiting to be ordered are MGM's to do.
+  const outside = me.code === OUTSIDE_LENS_HANDLER ? (s.outsideOrders ?? []).filter(x => x.status === 'to_order').length : 0;
+  return { fitting, stock, lens, outside };
 }
 
 // The sidebar folds to its icon rail and back. Remembered per browser — a

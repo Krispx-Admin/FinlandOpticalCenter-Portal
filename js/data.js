@@ -99,7 +99,8 @@ export const TABS = [
   { key: 'fitting',  label: 'Fitting Log',      icon: 'glasses' },
   { key: 'stock',    label: 'Stock Requests',   icon: 'box', note: 'Office Queue for the office' },
   { key: 'lens',     label: 'Lens Stock',       icon: 'lens' },
-  { key: 'claims',   label: 'Insurance Claims', icon: 'receipt' },
+  { key: 'outside',  label: 'Outside Lens Orders', icon: 'truck' },
+  { key: 'claims',   label: 'Reimbursement Invoice', icon: 'receipt' },
   { key: 'direct',   label: 'Direct Insurance', icon: 'shield' },
   { key: 'schedule', label: 'Schedule',         icon: 'calendar' },
 ];
@@ -175,6 +176,35 @@ const SELF_STATUS = {
   delivered: { label: 'Done',               color: 'done',   action: null,            actor: null,     done: null },
 };
 
+// ── Outside lens orders (TRIAL, schema-24) ──
+// Lenses from outside brands, ordered from the supplier by Mohammed Ashraf at
+// MGM, who also cuts them. The order's prescription and lens type travel with
+// it; the copy text is the WhatsApp message he sends, in the user's format.
+export const OUTSIDE_LENS_HANDLER = 'MGM';
+export const OUTSIDE_STATUS = {
+  to_order: { label: 'Lenses to order', color: 'amber' },
+  ordered:  { label: 'Lenses ordered',  color: 'green' },
+};
+const rxNum = v => {
+  const s = String(v ?? '').trim();
+  const n = parseFloat(s);
+  return s === '' ? '' : Number.isNaN(n) ? s : `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
+};
+// "R/ -2.00(-0.75) x 180 | Add: +2.00"
+export function outsideRxLine(eye, e = {}) {
+  const sph = rxNum(e?.sph), cyl = rxNum(e?.cyl), axis = String(e?.axis ?? '').trim(), add = rxNum(e?.add);
+  return `${eye}/ ${sph || '—'}${cyl ? `(${cyl})` : ''}${axis ? ` x ${axis}` : ''} | Add:${add ? ` ${add}` : ''}`;
+}
+export function outsideCopyText(x, order) {
+  return [
+    `*${locName(x.branch)}*`,
+    `*${order?.ref ?? ''}*`,
+    outsideRxLine('R', x.rx?.r),
+    outsideRxLine('L', x.rx?.l),
+    `*${x.lensType}*`,
+  ].join('\n');
+}
+
 // Which way round a lens request goes can still be switched by the branch
 // that ordered (or the office) until something has moved: to "send the
 // frame" while the lenses are not yet marked delivered, to "receive the
@@ -215,6 +245,13 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (ans === 'requested') return { ...base, ...LENS_WAIT, ...(long && from ? { label: `Waiting for Lenses — ${locName(from)} to send them` } : {}) };
     if (ans === 'sent' && long && from) return { ...base, label: `Waiting for Lenses — sent by ${locName(from)}` };
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
+  }
+  // Outside lenses: the frame can go to MGM whenever; the label says how the
+  // lens order stands (MGM itself reads it as waiting for the frame).
+  if (o.status === 'lenses_in' && o.outsideLens) {
+    const st = o.outsideLens.status === 'ordered' ? 'ordered' : 'to order';
+    if (viewer && viewer === o.fitter && o.fitter !== o.origin) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
+    return { ...base, label: `Outside lenses · ${st}`, color: o.outsideLens.status === 'ordered' ? 'cyan' : 'amber' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;

@@ -26,7 +26,7 @@ import { toast } from './ui.js';
 let state = {
   settings: { brandGroups: [], categories: [] },
   lensCatalogue: { types: [], indices: [], coatings: [] },
-  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [], branches: [],
+  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [], branches: [], outsideOrders: [],
 };
 
 const subs = new Set();
@@ -48,7 +48,9 @@ function applyBranches() { if (state.branches?.length) setLocations(state.branch
 // requests reload separately, so this runs after either comes back.
 function linkLensRequests() {
   const byOrder = new Map(state.lensRequests.filter(r => r.orderId).map(r => [r.orderId, r]));
+  const outside = new Map((state.outsideOrders ?? []).map(x => [x.orderId, x]));
   for (const o of state.orders) {
+    o.outsideLens = outside.get(o.id) ?? null;
     const r = byOrder.get(o.id);
     o.lensRequest = r ? { id: r.id, status: r.status, fulfilment: r.fulfilment, ref: r.ref, holder: r.holder } : null;
   }
@@ -96,7 +98,7 @@ const LENS_OPTION_LABEL = { types: 'lens types', indices: 'indices', coatings: '
 const MODULE_OF = {
   orders: 'fitting', requests: 'stock', lensStock: 'lens',
   lensRequests: 'lens', lensCatalogue: 'lens', claims: 'claims', settings: 'settings',
-  branches: 'settings',
+  branches: 'settings', outsideOrders: 'outside',
 };
 
 const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
@@ -291,22 +293,6 @@ export const store = {
       sub: done.length === 1 ? (done[0].customer || done[0].ref) : done.map(o => o.ref).join(', '),
       refs: done.map(o => o.id),
     })).then(done => (done ?? []).map(o => this.order(o.id)).filter(Boolean));
-  },
-
-  setUrgent(id, urgent, by) {
-    const o = this.order(id);
-    if (!o) return Promise.resolve(null);
-    return run(['orders'], async () => {
-      ok(await supabase.from('orders').update({ urgent }).eq('id', id));
-      ok(await supabase.from('order_events').insert({
-        order_id: id, by_code: by, text: urgent ? 'Flagged urgent' : 'Urgent flag removed',
-      }));
-      return o;
-    }, {
-      by, module: 'fitting',
-      title: `${by} ${urgent ? 'flagged' : 'unflagged'} ${o.ref} ${urgent ? 'urgent' : ''}`.trim(),
-      refs: [id],
-    });
   },
 
   // ── Stock request mutations ──
@@ -630,6 +616,21 @@ export const store = {
       ok(await supabase.rpc('save_branch', { p_code: code, p_name: next.name, p_role: next.role, p_active: next.active }));
       return true;
     }, { module: 'settings', title });
+  },
+
+  // ── Outside lens orders (TRIAL) ──
+  createOutsideOrder({ ref, customer, rx, lensType }, by) {
+    return run(['orders', 'outsideOrders'], async () => ok(await supabase.rpc('create_outside_lens_order', {
+      p_bill: ref, p_customer: customer, p_rx: rx, p_lens_type: lensType,
+    })), row => ({
+      by, module: 'fitting', title: `${by} logged ${row.ref} with outside lenses`,
+      sub: lensType, refs: [row.id],
+    })).then(row => (row ? this.order(row.id) : null));
+  },
+
+  setOutsideStatus(ids, status, by) {
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('set_outside_lens_status', { p_ids: ids, p_status: status })),
+      n => ({ by, module: 'outside', title: status === 'ordered' ? `${n} outside order${n === 1 ? '' : 's'} marked ordered` : `${n} outside order${n === 1 ? '' : 's'} put back to order` }));
   },
 
   // Gone for good — only a branch with nothing recorded; the database checks.

@@ -330,7 +330,7 @@ export async function mountScheduleViewer(stage, subEl) {
     if (filter.person && !people.includes(filter.person)) filter.person = '';
     if (filter.branch && !branches.some(b => b.code === filter.branch)) filter.branch = '';
     stage.innerHTML = `
-      ${weeks.length > 1 ? `<section class="chips sched-weeks">${weeks.map(w => `
+      ${weeks.length > 1 ? `<section class="chips status-chips sched-weeks">${weeks.map(w => `
         <button class="chip ${w === pick ? 'on' : ''}" data-week="${esc(w.week_start)}">
           ${esc(weekName(w.week_start))}<span class="chip-n">${esc(weekLabel(w.week_start))}</span>
         </button>`).join('')}</section>` : ''}

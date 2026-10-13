@@ -143,7 +143,6 @@ export function stockView(me) {
       </div>
       <div class="dw-body">
         <div class="dw-status-row">${pill(REQ_STATUS, r.status)}<span class="dw-when">updated ${relTime(r.updatedAt)}</span></div>
-        ${isAdmin && r.status === 'placed' ? `<div class="review-hint">${icons.printer} Print the pick sheet, fulfil it physically, then mark it completed.</div>` : ''}
         ${linesTableHTML(r)}
         <div class="dw-actions">${actions}</div>
         <h3 class="tl-h">${icons.history} Timeline</h3>

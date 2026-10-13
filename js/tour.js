@@ -50,7 +50,7 @@ const seeb = [
   ['caption', 'Fitting Log', 'Every frame that leaves the branch to have its lenses fitted'],
   ['focus', '#f-stats'],
   beat(2000),
-  ['caption', 'Active orders, urgent ones, and the ones waiting on you'],
+  ['caption', 'Active orders, and the ones waiting on you'],
   beat(1800),
   ['focus', '#f-chips'],
   ['caption', 'Filter by where each frame is on its journey'],
@@ -161,7 +161,7 @@ const seeb = [
   ['reset'],
 
   // ── insurance claims ──
-  ['caption', 'Insurance Claims', 'A printable invoice for the customer'],
+  ['caption', 'Reimbursement Invoice', 'A printable invoice for the customer'],
   nav('claims'),
   beat(900),
   ['tap', 'New claim'],

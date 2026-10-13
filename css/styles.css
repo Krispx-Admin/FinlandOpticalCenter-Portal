@@ -447,6 +447,27 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* waiting on whoever is looking: the sidebar badge's orange */
 .chip-n.act, .chip.on .chip-n.act { background: #f59e0b; color: #3a2500; opacity: 1; }
 .chip-urgent svg { width: 13px; height: 13px; color: var(--st-red); }
+/* the day filters sit in the toolbar as a compact chip bar */
+.toolbar .day-chips { margin: 0; box-shadow: none; }
+.toolbar .day-chips .chip { padding: 6px 10px; }
+/* "Select all" lines up with the rows' own boxes */
+.sel-all { display: inline-flex; align-items: center; gap: 10px; padding: 2px 17px 10px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.sel-all .cbx { display: inline-flex; }
+/* ── Outside Lens Orders ── */
+.ol-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.ol-switch b { font-weight: 650; }
+.ol-fields { display: flex; flex-direction: column; gap: 10px; }
+.ol-rx-in { border-collapse: separate; border-spacing: 6px 4px; margin: 0 -6px; }
+.ol-rx-in th { font-size: 11px; font-weight: 700; color: var(--ink-3); text-align: center; }
+.ol-rx-in tbody th { color: var(--brand); width: 24px; }
+.ol-rx-in input { width: 100%; text-align: center; font-family: ui-monospace, Consolas, monospace; }
+.ol-row { grid-template-columns: 26px minmax(170px, 1fr) minmax(220px, 1.2fr) minmax(160px, 1fr) auto; }
+.ol-rx { display: flex; flex-direction: column; gap: 2px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink); }
+.ol-type { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ol-type b { font-size: 13px; }
+.ol-bulk { margin-bottom: 12px; }
+@media (max-width: 1000px) { .ol-row { grid-template-columns: 26px 1fr auto; } .ol-rx, .ol-type { grid-column: 2; } }
 .chip-urgent.on { background: var(--st-red); border-color: var(--st-red); }
 .chip-urgent.on svg { color: #fff; }
 
@@ -620,6 +641,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 }
 /* the copy in the subtitle only shows once the journey column is hidden */
 .stock-tag-sub { display: none; }
+.outside-tag { color: var(--st-purple); }
 .journey-big .j-pin { font-size: 12px; padding: 4px 11px; }
 .journey-big .j-seg { height: 3px; }
 
@@ -807,7 +829,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .set-back:hover { background: var(--brand-soft); }
 .set-back svg { width: 15px; height: 15px; transform: rotate(180deg); }
 /* a page of one section: the page title already names it */
-.set-single .set-card-head h2 { display: none; }
+.set-single .set-card-head { display: none; }
 .set-group { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
   color: var(--ink-3); margin: 10px 0 0 4px; }
 .set-group:first-child { margin-top: 0; }

@@ -40,14 +40,17 @@ export async function signIn(branchCode, code) {
 
   const branch = branchOf(data.user);
   if (!branch) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { error: 'This account is not linked to a branch. Contact the office.' };
   }
   return { branch };
 }
 
+// Signs out THIS device only. Every device of a branch shares one account, and
+// the library's default ('global') would sign the branch out on every device
+// at once — a second till signing out used to log the first one out too.
 export async function signOut() {
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
 }
 
 // Fires when a session is restored, refreshed or lost (including in another

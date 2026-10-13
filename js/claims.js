@@ -1,4 +1,4 @@
-// ── Module 5: Insurance Claims — compose, preview, print the invoice ──
+// ── Module 5: Reimbursement Invoice (was Insurance Claims) — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
   RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly,
@@ -305,8 +305,8 @@ export function printClaim(c) {
 // salesperson — and the office and Ghiath get a dashboard of what was paid.
 const KINDS = {
   claim: {
-    title: 'Insurance Claims', sub: 'Raise a printable invoice with products, prescription and payment',
-    add: 'New claim', kicker: 'claim', heading: 'Insurance claim',
+    title: 'Reimbursement Invoice', sub: 'Raise a printable invoice with products, prescription and payment',
+    add: 'New invoice', kicker: 'reimbursement invoice', heading: 'Reimbursement invoice',
     empty: 'No claims yet — create one to print its invoice.',
   },
   direct: {
@@ -411,7 +411,7 @@ export function claimsView(me, kind = 'claim') {
     };
     const t = (n, lbl, cls = '') => `<div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
     return `
-      <section class="chips dash-periods">${PERIODS.map(p =>
+      <section class="chips status-chips dash-periods">${PERIODS.map(p =>
         `<button class="chip ${ui.period === p.key ? 'on' : ''}" data-period="${p.key}">${esc(p.label)}</button>`).join('')}</section>
       <section class="stats">
         ${t(`${money(total)} <small>${CURRENCY}</small>`, 'Paid by insurance', 'stat-brand')}
@@ -422,8 +422,7 @@ export function claimsView(me, kind = 'claim') {
         ${bars('By insurer', icons.receipt, group(c => c.insurer, k => k, store.settings.insurers ?? []))}
         ${bars('By branch', icons.store, group(c => c.branch, k => (k === '—' ? '—' : `${k} · ${locName(k)}`)))}
         ${bars('By employee', icons.glasses, group(c => c.employeeName, k => k))}
-      </section>
-      <p class="muted sm dash-note">Amounts in ${CURRENCY}; the last figure on each line is the number of customers. Hover a line for its share of the total.</p>`;
+      </section>`;
   }
 
   // Direct insurance reads as a table — number and date, customer, member ID,
@@ -681,7 +680,7 @@ export function claimsView(me, kind = 'claim') {
         </div>
 
         <div class="fieldset">
-          <div class="fs-head"><span>Prescription</span><span class="muted sm">Leave blank if not applicable</span></div>
+          <div class="fs-head"><span>Prescription</span></div>
           <div class="rx-wrap">
             <table class="rx-edit">
               <colgroup><col class="rx-lbl-col"><col span="8"></colgroup>

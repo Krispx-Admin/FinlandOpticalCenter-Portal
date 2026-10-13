@@ -3,10 +3,14 @@ import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
   locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses,
   fulfilmentSwitch,
-  isOutside, OUTSIDE_DEFAULT,
+  isOutside, OUTSIDE_DEFAULT, OUTSIDE_LENS_HANDLER, OUTSIDE_STATUS,
 } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
+
+// How far back to look (user, 2026-10-13): by the day an order was logged —
+// on Completed, by the day it was completed. 0 = any time.
+const DAY_FILTERS = [0, 1, 3, 7, 14, 30];
 
 // One chip per distinct label, so two stages that read the same — on the way
 // to the fitter and on the bench are both "Waiting to be Fitted" — share a chip
@@ -28,12 +32,14 @@ const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 // journey it hangs below the middle pin rather than taking room, so the
 // journey stays centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
+const outsideTag = (cls = '') => `<span class="stock-tag outside-tag ${cls}">Outside Lens</span>`;
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
 
 export function fittingView(me) {
   const ui = {
-    chip: 'active', urgentOnly: false, q: '',
+    chip: 'active', q: '', days: 0,
+    branch: 'all',                          // a branch: the branch it shares orders with
     origin: 'all', fitter: 'all',           // admin-only filters
     selected: new Set(),
     seen: new Set(store.state.orders.map(o => o.id)),
@@ -45,14 +51,14 @@ export function fittingView(me) {
   const viewOnly = readOnly(me.role);
 
   // ── data ──
-  function visible() {
+  // Everything the toolbar narrows by — the chips' counts follow it too.
+  function filtered() {
     let list = store.ordersFor(me.code);
-    if (ui.chip === 'active') list = list.filter(o => o.status !== 'delivered');
-    else {
-      const chip = CHIP_DEFS.find(d => d.key === ui.chip);
-      list = list.filter(o => chip && onChip(chip, o));
+    if (ui.days) {
+      const from = Date.now() - ui.days * 864e5;
+      list = list.filter(o => (o.status === 'delivered' ? o.updatedAt : o.createdAt) >= from);
     }
-    if (ui.urgentOnly) list = list.filter(o => o.urgent);
+    if (!isAdmin && ui.branch !== 'all') list = list.filter(o => o.origin === ui.branch || o.fitter === ui.branch);
     if (isAdmin && ui.origin !== 'all') list = list.filter(o => o.origin === ui.origin);
     if (isAdmin && ui.fitter === 'OUT') list = list.filter(isOutside);
     else if (isAdmin && ui.fitter !== 'all') list = list.filter(o => o.fitter === ui.fitter);
@@ -61,10 +67,23 @@ export function fittingView(me) {
       list = list.filter(o => [o.ref, o.customer, o.origin, o.fitter, o.outside ?? '', locName(o.origin), o.fitter ? locName(o.fitter) : '']
         .some(v => String(v).toLowerCase().includes(q)));
     }
-    return list.sort((a, b) => (b.urgent - a.urgent) || (b.updatedAt - a.updatedAt));
+    return list;
   }
+  function visible() {
+    let list = filtered();
+    if (ui.chip === 'active') list = list.filter(o => o.status !== 'delivered');
+    else {
+      const chip = CHIP_DEFS.find(d => d.key === ui.chip);
+      list = list.filter(o => chip && onChip(chip, o));
+    }
+    return list.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  // The other branches this one shares orders with, for its branch filter.
+  const partnerBranches = () => [...new Set(store.ordersFor(me.code)
+    .flatMap(o => [o.origin, o.fitter]).filter(c => c && c !== me.code))]
+    .sort((a, b) => locName(a).localeCompare(locName(b)));
   const counts = () => {
-    const all = store.ordersFor(me.code);
+    const all = filtered();
     const c = { active: all.filter(o => o.status !== 'delivered').length };
     for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => onChip(d, o)).length;
     return c;
@@ -116,8 +135,7 @@ export function fittingView(me) {
     const t = (n, lbl, cls = '') => `
       <div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
     return t(active.length, 'Active orders')
-      + t(active.filter(o => o.urgent).length, 'Urgent', 'stat-red')
-      + t(mine.length, isAdmin ? 'Awaiting action' : 'Need your action', 'stat-brand')
+      + t(mine.length, isAdmin ? 'Awaiting action' : 'Need your action', mine.length ? 'stat-amber' : 'stat-brand')
       + t(week.length, 'Completed · 7d');
   }
 
@@ -141,17 +159,16 @@ export function fittingView(me) {
       const title = o.customer || 'No customer name';
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
-      <div class="row ${isNew ? 'row-enter' : ''} ${o.urgent ? 'row-urgent' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
+      <div class="row ${isNew ? 'row-enter' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
         <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'delivered' || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
-            ${o.urgent ? urgentTag() : ''}
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens ? outsideTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens ? outsideTag() : '')}</div>
         <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
@@ -213,7 +230,7 @@ export function fittingView(me) {
       <div class="dw-head">
         <div>
           <div class="dw-kicker">Fitting order</div>
-          <h2>${esc(o.ref)} ${o.urgent ? urgentTag() : ''}</h2>
+          <h2>${esc(o.ref)}</h2>
           <div class="dw-sub">${esc(o.customer || 'No customer name')}${o.phone ? ` · ${esc(o.phone)}` : ''}</div>
         </div>
         <button class="icon-btn" data-close>${icons.x}</button>
@@ -228,11 +245,11 @@ export function fittingView(me) {
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
+        ${outsideLensHTML(o.outsideLens)}
         <div class="dw-actions">
           ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
-          ${o.status !== 'delivered' && !viewOnly ? `<button class="btn btn-ghost" data-urgent="${o.id}">${icons.zap} ${o.urgent ? 'Remove urgent flag' : 'Flag urgent'}</button>` : ''}
         </div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
@@ -244,6 +261,23 @@ export function fittingView(me) {
             </div>`).join('')}
         </div>
       </div>`;
+  }
+
+  // Outside lenses: the prescription and lens type MGM orders from the supplier.
+  function outsideLensHTML(x) {
+    if (!x) return '';
+    const eye = e => ['sph', 'cyl', 'axis', 'add'].map(k => `<td class="pwr">${esc(String(e?.[k] ?? '').trim() || '—')}</td>`).join('');
+    return `
+      <h3 class="tl-h">${icons.truck} Outside lenses</h3>
+      <div class="dw-status-row">
+        ${pill(OUTSIDE_STATUS, x.status)}
+        <span class="dw-when">${x.status === 'ordered' ? `ordered ${relTime(x.orderedAt)}` : `${esc(OUTSIDE_LENS_HANDLER)} orders them from the supplier`}</span>
+      </div>
+      <div class="kv"><div class="kv-wide"><span>Lens type</span><b>${esc(x.lensType)}</b></div></div>
+      <table class="lines">
+        <thead><tr><th></th><th>SPH</th><th>CYL</th><th>AXIS</th><th>ADD</th></tr></thead>
+        <tbody><tr><th>R</th>${eye(x.rx?.r)}</tr><tr><th>L</th>${eye(x.rx?.l)}</tr></tbody>
+      </table>`;
   }
 
   // The lenses a lens request took off the shelf for this job — what the bench
@@ -286,8 +320,7 @@ export function fittingView(me) {
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
       if (adv) return store.advanceOrders([adv.dataset.advance], me.code);
-      const urg = e.target.closest('[data-urgent]');
-      if (urg) { const o = store.order(urg.dataset.urgent); store.setUrgent(o.id, !o.urgent, me.code); }
+
     });
   }
 
@@ -321,7 +354,6 @@ export function fittingView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
-        <p class="muted">Pick where ${orders.length === 1 ? 'this frame' : 'these frames'} should go for lens fitting.</p>
         <div class="picker-grid">
           ${order.map(f => `
             <button class="picker-card ${home && f.code === home.code ? 'picker-home' : ''}" data-fitter="${f.code}">
@@ -368,8 +400,6 @@ export function fittingView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
-        <p class="muted">The 3rd-party cutters offered under “Outside” when a branch sends a frame to a fitter.
-           With none named, branches simply pick “${esc(OUTSIDE_DEFAULT)}”. Taking one off leaves the frames already sent to it as they are.</p>
         ${list.length ? `<div class="set-brands">${list.map(n => `
           <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-cutter="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`
           : `<div class="empty">${icons.glasses}<p>No outside cutters named yet — add the first below.</p></div>`}
@@ -409,9 +439,19 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
-        <p class="muted">${me.role === 'fitting'
-          ? 'It reads “Waiting for Lenses” until they arrive. Then use “Send to fitter” — pick your own centre to keep it here and skip the transit.'
-          : "You'll pick which fitting centre to send it to after it's logged."}</p>
+        <label class="ol-switch">
+          <span class="sw"><input type="checkbox" name="outside" id="nf-outside"><i></i></span>
+          <span><b>Outside lenses</b> <span class="muted">· other brands</span></span>
+        </label>
+        <div class="fieldset ol-fields" id="nf-ol" hidden>
+          <div class="fs-head"><span>Prescription</span></div>
+          <table class="ol-rx-in">
+            <thead><tr><th></th><th>SPH</th><th>CYL</th><th>AXIS</th><th>ADD</th></tr></thead>
+            <tbody>${['r', 'l'].map(eye => `<tr><th>${eye.toUpperCase()}</th>${['sph', 'cyl', 'axis', 'add'].map(k =>
+              `<td><input name="${eye}_${k}" inputmode="decimal" autocomplete="off" placeholder="${k === 'axis' ? '0–180' : '0.00'}"></td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+          <label>Lens type <input name="lensType" placeholder="e.g. 1.5 progressive blue UV" autocomplete="off"></label>
+        </div>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
           <button type="submit" class="btn btn-primary">${icons.send} Log order</button>
@@ -419,6 +459,9 @@ export function fittingView(me) {
       </form>
     `);
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    // The outside-lens fields open under the switch.
+    const outsideBox = layer.el.querySelector('#nf-outside');
+    outsideBox.addEventListener('change', () => { layer.el.querySelector('#nf-ol').hidden = !outsideBox.checked; });
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -436,7 +479,17 @@ export function fittingView(me) {
       go.disabled = true;
       const was = go.innerHTML;
       go.textContent = 'Saving…';
-      const o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
+      let o;
+      if (f.get('outside')) {
+        const val = k => String(f.get(k) ?? '').trim();
+        const rx = Object.fromEntries(['r', 'l'].map(eye => [eye, Object.fromEntries(['sph', 'cyl', 'axis', 'add'].map(k => [k, val(`${eye}_${k}`)]))]));
+        const lensType = val('lensType');
+        if (!rx.r.sph && !rx.l.sph) { toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
+        if (!lensType) { toast({ title: 'Type the lens type', sub: 'e.g. 1.5 progressive blue UV', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
+        o = await store.createOutsideOrder({ ref, customer, rx, lensType }, me.code);
+      } else {
+        o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
+      }
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
       layer.close();
       toast({
@@ -463,13 +516,15 @@ export function fittingView(me) {
       <section class="stats" id="f-stats">${statsHTML()}</section>
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="f-q" placeholder="Search ref, customer, frame, location…" value="${esc(ui.q)}"></div>
+        ${!isAdmin ? `<select class="sel" id="f-branch" aria-label="Branch"><option value="all">All branches</option>${branchOptions()}</select>` : ''}
         ${isAdmin ? `
-          <select class="sel" id="f-origin"><option value="all">All origins</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.origin === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+          <select class="sel" id="f-origin" aria-label="Branch it was sold at"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.origin === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
           <select class="sel" id="f-fitter"><option value="all">All fitters</option>${FITTERS.map(b => `<option value="${b.code}" ${ui.fitter === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}<option value="OUT" ${ui.fitter === 'OUT' ? 'selected' : ''}>Outside cutters</option></select>` : ''}
-        <button class="chip chip-urgent ${ui.urgentOnly ? 'on' : ''}" id="f-urgent">${icons.zap} Urgent only</button>
+        <div class="chips status-chips day-chips" id="f-days" role="group" aria-label="How far back">${daysHTML()}</div>
       </section>
       <section class="chips status-chips" id="f-chips">${chipsHTML()}</section>
       <div id="f-bulk">${bulkHTML()}</div>
+      <div id="f-selall">${selectAllHTML()}</div>
       <section class="list" id="f-list">${rowsHTML()}</section>`;
     wire();
     markSeen();
@@ -478,10 +533,37 @@ export function fittingView(me) {
   function refreshLists() {
     root.querySelector('#f-stats').innerHTML = statsHTML();
     root.querySelector('#f-chips').innerHTML = chipsHTML();
+    root.querySelector('#f-days').innerHTML = daysHTML();
     root.querySelector('#f-bulk').innerHTML = bulkHTML();
+    root.querySelector('#f-selall').innerHTML = selectAllHTML();
     root.querySelector('#f-list').innerHTML = rowsHTML();
+    const fb = root.querySelector('#f-branch');
+    if (fb && document.activeElement !== fb) fb.innerHTML = `<option value="all">All branches</option>${branchOptions()}`;
     markSeen();
     drawer?.update();
+  }
+
+  function branchOptions() {
+    return partnerBranches().map(c => `<option value="${c}" ${ui.branch === c ? 'selected' : ''}>${esc(locName(c))}</option>`).join('');
+  }
+
+  function daysHTML() {
+    return DAY_FILTERS.map(d => `<button class="chip ${ui.days === d ? 'on' : ''}" data-days="${d}">${d ? `${d} day${d === 1 ? '' : 's'}` : 'Any time'}</button>`).join('');
+  }
+
+  // Select every order on the open chip — not on "All active", where they need
+  // different things done. Completed orders cannot be selected.
+  const selectable = () => visible().filter(o => o.status !== 'delivered');
+  function selectAllHTML() {
+    if (viewOnly || ui.chip === 'active') return '';
+    const list = selectable();
+    if (!list.length) return '';
+    const all = list.every(o => ui.selected.has(o.id));
+    return `
+      <label class="sel-all">
+        <span class="cbx"><input type="checkbox" data-sel-all ${all ? 'checked' : ''}><i></i></span>
+        <span>${all ? 'Clear selection' : `Select all ${list.length}`}</span>
+      </label>`;
   }
 
   function markSeen() {
@@ -497,7 +579,7 @@ export function fittingView(me) {
 
   function wire() {
     root.querySelector('#f-q').addEventListener('input', e => { ui.q = e.target.value; refreshLists(); });
-    root.querySelector('#f-urgent').addEventListener('click', () => { ui.urgentOnly = !ui.urgentOnly; root.querySelector('#f-urgent').classList.toggle('on', ui.urgentOnly); refreshLists(); });
+    root.querySelector('#f-branch')?.addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refreshLists(); });
     root.querySelector('[data-new]')?.addEventListener('click', newOrderModal);
     root.querySelector('[data-cutters]')?.addEventListener('click', cuttersModal);
     root.querySelector('#f-origin')?.addEventListener('change', e => { ui.origin = e.target.value; refreshLists(); });
@@ -506,6 +588,14 @@ export function fittingView(me) {
     root.addEventListener('click', e => {
       const chip = e.target.closest('[data-chip]');
       if (chip) { ui.chip = chip.dataset.chip; ui.selected.clear(); refreshLists(); return; }
+      const dd = e.target.closest('[data-days]');
+      if (dd) { ui.days = +dd.dataset.days; ui.selected.clear(); refreshLists(); return; }
+      const sa = e.target.closest('[data-sel-all]');
+      if (sa) {
+        const list = selectable();
+        if (sa.checked) list.forEach(o => ui.selected.add(o.id)); else list.forEach(o => ui.selected.delete(o.id));
+        refreshLists(); return;
+      }
       if (e.target.closest('[data-bulk-clear]')) { ui.selected.clear(); refreshLists(); return; }
       if (e.target.closest('[data-bulk-act]')) {
         const { action, ok } = bulkAction();

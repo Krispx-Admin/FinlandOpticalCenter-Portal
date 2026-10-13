@@ -200,8 +200,6 @@ export function settingsView(me) {
       </div>
       <div class="form">
         <p>This removes <b>${esc(b.code)} · ${esc(b.name)}</b> and its sign-in account for good. It cannot be undone.</p>
-        <p class="muted">Only a branch with nothing recorded can be deleted — one added by mistake. A branch that has
-           orders, requests or claims is refused: close it instead, which keeps them.</p>
         <label>Type <b>${esc(b.code)}</b> to confirm
           <input id="del-code" autocomplete="off" placeholder="${esc(b.code)}">
         </label>
@@ -269,7 +267,7 @@ export function settingsView(me) {
           <label>Home branch<select name="home">${staffData.branches.map(b => `<option value="${esc(b.code)}" ${draft.home === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
         </div>
         <div class="fieldset">
-          <div class="fs-head"><span>Can also work at</span><span class="muted sm">in the order the schedule should try them</span></div>
+          <div class="fs-head"><span>Can also work at</span></div>
           <div class="emp-checks">${staffData.branches.map(b => `
             <label class="check sm"><input type="checkbox" name="also" value="${esc(b.code)}" ${draft.also.includes(b.code) ? 'checked' : ''}><i></i>${esc(b.code)}</label>`).join('')}</div>
         </div>
@@ -282,8 +280,7 @@ export function settingsView(me) {
           <div class="emp-checks">${WEEK.map(d => `
             <label class="check sm"><input type="checkbox" name="off" value="${d}" ${draft.off.includes(d) ? 'checked' : ''}><i></i>${d}</label>`).join('')}</div>
         </div>
-        <p class="muted sm">They appear on the staff schedule and in the Direct Insurance salesperson list.
-           If the Schedule tab is open somewhere, reload it there before saving the schedule, so they are not dropped.</p>
+        <p class="muted sm">If the Schedule tab is open somewhere, reload it before saving the schedule.</p>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
           <button type="submit" class="btn btn-primary">${icons.check} ${old ? 'Save changes' : 'Add employee'}</button>
@@ -368,8 +365,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.menu} Tabs</h2>
-          <p class="muted">Switch a tab off while it is being worked on. The branches see it greyed out,
-             marked <i>under maintenance</i>, and cannot open it; you still can. It changes for everyone at once.</p>
         </div>
         <div id="set-tabs">${tabsHTML()}</div>
       </section>`,
@@ -377,7 +372,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.tag} Categories</h2>
-          <p class="muted">Choose which fields each category needs, whether it's counted in pieces or boxes, and which brand group it draws from.</p>
         </div>
         <div id="set-cats">${categoriesHTML()}</div>
         <form class="set-add" id="add-cat">
@@ -394,7 +388,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.box} Brand groups</h2>
-          <p class="muted">Each category offers the brands in one group. Drag a brand onto another group to move it — the same brand may sit in several groups.</p>
         </div>
         <div id="set-groups">${groupsHTML()}</div>
         <form class="set-add" id="add-group">
@@ -406,8 +399,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.shield} Insurers</h2>
-          <p class="muted">The insurers a branch picks from when it records an insurance customer.
-             Taking one off leaves the customers already recorded with it as they are.</p>
         </div>
         <div id="set-ins">${insurersHTML()}</div>
         <form class="set-add" id="add-ins">
@@ -419,11 +410,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.warehouse} Branches</h2>
-          <p class="muted">Every location in the portal. Rename one; change what it is — a shop that gets a
-             cutting machine becomes a <b>Fitting centre</b> and is offered in “Send to fitter” from then on; or
-             close one — it leaves the sign-in screen and the lists and can no longer sign in, and everything it
-             recorded stays. Sign-in codes are stored hashed: nobody can read one, so setting a new code is how a
-             forgotten one is recovered.</p>
         </div>
         <div id="set-branches"><p class="muted sm">Loading…</p></div>
       </section>`,
@@ -431,8 +417,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.users} Employees</h2>
-          <p class="muted">Everyone who works in the branches. The staff schedule plans them by home branch, the
-             other branches they can cover, their type and their days off; Direct Insurance offers them as salespeople.</p>
         </div>
         <div id="set-staff"><p class="muted sm">Loading…</p></div>
         <div class="set-add"><button class="btn btn-primary btn-sm" data-emp-new>${icons.plus} Add employee</button></div>
@@ -441,9 +425,6 @@ export function settingsView(me) {
       <section class="set-card">
         <div class="set-card-head">
           <h2>${icons.plus} Add a branch</h2>
-          <p class="muted">The code is what it signs in under and how it is shown across the portal — 2 to 10
-             letters or digits, e.g. NGM. It can sign in as soon as it is added, with the 6-digit code you give it
-             here. To put it on the staff schedule, add it in the Schedule tab as well.</p>
         </div>
         <form class="set-add br-add" id="add-branch" autocomplete="off">
           <input name="code" class="br-code-in" placeholder="Code — e.g. NGM" maxlength="10" required>

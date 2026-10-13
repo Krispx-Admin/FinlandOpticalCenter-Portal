@@ -189,6 +189,11 @@ const SELECTS = {
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
   branches:     ['branches', 'code, name, role, active, position, holds_lens_stock', { column: 'position', asc: true }, r => r],
+  outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
+    id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
+    status: r.status, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
+    createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
+  })],
 };
 
 export const COLLECTIONS = Object.keys(SELECTS);
@@ -276,6 +281,7 @@ const TABLE_COLLECTION = {
   claims: 'claims', claim_items: 'claims', claim_prescriptions: 'claims',
   app_settings: 'settings', lens_catalogue: 'lensCatalogue',
   branches: 'branches',
+  outside_lens_orders: 'outsideOrders',
 };
 
 // The *_events tables already hold a human sentence written by whoever acted
