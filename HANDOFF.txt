@@ -1054,6 +1054,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Fix: the outside-lens prescription showed even with the switch off —
+             .ol-fields' display:flex beat the hidden attribute. Global rule
+             [hidden] { display: none !important } (top of styles.css).
  2026-10-13  Outside Lens Orders (TRIAL, schema-24) — see 4.9. Insurance Claims
              renamed "Reimbursement Invoice" (sidebar, page, Settings › Tabs).
              Fitting Log: Urgent removed everywhere (DB column left, unused);

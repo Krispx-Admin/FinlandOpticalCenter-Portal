@@ -47,6 +47,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Something marked hidden stays hidden, whatever display its class gives it. */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0; font-family: var(--font); color: var(--ink);
