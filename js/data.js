@@ -49,6 +49,19 @@ export const LENS_HOLDERS = LOCATIONS.filter(l => l.holdsLens);
 // in branch order. If it ever stops holding stock, the first in order leads.
 export const FIRST_SHELF = 'MGM';
 
+// A fitting centre whose fitter is on leave closes its bench (schema-28): no
+// frames can be sent there, and it cannot cut in-house, until it reopens —
+// by hand, or by itself after the date it set.
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export const isBenchClosed = code => {
+  const l = LOCATIONS.find(x => x.code === code);
+  return !!l?.benchClosed && (!l.benchUntil || l.benchUntil >= todayISO());
+};
+export const benchNote = code => {
+  const until = LOCATIONS.find(x => x.code === code)?.benchUntil;
+  return `Closed — fitter on leave${until ? ` until ${new Date(until + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}`;
+};
+
 // Replace the lists in place: every module imported these arrays, so they keep
 // their identity, and an existing location object is updated rather than
 // swapped — the signed-in session is one of them and sees its own changes.
@@ -56,6 +69,7 @@ export function setLocations(rows) {
   if (!rows?.length) return;
   const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
     code: r.code, name: r.name, role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
+    benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null,
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
@@ -186,8 +200,8 @@ export const OUTSIDE_STATUS = {
   ordered:  { label: 'Lenses ordered',  color: 'green' },
 };
 export const OUTSIDE_FULFILMENT = {
-  send_frames:  { label: 'Send the frame', chip: 'Frame goes to MGM' },
-  receive_lens: { label: 'Receive the lenses', chip: 'Lenses come to the branch' },
+  send_frames:  { label: 'Frame goes to MGM', chip: 'Frame goes to MGM' },
+  receive_lens: { label: 'Lenses come here', chip: 'Lenses come to the branch' },
 };
 // The small tag under the status: where the outside order stands.
 export const outsideTag = ol => !ol ? null
@@ -206,8 +220,8 @@ export function outsideSwitch(o, code) {
   const ol = o?.outsideLens;
   if (!ol || ol.branch === OUTSIDE_LENS_HANDLER) return null;
   if (!(ol.branch === code || loc(code)?.role === 'admin')) return null;
-  if (ol.fulfilment === 'receive_lens' && !ol.sentAt && o.status === 'pending') return 'send_frames';
-  if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && !o.fitter) return 'receive_lens';
+  if (ol.fulfilment === 'receive_lens' && !ol.sentAt && o.status === 'pending' && !isBenchClosed(OUTSIDE_LENS_HANDLER)) return 'send_frames';
+  if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === OUTSIDE_LENS_HANDLER) return 'receive_lens';
   return null;
 }
 const rxNum = v => {
@@ -282,10 +296,12 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
       color: 'slate', action: ol.status === 'ordered' ? 'Send lenses' : null, actor: 'outside' };
     if (long) return { ...base, label: `Waiting for Lenses — sent by ${h}` };
   }
-  // Send the frame (schema-27): "Waiting for Lenses", and Send to fitter lets
-  // the branch choose the fitter whenever the frame is ready.
+  // Frame goes to MGM (schema-28): "Waiting for Lenses"; the button says where
+  // the frame goes. MGM reads it as waiting for the frame. (MGM's own orders
+  // have no fitter yet: Send to fitter, keep it or send it on.)
   if (ol && o.status === 'lenses_in' && ol.fulfilment === 'send_frames') {
-    return { ...base, label: 'Waiting for Lenses', color: 'slate' };
+    if (o.fitter && viewer && viewer === o.fitter && o.fitter !== o.origin) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
+    return { ...base, label: 'Waiting for Lenses', color: 'slate', ...(o.fitter && o.fitter !== o.origin ? { action: `Send frame to ${o.fitter}` } : {}) };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;
@@ -447,6 +463,8 @@ export function canSeeOrder(o, code) {
 }
 export function canAdvanceOrder(o, code) {
   if (o.status === 'delivered' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
+  // A frame cannot be sent to a closed bench.
+  if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) return false;
   const me = loc(code);
   return me?.role === 'admin' || fitActor(o) === code;
 }

@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS } from './data.js';
+import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, isBenchClosed, benchNote } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime, openLayer } from './ui.js';
@@ -136,6 +136,10 @@ export function settingsView(me) {
           : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
         ${fixed ? '<span></span>' : `<button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${r.holds_lens_stock ? 'Holds lens stock — stop that first' : 'Delete this branch'}" ${r.holds_lens_stock ? 'disabled' : ''}>${icons.trash}</button>`}
         ${r.role === 'fitting' && r.active ? `
+        <label class="br-lens br-bench" title="Closed while the fitter is on leave: no frames can be sent there">
+          <span class="sw"><input type="checkbox" data-br-bench="${esc(r.code)}" ${isBenchClosed(r.code) ? '' : 'checked'}><i></i></span>
+          <span>${isBenchClosed(r.code) ? esc(benchNote(r.code)) : 'Bench open'}</span>
+        </label>
         <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
           <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>
           <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
@@ -572,6 +576,7 @@ export function settingsView(me) {
       if (d.brRole) return saveRole(e.target);
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);
+      if (d.brBench) return store.setBench(d.brBench, !e.target.checked);
       if (d.flag) {
         // Ticking Brand on a category with no group gives it the first one.
         const cat = store.settings.categories.find(c => c.name === d.cat);

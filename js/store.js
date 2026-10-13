@@ -651,6 +651,15 @@ export const store = {
       n => ({ by, module: 'outside', title: status === 'ordered' ? `${n} outside order${n === 1 ? '' : 's'} marked ordered` : `${n} outside order${n === 1 ? '' : 's'} put back to order` }));
   },
 
+  // Close a fitting centre's bench (fitter on leave), optionally until a date; or reopen it.
+  setBench(code, closed, until = null) {
+    const name = loc(code)?.name ?? code;
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_bench', { p_code: code, p_closed: closed, p_until: until || null }));
+      return true;
+    }, { module: 'fitting', title: closed ? `${name} closed — fitter on leave` : `${name} is open again` });
+  },
+
   // Gone for good — only a branch with nothing recorded; the database checks.
   deleteBranch(code) {
     const name = loc(code)?.name ?? code;

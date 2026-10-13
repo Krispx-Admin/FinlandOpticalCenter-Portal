@@ -2,6 +2,7 @@
 import {
   LENS_HOLDERS, FIRST_SHELF, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll, readOnly, fulfilmentSwitch,
+  isBenchClosed, benchNote,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount } from './ui.js';
@@ -396,7 +397,9 @@ export function lensView(me) {
     const canCut = canCutOwnLenses(me.role);
     const holder = ui.holder;
     const cart = basket(holder);
-    const draft = { customer: '', billNo: '', fulfilment: 'send_frames' };
+    // A holder whose bench is closed cannot take the frame: lenses only.
+    const holderShut = isBenchClosed(holder);
+    const draft = { customer: '', billNo: '', fulfilment: holderShut ? 'receive_lens' : 'send_frames' };
     const layer = openLayer('modal', () => {
       const rows = [...cart.entries()].map(([id, qty]) => {
         const i = store.lensItem(id);
@@ -433,10 +436,10 @@ export function lensView(me) {
           </div>
           <div class="fulfil">
             ${Object.entries(FULFILMENT).map(([k, f]) => `
-              <label class="fulfil-opt ${draft.fulfilment === k ? 'on' : ''}">
-                <input type="radio" name="fulfil" value="${k}" ${draft.fulfilment === k ? 'checked' : ''}>
+              <label class="fulfil-opt ${draft.fulfilment === k ? 'on' : ''} ${k === 'send_frames' && holderShut ? 'is-off' : ''}">
+                <input type="radio" name="fulfil" value="${k}" ${draft.fulfilment === k ? 'checked' : ''} ${k === 'send_frames' && holderShut ? 'disabled' : ''}>
                 <b>${esc(f.label)}</b>
-                <span>${esc(!canCut && f.subShop ? f.subShop : f.sub)}</span>
+                <span>${esc(k === 'send_frames' && holderShut ? benchNote(holder) : !canCut && f.subShop ? f.subShop : f.sub)}</span>
               </label>`).join('')}
           </div>
           <div class="form-foot">

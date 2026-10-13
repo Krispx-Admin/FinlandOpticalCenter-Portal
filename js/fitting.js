@@ -5,6 +5,7 @@ import {
   fulfilmentSwitch,
   isOutside, OUTSIDE_DEFAULT, OUTSIDE_LENS_HANDLER, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
   outsideTag, canSendOutside, outsideBlocked, outsideSwitch, canCutOwnLenses, awaitingOutside,
+  isBenchClosed, benchNote,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
@@ -33,6 +34,8 @@ const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 // journey it hangs below the middle pin rather than taking room, so the
 // journey stays centred in the row like every other.
 const stockTag = (cls = '') => `<span class="stock-tag ${cls}">Stock Lens</span>`;
+// The same marker for an order whose lenses come from an outside supplier.
+const outsideLensTag = (cls = '') => `<span class="stock-tag outside-tag ${cls}">Outside Lens</span>`;
 
 
 const READY_IDX = FIT_FLOW.indexOf('ready');
@@ -156,6 +159,7 @@ export function fittingView(me) {
       if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
       else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses</button>`;
       else if ((outsideBlocked(o) || (awaitingOutside(o) && o.outsideLens.status !== 'ordered')) && fitActor(o) === me.code) action = `<span class="row-actor">order the lenses first</span>`;
+      else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} closed — fitter on leave</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-ghost btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else action = `<span class="row-actor">${o.status === 'delivered' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
@@ -169,9 +173,9 @@ export function fittingView(me) {
             <b>${esc(o.ref)}</b>
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : ''}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens ? outsideLensTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : '')}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens ? outsideLensTag() : '')}</div>
         <div class="row-status">${stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label })}</div>
         <div class="row-act" data-stop>
           ${action}
@@ -375,13 +379,14 @@ export function fittingView(me) {
       </div>
       <div class="form">
         <div class="picker-grid">
-          ${order.map(f => `
-            <button class="picker-card ${home && f.code === home.code ? 'picker-home' : ''}" data-fitter="${f.code}">
+          ${order.map(f => { const shut = isBenchClosed(f.code); return `
+            <button class="picker-card ${home && f.code === home.code ? 'picker-home' : ''} ${shut ? 'is-closed' : ''}" data-fitter="${f.code}" ${shut ? 'disabled' : ''}>
               <span class="loc-chip">${f.code}</span>
               <b>${esc(f.name)}</b>
-              ${home && f.code === home.code ? '<span class="picker-note">Keep here — no transit</span>' : ''}
-              ${icons.arrowRight}
-            </button>`).join('')}
+              ${shut ? `<span class="picker-note">${esc(benchNote(f.code))}</span>`
+                : home && f.code === home.code ? '<span class="picker-note">Keep here — no transit</span>' : ''}
+              ${shut ? '' : icons.arrowRight}
+            </button>`; }).join('')}
         </div>
         <h3 class="picker-h">Outside — 3rd-party cutters</h3>
         <div class="picker-grid">
@@ -471,18 +476,24 @@ export function fittingView(me) {
               `<td><input name="${eye}_${k}" inputmode="decimal" autocomplete="off" placeholder="${k === 'axis' ? '0–180' : '0.00'}"></td>`).join('')}</tr>`).join('')}</tbody>
           </table>
           <label>Lens type <input name="lensType" placeholder="e.g. 1.5 progressive blue UV" autocomplete="off"></label>
-          ${me.code === OUTSIDE_LENS_HANDLER ? '' : `
-          <div class="fulfil">
-            ${Object.entries(OUTSIDE_FULFILMENT).map(([k, f], i) => `
-              <label class="fulfil-opt ${i === 0 ? 'on' : ''}">
-                <input type="radio" name="olHow" value="${k}" ${i === 0 ? 'checked' : ''}>
-                <b>${esc(f.label)}</b>
-                <span>${esc(k === 'send_frames'
-                  ? 'You send the frame to the fitter you choose when it is ready.'
-                  : canCutOwnLenses(me.role) ? `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here and you cut them.`
-                  : `${locName(OUTSIDE_LENS_HANDLER)} sends the lenses here; then you send the frame and lenses to a fitter.`)}</span>
-              </label>`).join('')}
-          </div>`}
+          ${me.code === OUTSIDE_LENS_HANDLER ? '' : (() => {
+            const h = OUTSIDE_LENS_HANDLER, hName = locName(h);
+            const hShut = isBenchClosed(h);
+            // A branch with an open bench cuts its own by default; the rest send the frame to MGM.
+            const pick = hShut || (canCutOwnLenses(me.role) && !isBenchClosed(me.code)) ? 'receive_lens' : 'send_frames';
+            const opt = (k, sub, off = false) => `
+              <label class="fulfil-opt ${pick === k ? 'on' : ''} ${off ? 'is-off' : ''}">
+                <input type="radio" name="olHow" value="${k}" ${pick === k ? 'checked' : ''} ${off ? 'disabled' : ''}>
+                <b>${esc(k === 'send_frames' ? `Frame goes to ${h}` : OUTSIDE_FULFILMENT.receive_lens.label)}</b>
+                <span>${esc(sub)}</span>
+              </label>`;
+            return `<div class="fulfil">
+              ${opt('send_frames', hShut ? `${hName}: ${benchNote(h).toLowerCase()}` : `Send your frame to ${hName}; they cut it.`, hShut)}
+              ${opt('receive_lens', canCutOwnLenses(me.role)
+                ? `${hName} sends the lenses here; then cut here or send to a fitter.`
+                : `${hName} sends the lenses here; then send frame and lenses to a fitter.`)}
+            </div>`;
+          })()}
         </div>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
@@ -546,8 +557,11 @@ export function fittingView(me) {
           <h1>Fitting Log</h1>
           <p class="mod-sub">${isAdmin ? 'Every frame travelling across the network' : 'Frames travelling between your branch and the fitting centres'}</p>
         </div>
+        <div class="mod-head-acts">
+        <span id="f-bench">${benchBtnHTML()}</span>
         ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>`
           : me.role === 'admin' ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
+        </div>
       </header>
       <section class="stats" id="f-stats">${statsHTML()}</section>
       <section class="toolbar">
@@ -572,11 +586,47 @@ export function fittingView(me) {
     root.querySelector('#f-days').innerHTML = daysHTML();
     root.querySelector('#f-bulk').innerHTML = bulkHTML();
     root.querySelector('#f-selall').innerHTML = selectAllHTML();
+    const fbn = root.querySelector('#f-bench');
+    if (fbn) fbn.innerHTML = benchBtnHTML();
     root.querySelector('#f-list').innerHTML = rowsHTML();
     const fb = root.querySelector('#f-branch');
     if (fb && document.activeElement !== fb) fb.innerHTML = `<option value="all">All branches</option>${branchOptions()}`;
     markSeen();
     drawer?.update();
+  }
+
+  // A fitting centre opens or closes its own bench (fitter on leave).
+  function benchBtnHTML() {
+    if (me.role !== 'fitting' || viewOnly) return '';
+    const shut = isBenchClosed(me.code);
+    return shut
+      ? `<button class="btn btn-ghost bench-btn is-closed" data-bench title="Press to open the bench again">${icons.wrench} ${esc(benchNote(me.code))}</button>`
+      : `<button class="btn btn-ghost bench-btn" data-bench title="Close the bench while the fitter is on leave">${icons.wrench} Bench open</button>`;
+  }
+  function benchModal() {
+    if (isBenchClosed(me.code)) {
+      if (confirm('Open the bench again? Frames can be sent here from now on.')) store.setBench(me.code, false);
+      return;
+    }
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Fitting bench</div><h2>Close the bench — fitter on leave</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form" id="bench-form">
+        <label>Reopens on <span class="opt">optional — leave empty to reopen by hand</span>
+          <input type="date" name="until" min="${new Date().toISOString().slice(0, 10)}"></label>
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} Close the bench</button>
+        </div>
+      </form>`);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.querySelector('#bench-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const until = new FormData(e.target).get('until') || null;
+      if (await store.setBench(me.code, true, until)) layer.close();
+    });
   }
 
   function branchOptions() {
@@ -618,6 +668,7 @@ export function fittingView(me) {
     root.querySelector('#f-branch')?.addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refreshLists(); });
     root.querySelector('[data-new]')?.addEventListener('click', newOrderModal);
     root.querySelector('[data-cutters]')?.addEventListener('click', cuttersModal);
+    root.querySelector('#f-bench')?.addEventListener('click', e => { if (e.target.closest('[data-bench]')) benchModal(); });
     root.querySelector('#f-origin')?.addEventListener('change', e => { ui.origin = e.target.value; refreshLists(); });
     root.querySelector('#f-fitter')?.addEventListener('change', e => { ui.fitter = e.target.value; refreshLists(); });
 
