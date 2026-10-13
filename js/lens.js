@@ -4,7 +4,7 @@ import {
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll, readOnly, fulfilmentSwitch,
 } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount } from './ui.js';
 
 const REQ_CHIPS = [
   { key: 'requested', label: 'Lenses to send' },
@@ -265,8 +265,11 @@ export function lensView(me) {
           BRANCHES.filter(b => b.code !== me.code).map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')
         }</select>` : ''}
       </section>
-      <section class="chips">${REQ_CHIPS.map(d =>
-        `<button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">${esc(d.label)}<span class="chip-n">${c[d.key]}</span></button>`).join('')}</section>
+      <section class="chips status-chips">${REQ_CHIPS.map(d => {
+        // Lenses to send are the holder's to do.
+        const act = ui.tab === 'queue' && isOwner && !isAdmin && (d.key === 'requested' || d.key === 'all') ? c.requested : 0;
+        return `${d.key === 'all' ? '<span class="chip-sep"></span>' : ''}<button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">${esc(d.label)}${chipCount(c[d.key], act)}</button>`;
+      }).join('')}</section>
       <section class="list" id="l-list">${reqRowsHTML()}</section>`;
   }
 

@@ -71,6 +71,12 @@ export function stepPill(s, { flash = false, title = '' } = {}) {
 }
 export const pill = (def, key, opts) => stepPill(def[key], opts);
 
+// A filter chip's count. Orange when some of it is waiting on whoever is
+// looking (the same orange as the sidebar badge); faded when it is nothing.
+export function chipCount(n, act = 0) {
+  return `<span class="chip-n${n ? '' : ' zero'}${act ? ' act' : ''}"${act ? ` title="${act} need${act === 1 ? 's' : ''} your action"` : ''}>${n}</span>`;
+}
+
 export function urgentTag() {
   return `<span class="pill s-red urgent-tag">${icons.zap}Urgent</span>`;
 }

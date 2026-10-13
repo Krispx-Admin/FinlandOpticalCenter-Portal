@@ -1,7 +1,7 @@
 // ── Module 2: Stock Requests — branch composer + office fulfilment queue ──
 import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, toast } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
 
 const CHIPS = [
   { key: 'placed', label: 'To fulfil' },
@@ -95,7 +95,9 @@ export function stockView(me) {
 
   const chipsHTML = () => {
     const c = counts();
-    return CHIPS.map(d => `<button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">${esc(d.label)}<span class="chip-n">${c[d.key]}</span></button>`).join('');
+    // Requests to fulfil are the office's to do.
+    const act = d => (isAdmin && (d.key === 'placed' || d.key === 'all') ? c.placed : 0);
+    return CHIPS.map(d => `${d.key === 'completed' ? '<span class="chip-sep"></span>' : ''}<button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">${esc(d.label)}${chipCount(c[d.key], act(d))}</button>`).join('');
   };
 
   // ── drawer: request detail ──
@@ -366,7 +368,7 @@ export function stockView(me) {
         <div class="searchbox">${icons.search}<input id="s-q" placeholder="Search ref, branch, category…" value="${esc(ui.q)}"></div>
         ${overseer ? `<select class="sel" id="s-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
       </section>
-      <section class="chips" id="s-chips">${chipsHTML()}</section>
+      <section class="chips status-chips" id="s-chips">${chipsHTML()}</section>
       <section class="list" id="s-list">${rowsHTML()}</section>`;
     wire();
     markSeen();

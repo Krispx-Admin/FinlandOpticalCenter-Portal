@@ -1024,6 +1024,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Status chips (Fitting Log, Stock Requests, Lens Stock requests) are
+             one tidy bar (.status-chips: rounded strip, no wrapping — scrolls
+             sideways when narrow, divider before Completed/All, 0 counts
+             faded). A chip's count turns the sidebar-badge orange (#f59e0b)
+             when it holds something waiting on whoever is looking (ui.js
+             chipCount(n, act); fitting: needsAction, stock: office + placed,
+             lens: holder + lenses to send); hover says how many.
  2026-10-12  DATA WIPED at the user's request (no backup, by choice): all fitting
              orders + events, stock requests + lines + events, lens stock rows,
              lens requests + lines + events, claims + Direct Insurance + items +

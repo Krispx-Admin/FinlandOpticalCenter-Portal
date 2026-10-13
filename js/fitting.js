@@ -6,7 +6,7 @@ import {
   isOutside, OUTSIDE_DEFAULT,
 } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, urgentTag, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
 
 // One chip per distinct label, so two stages that read the same — on the way
 // to the fitter and on the bench are both "Waiting to be Fitted" — share a chip
@@ -193,9 +193,12 @@ export function fittingView(me) {
 
   function chipsHTML() {
     const c = counts();
-    return CHIP_DEFS.map(d => `
+    // How many in each chip are waiting on this location.
+    const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'delivered' && needsAction(o, me.code));
+    const act = d => (d.key === 'active' ? mine.length : mine.filter(o => onChip(d, o)).length);
+    return CHIP_DEFS.map(d => `${d.key === 'delivered' ? '<span class="chip-sep"></span>' : ''}
       <button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">
-        ${esc(d.label)}<span class="chip-n">${c[d.key] ?? 0}</span>
+        ${esc(d.label)}${chipCount(c[d.key] ?? 0, act(d))}
       </button>`).join('');
   }
 
@@ -465,7 +468,7 @@ export function fittingView(me) {
           <select class="sel" id="f-fitter"><option value="all">All fitters</option>${FITTERS.map(b => `<option value="${b.code}" ${ui.fitter === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}<option value="OUT" ${ui.fitter === 'OUT' ? 'selected' : ''}>Outside cutters</option></select>` : ''}
         <button class="chip chip-urgent ${ui.urgentOnly ? 'on' : ''}" id="f-urgent">${icons.zap} Urgent only</button>
       </section>
-      <section class="chips" id="f-chips">${chipsHTML()}</section>
+      <section class="chips status-chips" id="f-chips">${chipsHTML()}</section>
       <div id="f-bulk">${bulkHTML()}</div>
       <section class="list" id="f-list">${rowsHTML()}</section>`;
     wire();
