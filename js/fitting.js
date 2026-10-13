@@ -113,6 +113,16 @@ export function fittingView(me) {
       </div>`;
     const fitterCode = out ? 'OUT' : o.fitter ?? '?';
     const fitterName = out ? `${o.outside} (outside)` : o.fitter ? locName(o.fitter) : 'Unassigned';
+    // The branch sending lenses (MGM for outside lenses, a stock holder for
+    // stock ones) sees the lenses' own road while they are on their way:
+    // from it to the branch that is receiving them.
+    const leg = lensLeg(o);
+    if (leg) return `
+      <div class="journey journey-lens ${big ? 'journey-big' : ''}" title="Lenses: ${esc(locName(leg.from))} → ${esc(locName(leg.to))}">
+        ${node(leg.from, 'done j-mid', locName(leg.from), tail)}
+        <i class="j-seg ${leg.moving ? 'moving' : ''}"></i>
+        ${node(leg.to, '', locName(leg.to))}
+      </div>`;
     // Nothing travelled, so there is no road to draw — one node, and a word
     // about why the rest of the diagram is missing.
     if (onShortRoad(o)) return `
@@ -128,6 +138,17 @@ export function fittingView(me) {
         <i class="j-seg ${seg2}"></i>
         ${node(o.origin, stage >= at('delivered') ? 'done' : '', 'Back at branch')}
       </div>`;
+  }
+
+  function lensLeg(o) {
+    if (o.status !== 'pending') return null;
+    const ol = o.outsideLens;
+    if (ol && ol.fulfilment === 'receive_lens' && me.code === OUTSIDE_LENS_HANDLER && o.origin !== me.code)
+      return { from: me.code, to: o.origin, moving: !!ol.sentAt };
+    const lr = o.lensRequest;
+    if (lr && lr.fulfilment === 'receive_lens' && me.code === lr.holder && o.origin !== me.code)
+      return { from: me.code, to: o.origin, moving: ['sent', 'confirmed'].includes(lr.status) };
+    return null;
   }
 
   // ── stats tiles ──
@@ -156,7 +177,10 @@ export function fittingView(me) {
       const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
       // Primary action: pick a fitter, advance, or show who we're waiting on.
       let action;
-      if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
+      // MGM's first job on another branch's outside order: order the lens — the button opens the list.
+      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === OUTSIDE_LENS_HANDLER && o.origin !== me.code && o.status !== 'delivered' && !viewOnly)
+        action = `<a class="btn btn-ghost btn-sm" href="#/outside">Order lens ${icons.arrowRight}</a>`;
+      else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
       else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses</button>`;
       else if ((outsideBlocked(o) || (awaitingOutside(o) && o.outsideLens.status !== 'ordered')) && fitActor(o) === me.code) action = `<span class="row-actor">order the lenses first</span>`;
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} closed — fitter on leave</span>`;

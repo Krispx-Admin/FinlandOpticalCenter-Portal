@@ -457,7 +457,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .sel-all .cbx { display: inline-flex; }
 /* ── Outside Lens Orders ── */
-.ol-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.ol-switch, .form .ol-switch { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
 .ol-switch b { font-weight: 650; }
 .ol-fields { display: flex; flex-direction: column; gap: 10px; }
 .ol-rx-in { border-collapse: separate; border-spacing: 6px 4px; margin: 0 -6px; }

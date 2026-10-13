@@ -510,8 +510,17 @@ THE FLOW (schema-28, agreed with the user 2026-10-13 after ideation):
   · MGM's own orders: no fitter, lenses_in → Send to fitter (keep or send on).
   Defaults on the form: a branch with an open bench → Lenses come here; any
   other → Frame goes to MGM; MGM closed → Lenses come here (the only choice).
-  Status pill: "Waiting for Lenses" (no tag in the list); the order is marked
-  by an "Outside Lens" label under its journey (like "Stock Lens", purple).
+  Status wording (user 2026-10-13), one pill, no extra tags:
+    branch, frame goes to MGM: "Lenses being ordered" (amber) → "Lenses at
+      MGM" (green), button "Send frame to MGM".
+    branch, lenses come here: "Waiting for Lenses" (→ Lenses delivered).
+    MGM: "Order lens" (amber) until ordered; then "Waiting for frame from X"
+      (frame goes over) or "Lenses ordered" (green) + Send lenses → "Lenses
+      sent to X"; its own orders "Order lens" → "Lenses ordered".
+  Journey: the sender of lenses (MGM for outside, a stock holder for stock)
+  sees the LENS road while it is pending — MGM → MOUJ, moving once sent
+  (fitting.js lensLeg()). The order is marked by an "Outside Lens" label
+  under its journey (like "Stock Lens", purple).
   FINISHING THE CUT (at_fitter -> ready/delivered) waits for Ordered.
   Enforced in the DB: orders_outside_lens_gate + create/change functions.
 BENCH LOCK (schema-28): branches.bench_closed (+ bench_closed_until, reopens
@@ -1095,6 +1104,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-13  Outside-lens wording per viewer: branch "Lenses being ordered" /
+             "Lenses at MGM"; MGM "Order lens" (amber) → "Lenses ordered"
+             (green) → Send lenses. Lens senders see the lens road (MGM → MOUJ,
+             also SAL → MOUJ for stock lenses).
  2026-10-13  Bench lock (fitter on leave) for fitting centres, and the agreed
              outside-lens flow: frame goes to MGM, or lenses come here and the
              branch then cuts or sends both together; "Outside Lens" label on

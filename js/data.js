@@ -290,18 +290,35 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
   // them once ordered, then the branch marks them delivered. Sending the
   // frame: it may travel any time; MGM itself reads "Waiting for frame".
   const ol = o.outsideLens;
+  const H = OUTSIDE_LENS_HANDLER;
+  const ordered = ol?.status === 'ordered';
+  // MGM, whose job is to order the lenses, reads that first: "Order lens"
+  // (orange) until it has, then the next step (user, 2026-10-13).
+  const orderLens = { ...base, label: 'Order lens', color: 'amber', action: null, actor: 'outside' };
   if (ol && o.status === 'pending' && ol.fulfilment === 'receive_lens') {
-    const h = locName(OUTSIDE_LENS_HANDLER);
-    if (!ol.sentAt) return { ...base, label: long ? `Waiting for Lenses — ${h} to ${ol.status === 'ordered' ? 'send' : 'order'} them` : 'Waiting for Lenses',
-      color: 'slate', action: ol.status === 'ordered' ? 'Send lenses' : null, actor: 'outside' };
+    const h = locName(H);
+    if (viewer === H && o.origin !== H) {
+      if (!ol.sentAt) return ordered ? { ...base, label: 'Lenses ordered', color: 'green', action: 'Send lenses', actor: 'outside' } : orderLens;
+      return { ...base, label: `Lenses sent to ${where(o.origin)}`, color: 'green' };
+    }
+    if (!ol.sentAt) return { ...base, label: long ? `Waiting for Lenses — ${h} to ${ordered ? 'send' : 'order'} them` : 'Waiting for Lenses',
+      color: 'slate', action: ordered ? 'Send lenses' : null, actor: 'outside' };
     if (long) return { ...base, label: `Waiting for Lenses — sent by ${h}` };
   }
+  if (ol && !ordered && viewer === H && o.status === 'at_fitter' && o.fitter === H) return { ...orderLens, actor: 'fitter' };
   // Frame goes to MGM (schema-28): "Waiting for Lenses"; the button says where
   // the frame goes. MGM reads it as waiting for the frame. (MGM's own orders
   // have no fitter yet: Send to fitter, keep it or send it on.)
   if (ol && o.status === 'lenses_in' && ol.fulfilment === 'send_frames') {
-    if (o.fitter && viewer && viewer === o.fitter && o.fitter !== o.origin) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
-    return { ...base, label: 'Waiting for Lenses', color: 'slate', ...(o.fitter && o.fitter !== o.origin ? { action: `Send frame to ${o.fitter}` } : {}) };
+    if (o.fitter && o.fitter !== o.origin) {
+      // MGM: order the lenses, then it waits for the frame.
+      if (viewer && viewer === o.fitter) return ordered ? { ...base, label: `Waiting for frame from ${where(o.origin)}` } : orderLens;
+      // The branch: where the lenses stand; it can send the frame any time.
+      return { ...base, label: ordered ? `Lenses at ${where(o.fitter)}` : 'Lenses being ordered',
+        color: ordered ? 'green' : 'amber', action: `Send frame to ${o.fitter}` };
+    }
+    // MGM's own order: order the lens, then keep it or send it on.
+    return ordered ? { ...base, label: 'Lenses ordered', color: 'green' } : { ...base, label: 'Order lens', color: 'amber' };
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
     const holder = o.lensRequest.holder ?? o.fitter;
