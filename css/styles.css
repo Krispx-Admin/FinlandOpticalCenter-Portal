@@ -547,6 +547,9 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   #f-list .row-status .ol-tag { position: relative; left: var(--mid); translate: -50% 0; }
 }
 .row-status .pill { max-width: 100%; }
+/* outside lenses: the frame's tag over the lenses', each level with its line */
+.tag-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+.dw-status-row .tag-stack { flex-direction: row; flex-wrap: wrap; gap: 6px; }
 .pill-t { overflow: hidden; text-overflow: ellipsis; }
 .row-act { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 .row-actor { color: var(--ink-3); font-size: 11.5px; font-style: italic; display: inline-flex; align-items: center; gap: 5px; }

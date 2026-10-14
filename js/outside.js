@@ -96,14 +96,16 @@ export function outsideView(me) {
         </div>
         <div class="ol-type"><b>${esc(x.lensType)}</b>
           <span class="fulfil-chip ${x.fulfilment}">${esc(x.branch === outsideHandler() ? 'Stays here' : `Lenses go to ${x.dest ?? x.branch}`)}</span>
-          ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}${x.receivedAt ? ` · received` : ''}</span>` : ''}</div>
+          ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.arrivedAt && !x.sentAt ? ' · received here' : ''}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}${x.receivedAt ? ` · received` : ''}</span>` : ''}</div>
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
             ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Confirm order</button>`
             : !x.sentAt && x.branch !== outsideHandler()
-              ? `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
-                 <button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses to ${esc(x.dest ?? x.branch)}</button>`
+              ? (x.arrivedAt
+                ? `<button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses to ${esc(x.dest ?? x.branch)}</button>`
+                : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
+                   <button class="btn btn-primary btn-sm" data-arrive="${x.id}">Lens received ${icons.arrowRight}</button>`)
               : x.sentAt ? '<span class="row-actor">sent</span>'
               : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>`}
         </div>
@@ -195,6 +197,8 @@ export function outsideView(me) {
       const c = e.target.closest('[data-copy]');
       if (c) { const x = all().find(y => y.id === c.dataset.copy); return x && copy([x]); }
       if (e.target.closest('[data-copy-set]')) return copy(setOf());
+      const ar = e.target.closest('[data-arrive]');
+      if (ar) return store.arriveOutsideLenses(ar.dataset.arrive, me.code);
       const sd = e.target.closest('[data-send]');
       if (sd) return store.sendOutsideLenses(sd.dataset.send, me.code);
       const m = e.target.closest('[data-mark]');

@@ -651,6 +651,14 @@ export const store = {
   },
 
   // The fitter marks outside lenses received.
+  // The handler marks outside lenses in from the supplier (schema-32).
+  arriveOutsideLenses(id, by) {
+    const x = (state.outsideOrders ?? []).find(y => y.id === id);
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('outside_lenses_arrived', { p_id: id })), {
+      by, module: 'fitting', title: `${by} received the outside lenses`, refs: x ? [x.orderId] : [],
+    });
+  },
+
   receiveOutsideLenses(id, by) {
     const x = (state.outsideOrders ?? []).find(y => y.id === id);
     return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('receive_outside_lenses', { p_id: id })), {

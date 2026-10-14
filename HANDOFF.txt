@@ -519,9 +519,16 @@ outside_lens_orders: status to_order|ordered, fulfilment, dest_code, sent_at,
 received_at.
 
 FLOW / WHO DOES WHAT
-  AV (Outside tab + Fitting Log): "Order lens" (amber, button opens the tab)
-    → mark Ordered → "Lenses ordered" (green) + "Send lenses to <dest>" →
-    sent; after sending the job leaves AV's Fitting Log.
+  AV (Outside tab + Fitting Log) — for AV the lens follows the normal steps
+  (schema-32, 2026-10-14), and its Fitting Log chips follow the LENS, not
+  the frame (handlerStage):
+    Waiting for Lenses: "Order lens" (amber, opens the tab) → Confirm order →
+      "Lenses ordered" (green) + "Lens received" when they reach AV (RPC
+      outside_lenses_arrived, arrived_at)
+    Lenses Delivered: "Send lenses to <dest>" (refused before arrival)
+    In transit: "In transit to <dest>", waiting on <dest>
+    → leaves AV's log once the dest receives them. These rows can't be
+      bulk-selected by AV. Undo (un-order) is refused once arrived.
   SEND THE FRAME: order fitter = dest, status lenses_in. Branch: "Lenses
     being ordered" / "Lenses ordered at AV" / "Lenses on the way to MGM" /
     "Lenses at MGM" + "Send frame to MGM" (any time). Fitter: "Waiting for
@@ -537,6 +544,12 @@ FLOW / WHO DOES WHAT
   CHANGE: the branch (or office) can switch the way or the fitter while
     nothing has moved (drawer "Change" → same choices; RPC
     change_outside_fulfilment(id, fulfilment, dest)).
+TAGS: two, stacked beside the two journey lines (frameStep / lensStep):
+  the frame's ("Frame at SCC", "Waiting for frame from SCC", "In transit to
+  MGM", "Waiting to be Fitted"…) and the lenses' ("Order lens" / "Lenses
+  being ordered", "Lenses ordered", "Lenses at AV" — AV reads "Lenses
+  Delivered", "In transit to MGM", "Lenses at MGM"). The drawer shows both.
+  AV's own orders keep one tag.
 JOURNEY: TWO lines, each named in a faded italic word — "Frame" (the frame's
   journey) and "Lens" (AV → dest, drawn the full width). Same navy design as
   every journey, no purple: AV navy once ordered, the line moves once sent,
@@ -544,8 +557,9 @@ JOURNEY: TWO lines, each named in a faded italic word — "Frame" (the frame's
 GATES in the DB (outside_lens_gate trigger + functions): no finishing the cut
   before the lenses are received; no "delivered" before sent; only AV/office
   order and send; only the dest receives; dest must be an open fitting
-  centre (bench lock). Visibility: the dest is the fitter; AV reads all
-  outside orders (RLS) and shows them until sent (canSeeOrder).
+  centre (bench lock); AV sends only after marking them received.
+  Visibility: the dest is the fitter; AV reads all outside orders (RLS) and
+  shows them until the dest receives them (canSeeOrder).
 Outside Lens Orders tab (js/outside.js): stats, search, branch filter, chips
 To order / Ordered (orange counts), rows with Rx, lens type, "Lenses go to X",
 Copy, Ordered / Undo + "Send lenses to X"; bulk Copy for WhatsApp / Mark
@@ -779,6 +793,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-32-outside-arrived.sql  outside_lens_orders.arrived_at,
+                             outside_lenses_arrived(); send needs it; no
+                             un-ordering once arrived. Applied 2026-10-14.
   schema-31-collected.sql    orders.status gains 'collected'; delivered →
                              collected (dates kept). APPLIED 2026-10-13.
 
@@ -1139,6 +1156,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-14  Outside lenses for AV follow the normal steps (schema-32, rehearsed
+             rolled back, applied): Waiting for Lenses → "Lens received" at AV
+             → Lenses Delivered → Send lenses → In transit; AV's chips follow
+             the lens. Outside-lens orders show two tags — the frame's and the
+             lenses' — beside the two journey lines (row and drawer). See 4.9.
  2026-10-14  Outside lenses: once AV sends them, the order stays in AV's Fitting
              Log under "In transit" ("In transit to X", waiting on X, not
              selectable) until X marks them received, then it leaves AV's log

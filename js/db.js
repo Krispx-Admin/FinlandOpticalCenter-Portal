@@ -193,7 +193,7 @@ const SELECTS = {
   outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
     id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
     status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null,
-    dest: r.dest_code ?? null, receivedAt: r.received_at ? ts(r.received_at) : null, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
+    dest: r.dest_code ?? null, arrivedAt: r.arrived_at ? ts(r.arrived_at) : null, receivedAt: r.received_at ? ts(r.received_at) : null, orderedAt: r.ordered_at ? ts(r.ordered_at) : null, orderedBy: r.ordered_by ?? null,
     createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   })],
 };

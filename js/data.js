@@ -217,7 +217,8 @@ export function outsideLensState(ol) {
   if (!ol) return '';
   const H = outsideHandler();
   if (ol.status !== 'ordered') return 'Lenses being ordered';
-  if (ol.branch === H || !ol.sentAt) return `Lenses ordered at ${H}`;
+  if (ol.branch === H) return `Lenses ordered at ${H}`;
+  if (!ol.sentAt) return ol.arrivedAt ? `Lenses at ${H}` : `Lenses ordered at ${H}`;
   if (!ol.receivedAt) return `Lenses on the way to ${ol.dest}`;
   return `Lenses at ${ol.dest}`;
 }
@@ -229,7 +230,13 @@ export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.fulfilment =
   && !o.outsideLens.receivedAt && o.status === 'at_fitter';
 export const canSendOutside = (o, code) => {
   const ol = o.outsideLens, H = outsideHandler();
-  return !!ol && ol.status === 'ordered' && !ol.sentAt && ol.branch !== H && !isBack(o)
+  return !!ol && ol.status === 'ordered' && !!ol.arrivedAt && !ol.sentAt && ol.branch !== H && !isBack(o)
+    && (code === H || loc(code)?.role === 'admin');
+};
+// The handler marks the lenses in when they reach it from the supplier.
+export const canArriveOutside = (o, code) => {
+  const ol = o.outsideLens, H = outsideHandler();
+  return !!ol && ol.status === 'ordered' && !ol.arrivedAt && ol.branch !== H && !isBack(o)
     && (code === H || loc(code)?.role === 'admin');
 };
 export const canReceiveOutside = (o, code) => {
@@ -312,9 +319,11 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     const H = outsideHandler();
     const ordered = ol.status === 'ordered';
     // The handler (Avenues): order the lens, then send it on.
-    if (viewer === H && o.origin !== H && !ol.sentAt) return ordered
-      ? { ...base, label: 'Lenses ordered', color: 'green', action: `Send lenses to ${ol.dest}`, actor: 'outside' }
-      : { ...base, label: 'Order lens', color: 'amber', action: null, actor: 'outside' };
+    if (viewer === H && o.origin !== H && !ol.sentAt) return !ordered
+      ? { ...base, label: 'Order lens', color: 'amber', action: null, actor: 'outside' }
+      : !ol.arrivedAt
+        ? { ...base, label: 'Lenses ordered', color: 'green', action: 'Lens received', actor: 'outside' }
+        : { ...base, label: 'Lenses Delivered', color: 'cyan', action: `Send lenses to ${ol.dest}`, actor: 'outside' };
     // …and, once sent, watches them on the road until they arrive.
     if (viewer && outsideInTransit(o, viewer))
       return { ...base, label: long ? `Lenses in transit to ${locName(ol.dest)}` : `In transit to ${ol.dest}`, color: 'blue', action: null, actor: null };
@@ -366,7 +375,7 @@ export function fitActor(order) {
 export const needsAction = (o, code) =>
   (canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
    && !(o.status === 'to_fitter' && isOutside(o)))
-  || canSendLenses(o, code) || canSendOutside(o, code) || canReceiveOutside(o, code);
+  || canSendLenses(o, code) || canSendOutside(o, code) || canArriveOutside(o, code) || canReceiveOutside(o, code);
 
 // ── Stock request state machine ──
 // Redesigned: a branch places a request, the office fulfils it. No review.
@@ -497,10 +506,38 @@ export function canSeeOrder(o, code) {
 }
 // The handler has sent the outside lenses and they have not arrived yet: the
 // order sits under its "In transit" chip (user, 2026-10-14).
-export const outsideInTransit = (o, code) => {
+// For the handler, an outside order from another branch follows the lens,
+// not the frame (user, 2026-10-14): Waiting for Lenses until it marks them in,
+// Lenses Delivered until it sends them, In transit until they arrive.
+// Returns the Fitting Log chip key, or null when the frame's own steps apply.
+export function handlerStage(o, code) {
   const ol = o.outsideLens;
-  return !!ol && code === outsideHandler() && o.origin !== code && ol.dest !== code && !!ol.sentAt && !ol.receivedAt && !isBack(o);
-};
+  if (!ol || code !== outsideHandler() || o.origin === code || ol.dest === code || ol.receivedAt || isBack(o)) return null;
+  return ol.sentAt ? 'to_fitter' : ol.arrivedAt ? 'lenses_in' : 'pending';
+}
+export const outsideInTransit = (o, code) => handlerStage(o, code) === 'to_fitter';
+
+// An outside order whose lenses travel from the handler has two roads, and a
+// tag for each (user, 2026-10-14): where the frame is, and where the lenses are.
+export const twoRoads = o => !!o.outsideLens && o.outsideLens.branch !== outsideHandler();
+export function frameStep(o, { long = false, viewer = null } = {}) {
+  const s = fitStep({ ...o, outsideLens: null, lensRequest: null }, { long, viewer });
+  const where = code => (long ? locName(code) : code);
+  if (o.status === 'pending' || o.status === 'lenses_in') {
+    if (viewer && o.fitter && viewer === o.fitter && o.fitter !== o.origin) return { ...s, label: `Waiting for frame from ${where(o.origin)}`, color: 'slate' };
+    return { ...s, label: `Frame at ${where(o.origin)}`, color: 'slate' };
+  }
+  return s;
+}
+export function lensStep(o, { long = false, viewer = null } = {}) {
+  const ol = o.outsideLens, H = outsideHandler();
+  const where = code => (long ? locName(code) : code);
+  if (ol.status !== 'ordered') return { label: viewer === H ? 'Order lens' : 'Lenses being ordered', color: 'amber' };
+  if (!ol.arrivedAt) return { label: long ? `Lenses ordered by ${locName(H)}` : 'Lenses ordered', color: 'green' };
+  if (!ol.sentAt) return { label: viewer === H ? 'Lenses Delivered' : `Lenses at ${where(H)}`, color: 'cyan' };
+  if (!ol.receivedAt) return { label: `In transit to ${where(ol.dest)}`, color: 'blue' };
+  return { label: `Lenses at ${where(ol.dest)}`, color: 'green' };
+}
 export function canAdvanceOrder(o, code) {
   if (o.status === 'collected' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
   // A frame cannot be sent to a closed bench.
