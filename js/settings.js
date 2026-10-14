@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, isBenchClosed, benchNote } from './data.js';
+import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime, openLayer } from './ui.js';
@@ -136,9 +136,9 @@ export function settingsView(me) {
           : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
         ${fixed ? '<span></span>' : `<button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${r.holds_lens_stock ? 'Holds lens stock — stop that first' : 'Delete this branch'}" ${r.holds_lens_stock ? 'disabled' : ''}>${icons.trash}</button>`}
         ${r.role === 'fitting' && r.active ? `
-        <label class="br-lens br-bench" title="Lab off: no frames can be sent there">
-          <span class="sw"><input type="checkbox" data-br-bench="${esc(r.code)}" ${isBenchClosed(r.code) ? '' : 'checked'}><i></i></span>
-          <span>${isBenchClosed(r.code) ? esc(benchNote(r.code)) : 'Lab on'}</span>
+        <label class="br-lens br-bench" title="In-house only: it cuts its own jobs, other branches can't send any. Off: nothing.">
+          <span>Lab</span>
+          <select class="sel sel-sm" data-br-lab="${esc(r.code)}">${LAB_MODES.map(([k, l]) => `<option value="${k}" ${labMode(r.code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
         </label>
         <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
           <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>
@@ -576,7 +576,7 @@ export function settingsView(me) {
       if (d.brRole) return saveRole(e.target);
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);
-      if (d.brBench) return store.setBench(d.brBench, !e.target.checked);
+      if (d.brLab) return store.setLab(d.brLab, e.target.value);
       if (d.flag) {
         // Ticking Brand on a category with no group gives it the first one.
         const cat = store.settings.categories.find(c => c.name === d.cat);

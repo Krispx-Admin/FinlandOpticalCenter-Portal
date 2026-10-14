@@ -189,7 +189,7 @@ const SELECTS = {
   lensStock:    ['lens_stock', '*', { column: 'updated_at', asc: false }, toLensItem],
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
-  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until', { column: 'position', asc: true }, r => r],
+  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until, bench_own_only', { column: 'position', asc: true }, r => r],
   outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
     id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
     status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null,

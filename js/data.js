@@ -49,15 +49,21 @@ export const LENS_HOLDERS = LOCATIONS.filter(l => l.holdsLens);
 // in branch order. If it ever stops holding stock, the first in order leads.
 export const FIRST_SHELF = 'MGM';
 
-// A fitting centre whose fitter is on leave closes its bench (schema-28): no
-// frames can be sent there, and it cannot cut in-house, until it reopens —
-// by hand, or by itself after the date it set.
+// A fitting centre's Lab (schema-28, -33): On; In-house only — it cuts its
+// own jobs but takes nothing from other branches; or Off — the fitter is on
+// leave, nothing at all (until it is turned on, or after a date, if one was set).
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-export const isBenchClosed = code => {
+export const isLabOff = code => {
   const l = LOCATIONS.find(x => x.code === code);
   return !!l?.benchClosed && (!l.benchUntil || l.benchUntil >= todayISO());
 };
+export const labMode = code => (isLabOff(code) ? 'off' : LOCATIONS.find(x => x.code === code)?.benchOwnOnly ? 'inhouse' : 'on');
+// Takes no work from other branches (Off or In-house only) — what every
+// "send it there" check asks.
+export const isBenchClosed = code => labMode(code) !== 'on';
+export const LAB_MODES = [['on', 'On'], ['inhouse', 'In-house only'], ['off', 'Off']];
 export const benchNote = code => {
+  if (labMode(code) === 'inhouse') return 'Lab in-house only';
   const until = LOCATIONS.find(x => x.code === code)?.benchUntil;
   return `Lab off${until ? ` until ${new Date(until + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}`;
 };
@@ -69,7 +75,7 @@ export function setLocations(rows) {
   if (!rows?.length) return;
   const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
     code: r.code, name: r.name, role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
-    benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null,
+    benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null, benchOwnOnly: !!r.bench_own_only,
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));

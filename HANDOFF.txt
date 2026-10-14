@@ -793,6 +793,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-33-lab-inhouse.sql  branches.bench_own_only; bench_off() = Off;
+                             bench_closed() now = takes no work from other
+                             branches (Off or In-house only); set_lab(code,
+                             'on'|'inhouse'|'off'). Applied 2026-10-14.
   schema-32-outside-arrived.sql  outside_lens_orders.arrived_at,
                              outside_lenses_arrived(); send needs it; no
                              un-ordering once arrived. Applied 2026-10-14.
@@ -1156,6 +1160,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-14  Lab has three settings (schema-33, rehearsed, applied): On /
+             In-house only (cuts its own jobs, other branches can't send it
+             frames or lenses — greyed in their pickers) / Off (fitter on
+             leave, nothing). Fitting Log header: a 3-way control; Settings >
+             Branches: a Lab select. Client: labMode / isLabOff /
+             isBenchClosed (= not taking other branches' work).
  2026-10-14  Outside lenses for AV follow the normal steps (schema-32, rehearsed
              rolled back, applied): Waiting for Lenses → "Lens received" at AV
              → Lenses Delivered → Send lenses → In transit; AV's chips follow

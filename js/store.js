@@ -680,6 +680,16 @@ export const store = {
   },
 
   // Close a fitting centre's bench (fitter on leave), optionally until a date; or reopen it.
+  // A fitting centre's Lab: 'on' | 'inhouse' | 'off' (schema-33).
+  setLab(code, mode) {
+    const name = loc(code)?.name ?? code;
+    const word = { on: 'lab on', inhouse: 'lab in-house only', off: 'lab off' }[mode];
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_lab', { p_code: code, p_mode: mode }));
+      return true;
+    }, { module: 'fitting', title: `${name}: ${word}` });
+  },
+
   setBench(code, closed, until = null) {
     const name = loc(code)?.name ?? code;
     return run(['branches'], async () => {
