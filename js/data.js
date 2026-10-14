@@ -315,6 +315,9 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (viewer === H && o.origin !== H && !ol.sentAt) return ordered
       ? { ...base, label: 'Lenses ordered', color: 'green', action: `Send lenses to ${ol.dest}`, actor: 'outside' }
       : { ...base, label: 'Order lens', color: 'amber', action: null, actor: 'outside' };
+    // …and, once sent, watches them on the road until they arrive.
+    if (viewer && outsideInTransit(o, viewer))
+      return { ...base, label: long ? `Lenses in transit to ${locName(ol.dest)}` : `In transit to ${ol.dest}`, color: 'blue', action: null, actor: null };
     // The fitter has the frame; the lenses are still coming.
     if (ol.fulfilment === 'send_frames' && o.status === 'at_fitter' && !ol.receivedAt)
       return { ...base, label: ol.sentAt ? `Lenses on the way from ${H}` : `Waiting for lenses from ${H}`, color: 'amber', action: null };
@@ -490,8 +493,14 @@ export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.pr
 export function canSeeOrder(o, code) {
   return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code
     || (o.lensRequest?.holder === code && o.lensRequest.status === 'requested')
-    || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.sentAt);   // the handler, until it has sent them
+    || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.receivedAt);   // the handler, until the lenses arrive
 }
+// The handler has sent the outside lenses and they have not arrived yet: the
+// order sits under its "In transit" chip (user, 2026-10-14).
+export const outsideInTransit = (o, code) => {
+  const ol = o.outsideLens;
+  return !!ol && code === outsideHandler() && o.origin !== code && ol.dest !== code && !!ol.sentAt && !ol.receivedAt && !isBack(o);
+};
 export function canAdvanceOrder(o, code) {
   if (o.status === 'collected' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
   // A frame cannot be sent to a closed bench.

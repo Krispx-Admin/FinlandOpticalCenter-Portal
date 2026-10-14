@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses, isBack,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses, isBack, outsideInTransit,
   fulfilmentSwitch,
   isOutside, OUTSIDE_DEFAULT, outsideHandler, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
@@ -73,12 +73,15 @@ export function fittingView(me) {
     }
     return list;
   }
+  // Outside lenses the handler has sent count as in transit for it, whatever
+  // the frame is doing.
+  const chipHas = (d, o) => (outsideInTransit(o, me.code) ? d.key === 'to_fitter' : onChip(d, o));
   function visible() {
     let list = filtered();
     if (ui.chip === 'active') list = list.filter(o => o.status !== 'collected');
     else {
       const chip = CHIP_DEFS.find(d => d.key === ui.chip);
-      list = list.filter(o => chip && onChip(chip, o));
+      list = list.filter(o => chip && chipHas(chip, o));
     }
     return list.sort((a, b) => b.updatedAt - a.updatedAt);
   }
@@ -89,7 +92,7 @@ export function fittingView(me) {
   const counts = () => {
     const all = filtered();
     const c = { active: all.filter(o => o.status !== 'collected').length };
-    for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => onChip(d, o)).length;
+    for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => chipHas(d, o)).length;
     return c;
   };
 
@@ -207,6 +210,7 @@ export function fittingView(me) {
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} lab off</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
+      else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
       else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       // The fitter marks the outside lenses received — alongside the frame's own step.
       if (canReceiveOutside(o, me.code) && !viewOnly) {
@@ -217,7 +221,7 @@ export function fittingView(me) {
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
-        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || viewOnly ? 'disabled' : ''}><i></i></label>
+        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || outsideInTransit(o, me.code) || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
@@ -695,7 +699,7 @@ export function fittingView(me) {
 
   // Select every order on the open chip — not on "All active", where they need
   // different things done. Completed orders cannot be selected.
-  const selectable = () => visible().filter(o => o.status !== 'collected');
+  const selectable = () => visible().filter(o => o.status !== 'collected' && !outsideInTransit(o, me.code));
   function selectAllHTML() {
     if (viewOnly || ui.chip === 'active') return '';
     const list = selectable();
@@ -714,7 +718,7 @@ export function fittingView(me) {
 
   function toggleSelect(id) {
     const o = store.order(id);
-    if (!o || o.status === 'collected' || viewOnly) return;
+    if (!o || o.status === 'collected' || outsideInTransit(o, me.code) || viewOnly) return;
     if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
     refreshLists();
   }

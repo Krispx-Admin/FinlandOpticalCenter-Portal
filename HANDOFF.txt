@@ -1139,6 +1139,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-14  Outside lenses: once AV sends them, the order stays in AV's Fitting
+             Log under "In transit" ("In transit to X", waiting on X, not
+             selectable) until X marks them received, then it leaves AV's log
+             (canSeeOrder, outsideInTransit). No DB change — AV already reads
+             every outside order.
  2026-10-13  The bench lock is now a "Lab" switch in the Fitting Log header of a
              fitting centre (On / Off, amber when off; no modal, no date). Off
              reads "Lab off" everywhere (pickers, rows, Settings > Branches).
