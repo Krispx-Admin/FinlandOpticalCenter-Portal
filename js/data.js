@@ -167,7 +167,7 @@ export const isOutside = o => !!o.outside;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
   to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame received', actor: 'origin', done: 'Received back from the outside cutter' },
-  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',         color: 'done',   action: null,            actor: null,     done: null },
 };
 
@@ -207,7 +207,7 @@ export const FIT_STATUS = {
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'here',   done: 'Handed to driver — returning to branch' },
   returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'to',     done: 'Delivered back at origin branch' },
-  delivered: { label: 'Ready for collection', color: 'green',  action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
+  delivered: { label: 'Ready for collection', color: 'green',  action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',            color: 'done',   action: null,              actor: null,     done: null },
 };
 
@@ -219,7 +219,7 @@ const SELF_STATUS = {
   pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens received', actor: 'fitter', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
   at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
-  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',          color: 'done',   action: null,            actor: null,     done: null },
 };
 
@@ -380,7 +380,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
   // The road after the fitter, to wherever the customer collects.
   const C = collectOf(o);
   if (o.status === 'at_fitter' && o.fitter && !isSelfFit(o) && C === o.fitter)
-    return { ...base, action: 'Ready for collection', done: 'Fitted — ready for collection here' };
+    return { ...base, action: 'Mark as done', done: 'Fitted — ready for collection here' };
   if (o.status === 'ready') {
     if (isTransfer(o)) return { ...base, label: `Transfer to ${where(C)}`, color: 'amber', action: `Transfer to ${C}`, done: `Handed to driver — transferred to ${locName(C)}` };
     return { ...base, action: `Send to ${C}`, done: `Handed to driver — on its way to ${locName(C)}` };

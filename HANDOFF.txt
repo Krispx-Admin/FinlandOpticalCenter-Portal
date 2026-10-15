@@ -1178,6 +1178,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Button "Handed to customer" is now "Hand to Customer". Collected at
+             the fitter: the fitter's button reads "Mark as done" (then Ready
+             for collection there).
  2026-10-15  COLLECT AT ANOTHER BRANCH (schema-36, rehearsed incl. RLS as the
              receiving branch, applied). New order form: "Customer collects
              at" (default this branch). Drawer: "Collect at … Change" — anyone
