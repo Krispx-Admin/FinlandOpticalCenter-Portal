@@ -1178,6 +1178,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Fitting Log Select all takes only the orders this location can act
+             on now, grouped by their step ("Select all 2 — Lens received ·
+             1 needs another step"); rows with nothing to press (e.g. waiting
+             on MGM to send stock lenses) can't be ticked. Works with the
+             search and every filter, so the bulk button always works.
  2026-10-15  Stock requests complete part by part (schema-38, rehearsed,
              applied): Complete opens "What was sent?" — a checkbox per line
              still to come, plus "All of it". Sent lines get done_at; the

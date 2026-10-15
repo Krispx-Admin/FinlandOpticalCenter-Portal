@@ -402,7 +402,7 @@ export function fittingView(me) {
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
-        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || handlerStage(o, me.code) || lensOnly(o) || viewOnly ? 'disabled' : ''}><i></i></label>
+        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${!canSelect(o) || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
@@ -422,13 +422,16 @@ export function fittingView(me) {
 
   // The one next action shared by every selected order — or null if they
   // need different actions (mixed stages / waiting on someone else).
+  // The button an order would get in a bulk move, or null when this location
+  // has nothing to press on it (yet) — e.g. waiting for another branch.
+  const bulkLabel = o => (!canAdvanceOrder(o, me.code) ? null
+    : (o.status === 'lenses_in' && !o.fitter) ? 'Send to fitter'
+    : fitStep(o).action) || null;
   function bulkAction() {
     const sel = [...ui.selected].map(id => store.order(id)).filter(Boolean);
     let action = null, ok = sel.length > 0;
     for (const o of sel) {
-      const label = !canAdvanceOrder(o, me.code) ? null
-        : (o.status === 'lenses_in' && !o.fitter) ? 'Send to fitter'
-        : fitStep(o).action;
+      const label = bulkLabel(o);
       if (!label) { ok = false; continue; }
       if (action === null) action = label;
       else if (action !== label) ok = false;
@@ -902,16 +905,27 @@ export function fittingView(me) {
 
   // Select every order on the open chip — not on "All active", where they need
   // different things done. Completed orders cannot be selected.
-  const selectable = () => visible().filter(o => o.status !== 'collected' && !handlerStage(o, me.code) && !lensOnly(o));
+  // Only orders with a step for this location to press can be selected; Select
+  // all takes the ones sharing the most common step (user, 2026-10-15), so the
+  // bulk button always works.
+  const canSelect = o => o.status !== 'collected' && !handlerStage(o, me.code) && !lensOnly(o) && !!bulkLabel(o);
+  const selectable = () => visible().filter(canSelect);
+  function selectAllGroup() {
+    const list = selectable();
+    const by = new Map();
+    for (const o of list) { const a = bulkLabel(o); by.set(a, [...(by.get(a) ?? []), o]); }
+    const [action, group] = [...by.entries()].sort((a, b) => b[1].length - a[1].length)[0] ?? [null, []];
+    return { action, group, others: list.length - group.length };
+  }
   function selectAllHTML() {
     if (viewOnly || ui.chip === 'active') return '';
-    const list = selectable();
-    if (!list.length) return '';
-    const all = list.every(o => ui.selected.has(o.id));
+    const { action, group, others } = selectAllGroup();
+    if (!group.length) return '';
+    const all = group.every(o => ui.selected.has(o.id));
     return `
       <label class="sel-all">
         <span class="cbx"><input type="checkbox" data-sel-all ${all ? 'checked' : ''}><i></i></span>
-        <span>${all ? 'Clear selection' : `Select all ${list.length}`}</span>
+        <span>${all ? 'Clear selection' : `Select all ${group.length} — ${esc(action)}`}${others ? ` <span class="muted">· ${others} need${others === 1 ? 's' : ''} another step</span>` : ''}</span>
       </label>`;
   }
 
@@ -921,7 +935,7 @@ export function fittingView(me) {
 
   function toggleSelect(id) {
     const o = store.order(id);
-    if (!o || o.status === 'collected' || handlerStage(o, me.code) || lensOnly(o) || viewOnly) return;
+    if (!o || !canSelect(o) || viewOnly) return;
     if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
     refreshLists();
   }
@@ -942,8 +956,8 @@ export function fittingView(me) {
       if (dd) { ui.days = +dd.dataset.days; ui.selected.clear(); refreshLists(); return; }
       const sa = e.target.closest('[data-sel-all]');
       if (sa) {
-        const list = selectable();
-        if (sa.checked) list.forEach(o => ui.selected.add(o.id)); else list.forEach(o => ui.selected.delete(o.id));
+        const { group } = selectAllGroup();
+        if (sa.checked) { ui.selected.clear(); group.forEach(o => ui.selected.add(o.id)); } else group.forEach(o => ui.selected.delete(o.id));
         refreshLists(); return;
       }
       if (e.target.closest('[data-bulk-clear]')) { ui.selected.clear(); refreshLists(); return; }
