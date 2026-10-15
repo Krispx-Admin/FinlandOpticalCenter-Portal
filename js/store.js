@@ -632,6 +632,14 @@ export const store = {
     })).then(row => (row ? this.order(row.id) : null));
   },
 
+  // Where the customer collects the glasses (schema-36).
+  setCollect(id, code, by) {
+    const o = this.order(id);
+    return run(['orders'], async () => ok(await supabase.rpc('set_collect', { p_id: id, p_code: code })), {
+      by, module: 'fitting', title: `${o?.ref ?? 'Order'} — collect at ${locName(code)}`, refs: [id],
+    });
+  },
+
   // ── fixing mistakes on an order (schema-34) ──
   editOrder(id, { ref, customer }, by) {
     return run(['orders', 'lensRequests'], async () => ok(await supabase.rpc('edit_order', { p_id: id, p_ref: ref, p_customer: customer })), {

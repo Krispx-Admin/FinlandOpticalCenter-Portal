@@ -7,6 +7,7 @@ import {
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
   isBenchClosed, isLabOff, labMode, LAB_MODES, benchNote,
   canEditOrder, canEditOutsideRx, canDeleteOrder, canUndoOrder, undoTarget,
+  collectOf, frameLoc, canChangeCollect, LOCATIONS,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
@@ -109,6 +110,38 @@ export function fittingView(me) {
     for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => chipHas(d, o)).length;
     return c;
   };
+
+  // ── where the customer collects (schema-36) ──
+  const collectBranches = () => LOCATIONS.filter(l => l.active !== false && !['admin', 'scheduler'].includes(l.role));
+  const collectOptions = pick => collectBranches().map(l => `<option value="${l.code}" ${l.code === pick ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
+  function collectModal(id) {
+    const o = store.order(id);
+    if (!o) return;
+    const C = collectOf(o);
+    const where = o.status === 'returning' ? `It is on its way to ${locName(o.toCode ?? C)} — it gets there first, then that branch transfers it.`
+      : o.status === 'delivered' || (o.status === 'ready' && frameLoc(o) !== o.fitter) ? `It is at ${locName(o.status === 'delivered' ? (o.frameAt ?? C) : frameLoc(o))} — that branch will transfer it.`
+      : 'The frame goes there after fitting.';
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">${esc(o.ref)} · ${esc(o.customer || '')}</div><h2>Where does the customer collect?</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form" id="co">
+        <label>Collect at <select name="collect">${collectOptions(C)}</select></label>
+        <p class="muted sm">${esc(where)}</p>
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} Save</button>
+        </div>
+      </form>`);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.querySelector('#co').addEventListener('submit', async e => {
+      e.preventDefault();
+      const to = new FormData(e.target).get('collect');
+      if (to === C) return layer.close();
+      if (await store.setCollect(id, to, me.code)) layer.close();
+    });
+  }
 
   // ── fixing mistakes: edit, undo the last step, delete (schema-34) ──
   function toolsHTML(o) {
@@ -260,18 +293,57 @@ export function fittingView(me) {
       </div>`;
     // Nothing travelled, so there is no road to draw — one node, and a word
     // about why the rest of the diagram is missing.
-    if (onShortRoad(o)) return `
+    if (onShortRoad(o) && collectOf(o) === o.origin) return `
       <div class="journey journey-self ${big ? 'journey-big' : ''}" title="${esc(fitterName)} — sold and fitted here, no transit">
         ${node(o.fitter, `${isBack(o) ? 'ready' : 'done'} j-mid`, fitterName, tail)}
         <span class="j-inhouse">${isBack(o) ? 'Fitted in-house' : 'In-house — no transit'}</span>
       </div>`;
-    return `
+    const C = collectOf(o);
+    // A plain round trip draws as it always has.
+    if (C === o.origin && !(o.stops ?? []).length && !isSelfFit(o)) return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
         ${node(o.origin, 'done', locName(o.origin))}
         <i class="j-seg ${seg1}"></i>
         ${node(fitterCode, `${fitterCls} j-mid`, fitterName, tail)}
         <i class="j-seg ${seg2}"></i>
         ${node(o.origin, stage >= at('delivered') ? 'done' : '', 'Back at branch')}
+      </div>`;
+    return routeJourney(o, big, tail, { node, fitterCode, fitterName, fitterCls });
+  }
+
+  // Collected somewhere else (schema-36): sold → fitter → every branch it
+  // stopped at → where the customer collects. Collected at the fitter, the
+  // road ends there.
+  function routeJourney(o, big, tail, { node, fitterCode, fitterName, fitterCls }) {
+    const C = collectOf(o), out = isOutside(o), self = isSelfFit(o);
+    const stops = o.stops ?? [];
+    const path = [{ code: o.origin, lbl: self ? `${locName(o.origin)} (in-house)` : locName(o.origin) }];
+    if (!self) path.push({ code: fitterCode, lbl: fitterName, fitter: true });
+    if (out) path.push({ code: o.origin, lbl: 'Back at branch' });
+    for (const s of stops) path.push({ code: s, lbl: locName(s) });
+    const to = o.status === 'returning' ? (o.toCode ?? C) : null;
+    if (to && to !== C && path[path.length - 1].code !== to) path.push({ code: to, lbl: locName(to) });
+    const here = !self && !out && C === o.fitter && !stops.length;    // collected at the fitter
+    if (!here && path[path.length - 1].code !== C) path.push({ code: C, lbl: `${locName(C)} · collect` });
+    // Where the frame is now, by place on the road.
+    const lastAt = code => path.map(p => p.code).lastIndexOf(code);
+    const s = o.status;
+    const cur = ['pending', 'lenses_in'].includes(s) ? 0
+      : s === 'to_fitter' ? (out ? 1 : 0)
+      : s === 'at_fitter' ? (self ? 0 : 1)
+      : s === 'ready' || s === 'returning' ? Math.max(0, lastAt(frameLoc(o)))
+      : path.length - 1;
+    const moving = (s === 'to_fitter' && !out) || s === 'returning';
+    const nodes = path.map((p, i) => {
+      const cls = p.fitter ? fitterCls : i <= cur ? 'done' : '';
+      const mid = (self ? i === 0 : p.fitter) ? ' j-mid' : '';
+      return node(p.code, cls + mid, p.lbl, mid ? tail : '');
+    });
+    const segs = path.slice(1).map((_, i) => `<i class="j-seg ${i + 1 <= cur ? 'done' : i === cur && moving ? 'moving' : ''}"></i>`);
+    return `
+      <div class="journey journey-route ${big ? 'journey-big' : ''}" title="${esc(path.map(p => locName(p.code) || p.code).join(' → '))}">
+        ${nodes.map((n, i) => (i ? segs[i - 1] : '') + n).join('')}
+        ${here ? '<span class="j-collect">Collect here</span>' : ''}
       </div>`;
   }
 
@@ -412,6 +484,8 @@ export function fittingView(me) {
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
           <div><span>Fitting centre</span><b>${isOutside(o) ? `<span class="loc-chip">OUT</span> ${esc(o.outside)} <span class="muted">· outside, 3rd party</span>`
             : o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}${isSelfFit(o) ? ' <span class="muted">· in-house</span>' : ''}` : '<span class="muted">Not assigned yet</span>'}</b></div>
+          <div><span>Collect at</span><b>${locChip(collectOf(o))} ${esc(locName(collectOf(o)))}${collectOf(o) === o.origin ? ' <span class="muted">· where it was sold</span>' : ''}
+            ${canChangeCollect(o, me.code) && !viewOnly ? `<button class="btn btn-ghost btn-sm kv-btn" data-collect="${o.id}">${icons.history} Change</button>` : ''}</b></div>
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
@@ -505,6 +579,8 @@ export function fittingView(me) {
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
       if (adv) return store.advanceOrders([adv.dataset.advance], me.code);
+      const co = e.target.closest('[data-collect]');
+      if (co) return collectModal(co.dataset.collect);
       const ed = e.target.closest('[data-edit-order]');
       if (ed) return editModal(ed.dataset.editOrder);
       const un = e.target.closest('[data-undo-order]');
@@ -681,6 +757,7 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
+        <label>Customer collects at <select name="collect">${collectOptions(me.code)}</select></label>
         <label class="ol-switch">
           <span class="sw"><input type="checkbox" name="outside" id="nf-outside"><i></i></span>
           <span><b>Outside lenses</b> <span class="muted">· other brands</span></span>
@@ -713,6 +790,7 @@ export function fittingView(me) {
       const f = new FormData(e.target);
       const ref = f.get('ref').trim();
       const customer = f.get('customer').trim();
+      const collect = String(f.get('collect') || me.code);
       // A name of only spaces passes the browser's own required check, so put
       // the trimmed values back and let it re-check — that way an empty field
       // gets the usual prompt instead of a button that quietly does nothing.
@@ -734,8 +812,9 @@ export function fittingView(me) {
         if (!lensType) { toast({ title: 'Type the lens type', sub: 'e.g. 1.5 progressive blue UV', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         const how = val('olHow') || 'receive_lens';
         o = await store.createOutsideOrder({ ref, customer, rx, lensType, fulfilment: how, dest: how === 'send_frames' ? val('olDest') : null }, me.code);
+        if (o && collect !== me.code) await store.setCollect(o.id, collect, me.code);
       } else {
-        o = await store.createOrder({ ref, origin: me.code, customer }, me.code);
+        o = await store.createOrder({ ref, origin: me.code, customer, collect }, me.code);
       }
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
       layer.close();

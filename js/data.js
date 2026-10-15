@@ -167,11 +167,32 @@ export const isOutside = o => !!o.outside;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
   to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame received', actor: 'origin', done: 'Received back from the outside cutter' },
-  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',         color: 'done',   action: null,            actor: null,     done: null },
 };
 
-export const flowFor = o => (isOutside(o) ? OUT_FLOW : onShortRoad(o) ? SELF_FLOW : FIT_FLOW);
+// ── Collect at another branch (schema-36, user 2026-10-15) ──
+// The customer collects where it was sold unless `collect` names another
+// branch. After the fitter the frame goes there (or waits at a branch it
+// reached before the customer changed their mind — a transfer). Collected
+// at the fitter itself, there is no trip back at all.
+export const collectOf = o => o.collect ?? o.origin;
+// Where the frame is while it is ready, or travelling from.
+export const frameLoc = o => o.frameAt ?? (isOutside(o) ? o.origin : o.fitter);
+// Waiting at a branch on the way, for the customer's new choice.
+export const isTransfer = o => o.status === 'ready' && !!o.frameAt && o.frameAt !== o.fitter && !(isOutside(o) && o.frameAt === o.origin);
+const TO_COLLECT = ['pending', 'lenses_in', 'at_fitter', 'ready', 'returning', 'delivered', 'collected'];
+const OUT_TO_COLLECT = ['pending', 'lenses_in', 'to_fitter', 'ready', 'returning', 'delivered', 'collected'];
+const AT_FITTER_COLLECT = ['pending', 'lenses_in', 'to_fitter', 'at_fitter', 'delivered', 'collected'];
+export const flowFor = o => {
+  const c = collectOf(o);
+  if (isOutside(o)) return c === o.origin ? OUT_FLOW : OUT_TO_COLLECT;
+  if (isSelfFit(o)) return c === o.origin ? (SELF_FLOW.includes(o.status) ? SELF_FLOW : FIT_FLOW) : TO_COLLECT;
+  return o.fitter && c === o.fitter ? AT_FITTER_COLLECT : FIT_FLOW;
+};
+// Anyone the frame passes through, or who collects it, is on its route.
+export const onRoute = (o, code) => [o.origin, o.fitter, o.collect, o.toCode, o.frameAt].includes(code) || (o.stops ?? []).includes(code);
+export const canChangeCollect = (o, code) => o.status !== 'collected' && (onRoute(o, code) || loc(code)?.role === 'admin');
 
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
@@ -184,9 +205,9 @@ export const FIT_STATUS = {
   lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
   to_fitter: { label: 'In transit',           color: 'blue',   action: 'Frame received', actor: 'fitter', done: 'Frame received at fitting centre' },
   at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
-  ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'fitter', done: 'Handed to driver — returning to branch' },
-  returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'origin', done: 'Delivered back at origin branch' },
-  delivered: { label: 'Ready for collection', color: 'green',  action: 'Handed to customer', actor: 'origin', done: 'Handed to the customer — collected' },
+  ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'here',   done: 'Handed to driver — returning to branch' },
+  returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'to',     done: 'Delivered back at origin branch' },
+  delivered: { label: 'Ready for collection', color: 'green',  action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',            color: 'done',   action: null,              actor: null,     done: null },
 };
 
@@ -198,7 +219,7 @@ const SELF_STATUS = {
   pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens received', actor: 'fitter', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
   at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
-  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'fitter', done: 'Handed to the customer — collected' },
+  delivered: { label: 'Ready for collection', color: 'green', action: 'Handed to customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',          color: 'done',   action: null,            actor: null,     done: null },
 };
 
@@ -356,9 +377,21 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (viewer && viewer === holder) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
     return { ...base, label: `Lenses at ${where(holder)}` };
   }
+  // The road after the fitter, to wherever the customer collects.
+  const C = collectOf(o);
+  if (o.status === 'at_fitter' && o.fitter && !isSelfFit(o) && C === o.fitter)
+    return { ...base, action: 'Ready for collection', done: 'Fitted — ready for collection here' };
+  if (o.status === 'ready') {
+    if (isTransfer(o)) return { ...base, label: `Transfer to ${where(C)}`, color: 'amber', action: `Transfer to ${C}`, done: `Handed to driver — transferred to ${locName(C)}` };
+    return { ...base, action: `Send to ${C}`, done: `Handed to driver — on its way to ${locName(C)}` };
+  }
+  if (o.status === 'returning') {
+    const to = o.toCode ?? C;
+    return { ...base, label: to === o.origin ? `Returning to ${where(to)}` : `In transit to ${where(to)}`, done: `Frame received at ${locName(to)}` };
+  }
+  if (o.status === 'delivered' && long && C !== o.origin) return { ...base, label: `Ready for collection at ${locName(C)}` };
   if (o.status === 'to_fitter' && isOutside(o)) return { ...base, label: long ? `At ${o.outside} (outside)` : `At ${o.outside}` };
   if (o.status === 'to_fitter' && o.fitter) return { ...base, label: `In transit to ${where(o.fitter)}` };
-  if (o.status === 'returning') return { ...base, label: `Returning to ${where(o.origin)}` };
   return base;
 }
 
@@ -378,7 +411,7 @@ export function canDeleteOrder(o, code) {
 // The step an undo goes back to, or null when there is none.
 export function undoTarget(o) {
   const f = flowFor(o), i = f.indexOf(o.status);
-  if (i < 1) return null;
+  if (i < 1 || (o.stops ?? []).length) return null;
   const prev = f[i - 1], lr = o.lensRequest, ol = o.outsideLens;
   if (prev === 'pending') {
     if (lr?.fulfilment === 'send_frames' || ol?.fulfilment === 'send_frames') return null;   // it started with the frame going
@@ -386,7 +419,7 @@ export function undoTarget(o) {
   }
   return prev;
 }
-export const canUndoOrder = (o, code) => !!undoTarget(o) && (o.origin === code || o.fitter === code || isAdminLoc(code));
+export const canUndoOrder = (o, code) => !!undoTarget(o) && ([o.origin, o.fitter, o.collect, o.toCode, o.frameAt].includes(code) || isAdminLoc(code));
 
 export const nextFitStatus = o => {
   const f = flowFor(o);
@@ -398,6 +431,7 @@ export const nextFitStatus = o => {
 export function fitActor(order) {
   const a = fitStep(order).actor;
   return a === 'origin' ? order.origin : a === 'fitter' ? order.fitter
+    : a === 'here' ? frameLoc(order) : a === 'to' ? (order.toCode ?? collectOf(order)) : a === 'collect' ? collectOf(order)
     : a === 'lens' ? (order.lensRequest?.holder ?? LENS_HOLDERS[0]?.code ?? null)
     : a === 'outside' ? outsideHandler() : null;
 }
@@ -545,7 +579,7 @@ export function itemCounts(items) {
 // sent them — after that, where the job goes is not its concern (user,
 // 2026-10-13); the request stays in its Lens Stock tab.
 export function canSeeOrder(o, code) {
-  return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code
+  return seesAll(loc(code)?.role) || onRoute(o, code)
     || o.lensRequest?.holder === code   // the stock holder, for the whole job (user, 2026-10-15)
     || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.receivedAt);   // the handler, until the lenses arrive
 }

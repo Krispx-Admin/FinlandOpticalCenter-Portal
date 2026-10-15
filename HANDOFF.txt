@@ -793,6 +793,15 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-36-collect-at.sql   orders.collect_code (null = where sold),
+                             frame_at, to_code, stops[]; trigger
+                             orders_route_gate keeps them right on every step
+                             (collect at the fitter: Mark ready → delivered;
+                             arriving where it is no longer collected →
+                             'ready' there = a transfer); set_collect(id,
+                             code); orders/order_events RLS widened to every
+                             branch on the route; undo refuses after a
+                             transfer. Applied 2026-10-15.
   schema-35-claim-item-kind-qty.sql  claim_items.kind ('frame'|'lens') +
                              qty (default 1); total = sum(price × qty).
                              Applied 2026-10-15; every total unchanged.
@@ -1169,6 +1178,21 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  COLLECT AT ANOTHER BRANCH (schema-36, rehearsed incl. RLS as the
+             receiving branch, applied). New order form: "Customer collects
+             at" (default this branch). Drawer: "Collect at … Change" — anyone
+             on the route or the office. Before the frame leaves the fitter a
+             change just swaps the end; a frame on its way arrives first; a
+             frame sitting at a branch that is no longer the collect branch
+             gets "Transfer to X" there (Ready tab, amber tag) and the
+             journey grows a pin: MOO─MGM─QCC─SCC. Collect at the fitter: no
+             trip back — the fitter's button is "Ready for collection", the
+             journey shows "Collect here". Frame received / Ready for
+             collection / Handed to customer belong to the collect branch.
+             data.js: collectOf, frameLoc, isTransfer, onRoute,
+             canChangeCollect; flowFor per road; actors 'here' / 'to' /
+             'collect'. fitting.js: routeJourney. Not built (asked, not
+             answered): a "balance to pay on collection" note.
  2026-10-15  Stock-lens holders keep every order on their stock in the Fitting
              Log for the whole job (reverses 2026-10-13; canSeeOrder): after
              Send lenses it reads "Lenses sent to SCC". New tab "Stock Lens"

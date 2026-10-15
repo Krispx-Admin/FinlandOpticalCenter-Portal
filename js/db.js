@@ -33,6 +33,9 @@ const toOrder = r => ({
   origin: r.origin_code, fitter: r.fitter_code ?? null, outside: r.outside_cutter ?? null,
   customer: r.customer ?? '', phone: r.phone ?? '',
   urgent: !!r.urgent, note: r.note ?? '', status: r.status,
+  // Where the customer collects (null = where it was sold), and the frame's
+  // road after the fitter (schema-36).
+  collect: r.collect_code ?? null, frameAt: r.frame_at ?? null, toCode: r.to_code ?? null, stops: r.stops ?? [],
   createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   timeline: timeline(r.order_events),
 });
@@ -137,6 +140,7 @@ export const orderRow = (f, by) => ({
   ref: f.ref, origin_code: f.origin ?? by, fitter_code: f.fitter ?? null,
   customer: f.customer ?? '', phone: f.phone ?? '',
   urgent: !!f.urgent, note: f.note ?? '', status: 'pending',
+  collect_code: f.collect && f.collect !== (f.origin ?? by) ? f.collect : null,
 });
 
 export const stockLineRows = (requestId, lines) => lines.map((l, i) => ({
