@@ -1,7 +1,7 @@
 // ── Module 2: Stock Requests — branch composer + office fulfilment queue ──
 import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
 
 const CHIPS = [
   { key: 'placed', label: 'To fulfil' },
@@ -10,6 +10,11 @@ const CHIPS = [
 ];
 
 const units = r => r.lines.reduce((s, l) => s + (l.qty || 0), 0);
+// Part of it sent already (schema-38): "Partly sent · 1/3".
+const doneCount = r => r.lines.filter(l => l.done).length;
+const statusPill = (r, opts) => (r.status === 'placed' && doneCount(r)
+  ? stepPill({ label: `Partly sent · ${doneCount(r)}/${r.lines.length}`, color: 'teal' }, opts)
+  : pill(REQ_STATUS, r.status, opts));
 const unitLbl = l => l.unit === 'box' ? (l.qty === 1 ? 'box' : 'boxes') : 'pcs';
 // e.g. "3 lines · 24 pcs · 5 boxes"
 function unitsBreakdown(lines) {
@@ -86,7 +91,7 @@ export function stockView(me) {
           <div class="row-sub">${lineSummary(r)}</div>
         </div>
         <div class="row-units"><b>${r.lines.length}</b> line${r.lines.length === 1 ? '' : 's'}${unitsBreakdown(r.lines) ? ` · ${unitsBreakdown(r.lines)}` : ''}</div>
-        <div class="row-status">${pill(REQ_STATUS, r.status, { flash: changed })}</div>
+        <div class="row-status">${statusPill(r, { flash: changed })}</div>
         <div class="row-time" title="${fmtDT(r.updatedAt)}">${relTime(r.updatedAt)}</div>
         <div class="row-act" data-stop>${quick}</div>
       </div>`;
@@ -105,6 +110,7 @@ export function stockView(me) {
     const anyBrand = r.lines.some(l => l.brand);
     const anyAud = r.lines.some(l => l.audience);
     const anyQty = r.lines.some(l => l.qty != null);
+    const partly = r.status === 'placed' && doneCount(r) > 0;
     return `
       <table class="lines">
         <thead><tr>
@@ -112,6 +118,7 @@ export function stockView(me) {
           ${anyBrand ? '<th>Brand</th>' : ''}
           ${anyAud ? '<th>Audience</th>' : ''}
           ${anyQty ? '<th class="num">Qty</th>' : ''}
+          ${partly ? '<th>Sent</th>' : ''}
         </tr></thead>
         <tbody>
           ${r.lines.map(l => `
@@ -120,6 +127,7 @@ export function stockView(me) {
               ${anyBrand ? `<td>${l.brand ? esc(l.brand) : '<span class="muted">—</span>'}</td>` : ''}
               ${anyAud ? `<td>${l.audience ? esc(l.audience) : '<span class="muted">—</span>'}</td>` : ''}
               ${anyQty ? `<td class="num">${l.qty != null ? `<b>${l.qty}</b> <span class="muted">${unitLbl(l)}</span>` : '<span class="muted">—</span>'}</td>` : ''}
+              ${partly ? `<td>${l.done ? `<span class="sent-ok">${icons.check} Sent</span>` : '<span class="muted">To come</span>'}</td>` : ''}
             </tr>`).join('')}
         </tbody>
       </table>`;
@@ -142,7 +150,7 @@ export function stockView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="dw-body">
-        <div class="dw-status-row">${pill(REQ_STATUS, r.status)}<span class="dw-when">updated ${relTime(r.updatedAt)}</span></div>
+        <div class="dw-status-row">${statusPill(r)}<span class="dw-when">updated ${relTime(r.updatedAt)}</span></div>
         ${linesTableHTML(r)}
         <div class="dw-actions">${actions}</div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
@@ -165,7 +173,50 @@ export function stockView(me) {
       const pr = e.target.closest('[data-print]');
       if (pr) return printRequest(store.request(pr.dataset.print));
       const cp = e.target.closest('[data-complete]');
-      if (cp) return store.completeRequest(cp.dataset.complete, me.code);
+      if (cp) return completeModal(cp.dataset.complete);
+    });
+  }
+
+  // Complete: tick what was sent — every line, or only some; the request
+  // stays open until the last line goes (user, 2026-10-15).
+  function completeModal(id) {
+    const r = store.request(id);
+    if (!r || r.status !== 'placed') return;
+    const open = r.lines.filter(l => !l.done);
+    const picked = new Set(open.map(l => l.id));
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">${esc(r.ref)} · ${esc(locName(r.branch))}</div><h2>What was sent?</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <label class="sel-all cm-all"><span class="cbx"><input type="checkbox" data-all ${picked.size === open.length ? 'checked' : ''}><i></i></span>
+          <span>All of it${open.length < r.lines.length ? ' that is left' : ''}</span></label>
+        <div class="cm-lines">
+          ${open.map(l => `
+            <label class="cm-line"><span class="cbx"><input type="checkbox" data-line="${l.id}" ${picked.has(l.id) ? 'checked' : ''}><i></i></span>
+              <span><b>${esc(l.category)}</b>${l.brand ? ` · ${esc(l.brand)}` : ''}${l.audience ? ` · ${esc(l.audience)}` : ''}</span>
+              <span class="muted">${l.qty != null ? `${l.qty} ${unitLbl(l)}` : ''}</span></label>`).join('')}
+        </div>
+        ${r.lines.some(l => l.done) ? `<p class="muted sm">Already sent: ${esc(r.lines.filter(l => l.done).map(l => l.category).join(', '))}</p>` : ''}
+        <div class="form-foot">
+          <span class="muted">${picked.size === open.length ? 'Completes the request' : `${open.length - picked.size} still to come`}</span>
+          <button class="btn btn-ghost" data-close>Cancel</button>
+          <button class="btn btn-primary" data-go ${picked.size ? '' : 'disabled'}>${icons.check} ${picked.size === open.length ? 'Complete' : `Mark ${picked.size} sent`}</button>
+        </div>
+      </div>`);
+    layer.el.addEventListener('change', e => {
+      if (e.target.matches('[data-all]')) { if (e.target.checked) open.forEach(l => picked.add(l.id)); else picked.clear(); }
+      const ln = e.target.closest('[data-line]');
+      if (ln) { if (ln.checked) picked.add(ln.dataset.line); else picked.delete(ln.dataset.line); }
+      layer.update();
+    });
+    layer.el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      const go = e.target.closest('[data-go]');
+      if (!go || !picked.size) return;
+      go.disabled = true;
+      if (await store.completeLines(id, [...picked], me.code)) layer.close(); else go.disabled = false;
     });
   }
 
@@ -178,7 +229,7 @@ export function stockView(me) {
         <td>${esc(l.brand ?? '—')}</td>
         <td>${esc(l.audience ?? '—')}</td>
         <td class="num">${l.qty != null ? `${l.qty} ${unitLbl(l)}` : '—'}</td>
-        <td class="pick"></td>
+        <td class="pick">${l.done ? 'sent' : ''}</td>
       </tr>`).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.ref)} — Pick Sheet</title>
       <style>
@@ -396,7 +447,7 @@ export function stockView(me) {
       const pr = e.target.closest('[data-print]');
       if (pr) { e.stopPropagation(); printRequest(store.request(pr.dataset.print)); return; }
       const cp = e.target.closest('[data-complete]');
-      if (cp) { e.stopPropagation(); store.completeRequest(cp.dataset.complete, me.code); return; }
+      if (cp) { e.stopPropagation(); completeModal(cp.dataset.complete); return; }
       if (e.target.closest('[data-stop]')) return;
       const row = e.target.closest('[data-open]');
       if (row) openDrawer(row.dataset.open);

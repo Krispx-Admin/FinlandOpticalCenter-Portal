@@ -337,6 +337,18 @@ export const store = {
     });
   },
 
+  // Some of the lines sent — the request completes once every line is (schema-38).
+  completeLines(id, lineIds, by) {
+    const r = this.request(id);
+    if (!r || r.status !== 'placed' || !lineIds.length) return Promise.resolve(null);
+    const names = r.lines.filter(l => lineIds.includes(l.id)).map(l => l.category);
+    const all = r.lines.every(l => l.done || lineIds.includes(l.id));
+    return run(['requests'], async () => ok(await supabase.rpc('complete_stock_lines', { p_request: id, p_lines: lineIds })), {
+      by, module: 'stock', title: all ? `${by} completed ${r.ref}` : `${by} sent part of ${r.ref}`,
+      sub: `${names.join(', ')} → ${locName(r.branch)}`, refs: [id],
+    });
+  },
+
   // ── Lens stock (owned by the holding fitting centre) ──
   // Same spec twice means more of the same lens on the shelf, not a second
   // row — and the add happens in one SQL statement so it cannot double-count.

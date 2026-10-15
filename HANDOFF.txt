@@ -1178,6 +1178,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Stock requests complete part by part (schema-38, rehearsed,
+             applied): Complete opens "What was sent?" — a checkbox per line
+             still to come, plus "All of it". Sent lines get done_at; the
+             request stays To fulfil with a "Partly sent · 1/3" tag (drawer:
+             Sent / To come column; pick sheet marks "sent") until the last
+             line goes, then Completed. RPC complete_stock_lines.
  2026-10-15  Direct Insurance salesperson list: names only (no branch under them).
  2026-10-15  ADMINS + DAMAGED STOCK + EXPORT (schema-37, rehearsed with RLS
              checks, applied). Office (OFC) renamed Omar — the one real admin.

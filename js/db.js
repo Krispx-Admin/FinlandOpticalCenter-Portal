@@ -50,6 +50,7 @@ const toRequest = r => ({
       ...(l.audience == null ? {} : { audience: l.audience }),
       ...(l.qty == null ? {} : { qty: l.qty, unit: l.unit ?? 'pcs' }),
       note: l.note ?? '',
+      done: !!l.done_at,   // sent by the office (schema-38)
     })),
   createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   timeline: timeline(r.stock_request_events),
