@@ -1169,6 +1169,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Fitting Log tabs are named for the next ACTION, not the tag (tags
+             unchanged): Waiting for Lenses · Send to Fitter (tag "Lenses
+             Delivered") · In Transit to Fitter · In Fitting · Ready · In
+             Transit to Branch · Ready for Collection · Completed. The
+             separate "Outside cutter" tab is gone — a frame at an outside
+             cutter sits under In Fitting. (fitting.js CHIP_LABELS)
  2026-10-15  Reimbursement Invoice / Direct Insurance products (schema-35): each
              is a Frame or Lenses (older rows "Other"), with Qty and a price
              EACH — a line is price × qty. Form: Item | Description | Qty |

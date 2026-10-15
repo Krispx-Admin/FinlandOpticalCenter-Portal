@@ -15,18 +15,19 @@ import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLa
 // on Completed, by the day it was completed. 0 = any time.
 const DAY_FILTERS = [0, 1, 3, 7, 14, 30];
 
-// One chip per distinct label, so two stages that read the same — on the way
-// to the fitter and on the bench are both "Waiting to be Fitted" — share a chip
-// rather than showing the same words twice. A chip's key is its first status.
+// The tabs are named for what is done next — the action — not for the
+// order's tag: an order whose tag reads "Lenses Delivered" sits under "Send to
+// Fitter". Where nothing is pressed, the tab says where the frame is
+// (user, 2026-10-15). A chip's key is its status.
+const CHIP_LABELS = {
+  pending: 'Waiting for Lenses', lenses_in: 'Send to Fitter', to_fitter: 'In Transit to Fitter',
+  at_fitter: 'In Fitting', ready: 'Ready', returning: 'In Transit to Branch', delivered: 'Ready for Collection',
+};
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
-for (const s of FIT_FLOW.filter(s => s !== 'collected')) {
-  const same = CHIP_DEFS.find(d => d.label === FIT_STATUS[s].label);
-  if (same) same.statuses.push(s);
-  else CHIP_DEFS.push({ key: s, label: FIT_STATUS[s].label, statuses: [s] });
-}
-// Frames at an outside cutter have their own chip, not "In transit".
-for (const d of CHIP_DEFS) if (d.statuses?.includes('to_fitter')) d.test = o => d.statuses.includes(o.status) && !(o.status === 'to_fitter' && isOutside(o));
-CHIP_DEFS.push({ key: 'outside', label: 'Outside cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
+for (const s of FIT_FLOW.filter(s => s !== 'collected')) CHIP_DEFS.push({ key: s, label: CHIP_LABELS[s], statuses: [s] });
+// A frame at an outside cutter is being fitted there: "In Fitting", not in transit.
+CHIP_DEFS.find(d => d.key === 'to_fitter').test = o => o.status === 'to_fitter' && !isOutside(o);
+CHIP_DEFS.find(d => d.key === 'at_fitter').test = o => o.status === 'at_fitter' || (o.status === 'to_fitter' && isOutside(o));
 CHIP_DEFS.push({ key: 'collected', label: 'Completed', statuses: ['collected'] });
 const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 
