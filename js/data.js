@@ -316,6 +316,8 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     const ans = o.lensRequest.status;
     const from = o.lensRequest.holder;
     if (ans === 'requested') return { ...base, ...LENS_WAIT, ...(long && from ? { label: `Waiting for Lenses — ${locName(from)} to send them` } : {}) };
+    // The holder, once it has sent them, reads where they went.
+    if (ans === 'sent' && viewer && viewer === from && o.origin !== from) return { ...base, label: `Lenses sent to ${where(o.origin)}`, color: 'blue', action: null };
     if (ans === 'sent' && long && from) return { ...base, label: `Waiting for Lenses — sent by ${locName(from)}` };
     if (ans === 'declined') return { ...base, label: 'Lens Declined', color: 'red' };
   }
@@ -544,7 +546,7 @@ export function itemCounts(items) {
 // 2026-10-13); the request stays in its Lens Stock tab.
 export function canSeeOrder(o, code) {
   return seesAll(loc(code)?.role) || o.origin === code || o.fitter === code
-    || (o.lensRequest?.holder === code && o.lensRequest.status === 'requested')
+    || o.lensRequest?.holder === code   // the stock holder, for the whole job (user, 2026-10-15)
     || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.receivedAt);   // the handler, until the lenses arrive
 }
 // The handler has sent the outside lenses and they have not arrived yet: the
@@ -559,6 +561,8 @@ export function handlerStage(o, code) {
   return ol.sentAt ? 'to_fitter' : ol.arrivedAt ? 'lenses_in' : 'pending';
 }
 export const outsideInTransit = (o, code) => handlerStage(o, code) === 'to_fitter';
+// Another branch's order that uses this branch's stock lenses.
+export const onMyStock = (o, code) => o.lensRequest?.holder === code && o.origin !== code;
 
 // An outside order whose lenses travel from the handler has two roads, and a
 // tag for each (user, 2026-10-14): where the frame is, and where the lenses are.

@@ -1169,6 +1169,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Stock-lens holders keep every order on their stock in the Fitting
+             Log for the whole job (reverses 2026-10-13; canSeeOrder): after
+             Send lenses it reads "Lenses sent to SCC". New tab "Stock Lens"
+             (only branches holding lens stock see it; onMyStock) lists every
+             other branch's order using their lenses; a lens-only order (frame
+             not cut there) sits only there (and Completed), not in the frame
+             tabs, and can't be bulk-selected. The "Outside Cutter" tab is
+             back; Stock Lens sits next to it. No DB change (RLS already lets
+             the holder read these orders).
  2026-10-15  Fitting Log tabs are named for the next ACTION, not the tag (tags
              unchanged): Waiting for Lenses · Send to Fitter (tag "Lenses
              Delivered") · In Transit to Fitter · In Fitting · Ready · In

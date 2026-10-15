@@ -1,7 +1,7 @@
 // ── Module 1: Fitting Log — the frame's journey branch → fitter → branch ──
 import {
   FIT_FLOW, FIT_STATUS, FITTERS, BRANCHES, FULFILMENT, LENSREQ_STATUS,
-  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses, isBack, outsideInTransit, handlerStage, twoRoads, frameStep, lensStep, canArriveOutside,
+  locName, fitStep, fitActor, isSelfFit, onShortRoad, canAdvanceOrder, needsAction, fmtPwr, seesAll, readOnly, canSendLenses, isBack, outsideInTransit, handlerStage, onMyStock, isLensOwner, twoRoads, frameStep, lensStep, canArriveOutside,
   fulfilmentSwitch,
   isOutside, OUTSIDE_DEFAULT, outsideHandler, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
@@ -25,9 +25,12 @@ const CHIP_LABELS = {
 };
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
 for (const s of FIT_FLOW.filter(s => s !== 'collected')) CHIP_DEFS.push({ key: s, label: CHIP_LABELS[s], statuses: [s] });
-// A frame at an outside cutter is being fitted there: "In Fitting", not in transit.
+// A frame at an outside cutter has its own tab, not "In Transit to Fitter".
 CHIP_DEFS.find(d => d.key === 'to_fitter').test = o => o.status === 'to_fitter' && !isOutside(o);
-CHIP_DEFS.find(d => d.key === 'at_fitter').test = o => o.status === 'at_fitter' || (o.status === 'to_fitter' && isOutside(o));
+CHIP_DEFS.push({ key: 'outside', label: 'Outside Cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
+// Every order that uses this branch's stock lenses — only a branch holding
+// lens stock has this tab (user, 2026-10-15). Matched in the view (chipHas).
+CHIP_DEFS.push({ key: 'stock', label: 'Stock Lens', statuses: [], holders: true, test: () => false });
 CHIP_DEFS.push({ key: 'collected', label: 'Completed', statuses: ['collected'] });
 const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 
@@ -77,7 +80,16 @@ export function fittingView(me) {
   }
   // For the handler, another branch's outside order sits under the lens's
   // step (Waiting for Lenses / Lenses Delivered / In transit), not the frame's.
-  const chipHas = (d, o) => { const hs = handlerStage(o, me.code); return hs ? d.key === hs : onChip(d, o); };
+  // A stock holder's lens-only orders (another branch's frame, its lenses)
+  // sit under Stock Lens — and Completed, once collected — not the frame tabs.
+  const lensOnly = o => onMyStock(o, me.code) && o.fitter !== me.code;
+  const chipHas = (d, o) => {
+    const hs = handlerStage(o, me.code);
+    if (hs) return d.key === hs;
+    if (d.key === 'stock') return onMyStock(o, me.code);
+    if (lensOnly(o)) return d.key === 'collected' && o.status === 'collected';
+    return onChip(d, o);
+  };
   function visible() {
     let list = filtered();
     if (ui.chip === 'active') list = list.filter(o => o.status !== 'collected');
@@ -318,7 +330,7 @@ export function fittingView(me) {
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
       <div class="row ${isNew ? 'row-enter' : ''} ${selected ? 'row-selected' : ''}" data-select="${o.id}">
-        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || handlerStage(o, me.code) || viewOnly ? 'disabled' : ''}><i></i></label>
+        <label class="cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${o.status === 'collected' || handlerStage(o, me.code) || lensOnly(o) || viewOnly ? 'disabled' : ''}><i></i></label>
         <div class="row-main">
           <div class="row-title">
             <b>${esc(o.ref)}</b>
@@ -371,7 +383,7 @@ export function fittingView(me) {
     // How many in each chip are waiting on this location.
     const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'collected' && needsAction(o, me.code));
     const act = d => (d.key === 'active' ? mine.length : mine.filter(o => chipHas(d, o)).length);
-    return CHIP_DEFS.map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
+    return CHIP_DEFS.filter(d => !d.holders || isLensOwner(me.code)).map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
       <button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">
         ${esc(d.label)}${chipCount(c[d.key] ?? 0, act(d))}
       </button>`).join('');
@@ -811,7 +823,7 @@ export function fittingView(me) {
 
   // Select every order on the open chip — not on "All active", where they need
   // different things done. Completed orders cannot be selected.
-  const selectable = () => visible().filter(o => o.status !== 'collected' && !handlerStage(o, me.code));
+  const selectable = () => visible().filter(o => o.status !== 'collected' && !handlerStage(o, me.code) && !lensOnly(o));
   function selectAllHTML() {
     if (viewOnly || ui.chip === 'active') return '';
     const list = selectable();
@@ -830,7 +842,7 @@ export function fittingView(me) {
 
   function toggleSelect(id) {
     const o = store.order(id);
-    if (!o || o.status === 'collected' || handlerStage(o, me.code) || viewOnly) return;
+    if (!o || o.status === 'collected' || handlerStage(o, me.code) || lensOnly(o) || viewOnly) return;
     if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
     refreshLists();
   }
