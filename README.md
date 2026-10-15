@@ -119,6 +119,7 @@ Applied in order:
 | `supabase/schema-34-order-edit-delete.sql` | fix mistakes: edit an order, undo its last step, delete it before anything moved |
 | `supabase/schema-35-claim-item-kind-qty.sql` | invoice products: frame or lenses, with a quantity |
 | `supabase/schema-36-collect-at.sql` | collect at another branch, with transfers when the customer changes their mind |
+| `supabase/schema-37-admins-damaged.sql` | view-only admins (Wijdan, Sarah), the insurance export switch, Damaged Stock reports |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

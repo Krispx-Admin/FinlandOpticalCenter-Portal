@@ -116,7 +116,8 @@ export function settingsView(me) {
     if (error) { host.innerHTML = `<p class="muted sm">Could not load the branches — ${esc(error)}</p>`; return; }
     host.innerHTML = rows.map(r => {
       const fixed = !BRANCH_KINDS.includes(r.role);
-      const keep = fixed || r.holds_lens_stock;
+      // A view-only admin (Wijdan, Sarah) can be closed; the office and Ghiath cannot.
+      const keep = (fixed && r.role !== 'manager') || r.holds_lens_stock;
       return `
       <div class="br-row ${r.active ? '' : 'is-closed'}" data-branch="${esc(r.code)}">
         <span class="loc-chip">${esc(r.code)}</span>
@@ -143,6 +144,11 @@ export function settingsView(me) {
         <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
           <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>
           <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
+        </label>` : ''}
+        ${r.role === 'manager' ? `
+        <label class="br-lens" title="Shows the Export button in Direct Insurance">
+          <span class="sw"><input type="checkbox" data-br-export="${esc(r.code)}" ${LOCATIONS.find(l => l.code === r.code)?.canExport ? 'checked' : ''}><i></i></span>
+          <span>Can export Direct Insurance</span>
         </label>` : ''}
         <div class="ba-msg"></div>
       </div>`;
@@ -433,7 +439,7 @@ export function settingsView(me) {
         <form class="set-add br-add" id="add-branch" autocomplete="off">
           <input name="code" class="br-code-in" placeholder="Code — e.g. NGM" maxlength="10" required>
           <input name="name" placeholder="Name — e.g. Nizwa Grand Mall" required>
-          <select name="role" aria-label="What it is">${kindOptions('retail')}</select>
+          <select name="role" aria-label="What it is">${kindOptions('retail')}<option value="manager">${esc(ROLES.manager.label)}</option></select>
           <input name="pin" class="br-pin-in" inputmode="numeric" maxlength="6" placeholder="Sign-in code" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add branch</button>
         </form>
@@ -577,6 +583,7 @@ export function settingsView(me) {
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);
       if (d.brLab) return store.setLab(d.brLab, e.target.value);
+      if (d.brExport) return store.setInsuranceExport(d.brExport, e.target.checked);
       if (d.flag) {
         // Ticking Brand on a category with no group gives it the first one.
         const cat = store.settings.categories.find(c => c.name === d.cat);

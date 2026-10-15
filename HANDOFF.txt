@@ -1178,6 +1178,26 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Direct Insurance salesperson list: names only (no branch under them).
+ 2026-10-15  ADMINS + DAMAGED STOCK + EXPORT (schema-37, rehearsed with RLS
+             checks, applied). Office (OFC) renamed Omar — the one real admin.
+             New role 'manager' = "Admin · view only" (Wijdan, Sarah): sees
+             everything read-only like Ghiath (is_scheduler() now covers it),
+             is added by the office in Settings → Branches (Add a branch →
+             "Admin · view only", with a sign-in code the office types), can
+             be closed. Per-profile switch "Can export Direct Insurance"
+             (branches.can_export_insurance; the office always can).
+             DAMAGED STOCK tab (js/damaged.js): a branch sends a report of
+             lines — name of glasses, barcode, qty (Enter after a barcode
+             starts the next line; scanners work) + optional note; numbered
+             DS-1001…; Omar, Wijdan, Sarah and Ghiath see every report, print
+             it (no statuses — they print the paper and send it); the branch
+             or the office can delete one sent by mistake. Settings → Tabs can
+             switch it off like any tab.
+             EXPORT (Direct Insurance header, Sarah + the office): branch or
+             all, Today / Last 7 / Last 30 days / a date range → .xlsx with a
+             sheet per invoice and a Products sheet (SheetJS 0.18.5 from
+             jsdelivr, loaded only when exporting).
  2026-10-15  Button "Handed to customer" is now "Hand to Customer". Collected at
              the fitter: the fitter's button reads "Mark as done" (then Ready
              for collection there).

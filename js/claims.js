@@ -1,7 +1,7 @@
 // ── Module 5: Reimbursement Invoice (was Insurance Claims) — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts,
+  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance,
 } from './data.js';
 import { store } from './store.js';
 import { supabase } from './auth.js';
@@ -629,12 +629,11 @@ export function claimsView(me, kind = 'claim') {
     const total = () => draft.items.reduce((t, i) => t + itemAmount(i), 0);
 
     // Direct insurance: the insurer, and the salesperson — typed and picked
-    // from the schedule's roster, one list in alphabetical order, each name
-    // with its home branch beside it.
+    // from the schedule's roster, one list in alphabetical order, names only.
     const insurers = insurerChoices();
     let staff = staffCache;
     const staffOptions = () => (staff ?? []).map(s =>
-      `<option value="${esc(s.name)}" label="${esc((s.branches ?? [])[0] ?? '')}"></option>`).join('');
+      `<option value="${esc(s.name)}"></option>`).join('');
     const directHTML = () => !direct ? '' : `
         <div class="grid2">
           <label>Insurer
@@ -823,6 +822,97 @@ export function claimsView(me, kind = 'claim') {
   }
 
   // ── render ──
+  // ── Export to Excel (Sarah and the office; schema-37) ──
+  // Every Direct Insurance entry for one branch or all, over the last 1 / 7 /
+  // 30 days or a range of dates — one row per invoice, and a second sheet with
+  // every product line.
+  function exportModal() {
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
+    const st = { branch: 'all', period: 7, from: daysAgo(7), to: iso(new Date()) };
+    const range = () => (st.period === 'range' ? [st.from, st.to] : [daysAgo(st.period - 1), iso(new Date())]);
+    const picked = () => {
+      const [from, to] = range();
+      return store.state.claims.filter(c => c.kind === 'direct' && (st.branch === 'all' || c.branch === st.branch)
+        && c.date >= from && c.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    };
+    const layer = openLayer('modal', () => {
+      const n = picked().length;
+      return `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Direct Insurance</div><h2>Export to Excel</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <label>Branch
+          <select id="x-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${st.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+        </label>
+        <div class="fieldset">
+          <div class="fs-head"><span>Period</span></div>
+          <div class="chips status-chips" id="x-period">${[[1, 'Today'], [7, 'Last 7 days'], [30, 'Last 30 days'], ['range', 'Date range']].map(([k, l]) =>
+            `<button class="chip ${st.period === k ? 'on' : ''}" data-period="${k}">${l}</button>`).join('')}</div>
+          ${st.period === 'range' ? `<div class="grid2" style="margin-top:10px">
+            <label>From <input type="date" id="x-from" value="${st.from}"></label>
+            <label>To <input type="date" id="x-to" value="${st.to}"></label></div>` : ''}
+        </div>
+        <div class="form-foot">
+          <span class="muted">${n} entr${n === 1 ? 'y' : 'ies'}</span>
+          <button class="btn btn-ghost" data-close>Cancel</button>
+          <button class="btn btn-primary" data-go ${n ? '' : 'disabled'}>${icons.download} Download Excel</button>
+        </div>
+      </div>`;
+    });
+    const el = layer.el;
+    el.addEventListener('change', e => {
+      if (e.target.id === 'x-branch') st.branch = e.target.value;
+      if (e.target.id === 'x-from') st.from = e.target.value;
+      if (e.target.id === 'x-to') st.to = e.target.value;
+      layer.update();
+    });
+    el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      const p = e.target.closest('[data-period]');
+      if (p) { st.period = p.dataset.period === 'range' ? 'range' : +p.dataset.period; return layer.update(); }
+      const go = e.target.closest('[data-go]');
+      if (!go) return;
+      const list = picked();
+      if (!list.length) return;
+      go.disabled = true;
+      try {
+        const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+        const rows = list.map(c => ({
+          'Invoice No.': c.ref, Date: c.date, Branch: locName(c.branch), 'Bill Number': c.billNo,
+          'Customer Name': c.customer, 'Member ID': c.memberId, Insurer: c.insurer, Salesperson: c.employeeName,
+          Frames: (c.items ?? []).filter(i => i.kind === 'frame').reduce((s, i) => s + itemQty(i), 0),
+          Lenses: (c.items ?? []).filter(i => i.kind === 'lens').reduce((s, i) => s + itemQty(i), 0),
+          [`Total (${CURRENCY})`]: Number(claimTotal(c).toFixed(3)),
+        }));
+        const lines = list.flatMap(c => (c.items ?? []).map(i => ({
+          'Invoice No.': c.ref, Date: c.date, Branch: locName(c.branch), 'Customer Name': c.customer,
+          Item: ITEM_KINDS[i.kind]?.label ?? '', Description: i.name, Qty: itemQty(i),
+          [`Price each (${CURRENCY})`]: Number(i.price) || 0, [`Amount (${CURRENCY})`]: Number(itemAmount(i).toFixed(3)),
+        })));
+        const wb = XLSX.utils.book_new();
+        const s1 = XLSX.utils.json_to_sheet(rows);
+        s1['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length, ...rows.map(r => String(r[k] ?? '').length)) + 2 }));
+        XLSX.utils.book_append_sheet(wb, s1, 'Direct Insurance');
+        if (lines.length) {
+          const s2 = XLSX.utils.json_to_sheet(lines);
+          s2['!cols'] = Object.keys(lines[0]).map(k => ({ wch: Math.max(k.length, ...lines.map(r => String(r[k] ?? '').length)) + 2 }));
+          XLSX.utils.book_append_sheet(wb, s2, 'Products');
+        }
+        const [from, to] = range();
+        const who = st.branch === 'all' ? 'All branches' : st.branch;
+        XLSX.writeFile(wb, `Direct Insurance - ${who} - ${from === to ? from : `${from} to ${to}`}.xlsx`);
+        layer.close();
+        toast({ title: `Exported ${list.length} entr${list.length === 1 ? 'y' : 'ies'}`, sub: 'The Excel file is in your downloads.', tone: 'info' });
+      } catch (err) {
+        go.disabled = false;
+        toast({ title: 'Could not export', sub: err.message, tone: 'stock' });
+      }
+    });
+  }
+
   function render() {
     root.innerHTML = `
       <style>${RECEIPT_CSS}</style>
@@ -831,7 +921,10 @@ export function claimsView(me, kind = 'claim') {
           <h1>${T.title}</h1>
           <p class="mod-sub">${T.sub}</p>
         </div>
-        ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} ${T.add}</button>`}
+        <div class="mod-head-acts">
+          ${direct && canExportInsurance(me.code) ? `<button class="btn btn-ghost" data-export>${icons.download} Export</button>` : ''}
+          ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} ${T.add}</button>`}
+        </div>
       </header>
       ${direct && isAdmin ? `<div id="d-dash">${dashHTML()}</div><h2 class="dash-list-h">Every insurance customer</h2>` : ''}
       <section class="toolbar">
@@ -872,6 +965,7 @@ export function claimsView(me, kind = 'claim') {
   function wireRoot() {
     root.addEventListener('click', e => {
       if (e.target.closest('[data-new]')) return composer(null);
+      if (e.target.closest('[data-export]')) return exportModal();
       const det = e.target.closest('[data-detail]');
       if (det) { e.stopPropagation(); return openDetail(det.dataset.detail); }
       const per = e.target.closest('[data-period]');

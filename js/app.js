@@ -1,5 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
 import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
+import { damagedView } from './damaged.js';
 import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
@@ -68,7 +69,7 @@ function renderLogin(preselect = null) {
             <h2>Sign in</h2>
             <p class="lp-sub">Choose your location.</p>
           </header>
-          ${groupHTML(['Office', ['admin', 'scheduler']], 'lp-wh')}
+          ${groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
           <div class="lp-cols">
             ${columns.map(c => `
               <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
@@ -245,6 +246,7 @@ const MODULES = {
   outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me?.role) },
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
+  damaged:  { label: 'Damaged Stock', icon: 'damage', make: damagedView },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
   settings: { label: 'Settings', icon: 'settings', make: settingsView, adminOnly: true },
 };

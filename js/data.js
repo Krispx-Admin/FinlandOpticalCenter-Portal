@@ -22,7 +22,7 @@ export const LOCATIONS = [
   { code: 'SOHFEC', name: 'Sohar FEC',        role: 'clinic' },
   { code: 'NIZFEC', name: 'Nizwa FEC',        role: 'clinic' },
   // The office runs the network; Ghiath reads all of it and writes the rota.
-  { code: 'OFC',    name: 'Office',           role: 'admin' },
+  { code: 'OFC',    name: 'Omar',             role: 'admin' },
   { code: 'GHIATH', name: 'Ghiath',           role: 'scheduler' },
 ];
 
@@ -32,6 +32,8 @@ export const ROLES = {
   clinic:  { label: 'Clinic',         hue: 'purple' },
   admin:   { label: 'Office · Admin', hue: 'navy' },
   scheduler: { label: 'Schedule editor', hue: 'blue' },
+  // Wijdan, Sarah (schema-37): admins who see everything and change little.
+  manager: { label: 'Admin · view only', hue: 'navy' },
 };
 
 export const loc = code => LOCATIONS.find(l => l.code === code);
@@ -76,6 +78,7 @@ export function setLocations(rows) {
   const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
     code: r.code, name: r.name, role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
     benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null, benchOwnOnly: !!r.bench_own_only,
+    canExport: !!r.can_export_insurance,
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
@@ -85,8 +88,10 @@ export function setLocations(rows) {
 
 // Who looks at the whole network. The office runs it; the schedule editor
 // reads every module but changes nothing outside the schedule.
-export const seesAll = role => role === 'admin' || role === 'scheduler';
-export const readOnly = role => role === 'scheduler';
+export const seesAll = role => role === 'admin' || role === 'scheduler' || role === 'manager';
+export const readOnly = role => role === 'scheduler' || role === 'manager';
+// May export Direct Insurance to Excel: the office, and any profile switched on (Sarah).
+export const canExportInsurance = code => loc(code)?.role === 'admin' || !!loc(code)?.canExport;
 export const canEditSchedule = role => role === 'admin' || role === 'scheduler';
 
 // ── Catalogue ──
@@ -122,6 +127,7 @@ export const TABS = [
   { key: 'outside',  label: 'Outside Lens Orders', icon: 'truck' },
   { key: 'claims',   label: 'Reimbursement Invoice', icon: 'receipt' },
   { key: 'direct',   label: 'Direct Insurance', icon: 'shield' },
+  { key: 'damaged',  label: 'Damaged Stock',    icon: 'damage' },
   { key: 'schedule', label: 'Schedule',         icon: 'calendar' },
 ];
 export const tabOff = (settings, key) => key !== 'settings' && (settings?.disabledTabs ?? []).includes(key);

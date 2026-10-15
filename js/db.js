@@ -194,7 +194,12 @@ const SELECTS = {
   lensStock:    ['lens_stock', '*', { column: 'updated_at', asc: false }, toLensItem],
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
-  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until, bench_own_only', { column: 'position', asc: true }, r => r],
+  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until, bench_own_only, can_export_insurance', { column: 'position', asc: true }, r => r],
+  damaged: ['damaged_reports', '*, damaged_lines(*)', { column: 'created_at', asc: false }, r => ({
+    id: r.id, ref: r.ref, branch: r.branch_code, note: r.note ?? '', createdAt: ts(r.created_at),
+    lines: (r.damaged_lines ?? []).slice().sort((a, b) => a.position - b.position)
+      .map(l => ({ name: l.name, barcode: l.barcode ?? '', qty: l.qty })),
+  })],
   outsideOrders: ['outside_lens_orders', '*', { column: 'created_at', asc: false }, r => ({
     id: r.id, orderId: r.order_id, branch: r.branch_code, rx: r.rx ?? {}, lensType: r.lens_type ?? '',
     status: r.status, fulfilment: r.fulfilment ?? 'send_frames', sentAt: r.sent_at ? ts(r.sent_at) : null,
@@ -290,6 +295,7 @@ const TABLE_COLLECTION = {
   app_settings: 'settings', lens_catalogue: 'lensCatalogue',
   branches: 'branches',
   outside_lens_orders: 'outsideOrders',
+  damaged_reports: 'damaged', damaged_lines: 'damaged',
 };
 
 // The *_events tables already hold a human sentence written by whoever acted

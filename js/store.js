@@ -26,7 +26,7 @@ import { toast } from './ui.js';
 let state = {
   settings: { brandGroups: [], categories: [] },
   lensCatalogue: { types: [], indices: [], coatings: [] },
-  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [], branches: [], outsideOrders: [],
+  orders: [], requests: [], lensStock: [], lensRequests: [], claims: [], branches: [], outsideOrders: [], damaged: [],
 };
 
 const subs = new Set();
@@ -102,7 +102,7 @@ const LENS_OPTION_LABEL = { types: 'lens types', indices: 'indices', coatings: '
 const MODULE_OF = {
   orders: 'fitting', requests: 'stock', lensStock: 'lens',
   lensRequests: 'lens', lensCatalogue: 'lens', claims: 'claims', settings: 'settings',
-  branches: 'settings', outsideOrders: 'outside',
+  branches: 'settings', outsideOrders: 'outside', damaged: 'damaged',
 };
 
 const ok = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
@@ -152,6 +152,9 @@ export const store = {
   // database is not the only thing standing between branches.
   ordersFor(code) { return state.orders.filter(o => canSeeOrder(o, code)); },
   requestsFor(code) { return state.requests.filter(r => canSeeRequest(r, code)); },
+  // A branch sees its own damaged-stock reports; the office and the
+  // view-only admins see them all (the database decides — this just reads).
+  damagedFor() { return state.damaged ?? []; },
   order(id) { return state.orders.find(o => o.id === id); },
   request(id) { return state.requests.find(r => r.id === id); },
 
@@ -630,6 +633,26 @@ export const store = {
       by, module: 'fitting', title: `${by} logged ${row.ref} with outside lenses`,
       sub: lensType, refs: [row.id],
     })).then(row => (row ? this.order(row.id) : null));
+  },
+
+  // ── Damaged Stock (schema-37) ──
+  createDamaged({ lines, note }, by) {
+    return run(['damaged'], async () => ok(await supabase.rpc('create_damaged_report', { p_lines: lines, p_note: note ?? '' })), row => ({
+      by, module: 'damaged', title: `${by} reported damaged stock ${row.ref}`,
+      sub: `${lines.length} line${lines.length === 1 ? '' : 's'} · ${lines.reduce((s, l) => s + l.qty, 0)} pcs`,
+    })).then(row => (row ? (state.damaged ?? []).find(r => r.id === row.id) ?? row : null));
+  },
+  deleteDamaged(id, by) {
+    const r = (state.damaged ?? []).find(x => x.id === id);
+    return run(['damaged'], async () => { ok(await supabase.from('damaged_reports').delete().eq('id', id)); return true; }, {
+      by, module: 'damaged', title: `${by} deleted ${r?.ref ?? 'a damaged stock report'}`,
+    });
+  },
+  // Who may export Direct Insurance (the office decides).
+  setInsuranceExport(code, on) {
+    return run(['branches'], async () => { ok(await supabase.rpc('set_insurance_export', { p_code: code, p_on: on })); return true; }, {
+      module: 'settings', title: `${locName(code)} ${on ? 'can' : 'can no longer'} export Direct Insurance`,
+    });
   },
 
   // Where the customer collects the glasses (schema-36).
