@@ -88,7 +88,7 @@ function toClaim(r) {
     memberId: r.member_id ?? '', kind: r.kind ?? 'claim',
     insurer: r.insurer ?? '', employeeId: r.employee_id ?? '', employeeName: r.employee_name ?? '',
     items: (r.claim_items ?? []).slice().sort((a, b) => a.position - b.position)
-      .map(i => ({ id: i.id, name: i.name, price: num(i.price) })),
+      .map(i => ({ id: i.id, kind: i.kind ?? '', name: i.name, qty: i.qty ?? 1, price: num(i.price) })),
     rx: normaliseRx(rx), payment: r.payment,
     createdAt: ts(r.created_at), updatedAt: ts(r.updated_at), by: r.created_by,
   };
@@ -164,6 +164,7 @@ export const claimRow = (f, by) => ({
 
 export const claimItemRows = (claimId, items) => items.map((it, i) => ({
   claim_id: claimId, position: i, name: it.name, price: num(it.price),
+  kind: it.kind || null, qty: Math.max(1, parseInt(it.qty, 10) || 1),
 }));
 
 export const claimRxRows = (claimId, rx) => ['d', 'n'].map(line => {

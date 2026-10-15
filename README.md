@@ -117,6 +117,7 @@ Applied in order:
 | `supabase/schema-32-outside-arrived.sql` | outside lenses: Avenues marks them received before sending them on |
 | `supabase/schema-33-lab-inhouse.sql` | the Lab: On / In-house only / Off |
 | `supabase/schema-34-order-edit-delete.sql` | fix mistakes: edit an order, undo its last step, delete it before anything moved |
+| `supabase/schema-35-claim-item-kind-qty.sql` | invoice products: frame or lenses, with a quantity |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

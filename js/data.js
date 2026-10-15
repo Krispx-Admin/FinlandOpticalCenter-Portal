@@ -525,7 +525,18 @@ export function normaliseRx(rx) {
   }
   return out;
 }
-export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + (Number(i.price) || 0), 0);
+// A product is a frame or lenses, with a quantity; the price is per piece
+// (schema-35), so a line is price × qty.
+export const ITEM_KINDS = { frame: { label: 'Frame', ar: 'إطار', hint: 'e.g. Ray-Ban RB5154' }, lens: { label: 'Lenses', ar: 'عدسات', hint: 'e.g. Essilor 1.6 blue-cut' } };
+export const itemQty = i => Math.max(1, parseInt(i.qty, 10) || 1);
+export const itemAmount = i => (Number(i.price) || 0) * itemQty(i);
+export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + itemAmount(i), 0);
+// "2 frames · 2 lenses" — how many of each the invoice covers.
+export function itemCounts(items) {
+  const n = k => (items ?? []).filter(i => i.kind === k).reduce((t, i) => t + itemQty(i), 0);
+  const f = n('frame'), l = n('lens');
+  return [f ? `${f} frame${f === 1 ? '' : 's'}` : '', l ? `${l} lens${l === 1 ? '' : 'es'}` : ''].filter(Boolean).join(' · ');
+}
 
 // ── Permissions ──
 // The holder whose stock lenses a job is waiting for sees it until it has

@@ -793,6 +793,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-35-claim-item-kind-qty.sql  claim_items.kind ('frame'|'lens') +
+                             qty (default 1); total = sum(price × qty).
+                             Applied 2026-10-15; every total unchanged.
   schema-34-order-edit-delete.sql  edit_order (bill + name, any stage),
                              edit_outside_lens (until AV confirms),
                              undo_order_step (back one step; foc.undo flag
@@ -1166,6 +1169,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Reimbursement Invoice / Direct Insurance products (schema-35): each
+             is a Frame or Lenses (older rows "Other"), with Qty and a price
+             EACH — a line is price × qty. Form: Item | Description | Qty |
+             Price, buttons "Add frame" / "Add lenses" (a new invoice starts
+             with one of each). Printed invoice + drawer: Item / Description /
+             Qty / Amount, and "1 frame · 2 lenses" by the total. Printed
+             invoice labels now also in Arabic: التاريخ, الفرع, رقم الإيصال
+             (bill), رقم الفاتورة (invoice), اسم العميل, رقم العضوية, and the
+             two signature lines. data.js: ITEM_KINDS, itemQty, itemAmount,
+             itemCounts; claimTotal uses them.
  2026-10-15  Fix mistakes on a fitting order (schema-34, rehearsed incl. stock
              going back on the shelf, applied). Drawer row under the step
              buttons: Edit (bill + customer any stage; outside Rx + lens type

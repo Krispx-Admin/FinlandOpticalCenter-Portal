@@ -1,7 +1,7 @@
 // ── Module 5: Reimbursement Invoice (was Insurance Claims) — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly,
+  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts,
 } from './data.js';
 import { store } from './store.js';
 import { supabase } from './auth.js';
@@ -71,7 +71,10 @@ export const RECEIPT_CSS = `
   gap: 3.5mm; margin: 4.5mm 0 5mm;
 }
 .rc-meta > div { border-bottom: 1px solid var(--r-line); padding-bottom: 1.6mm; min-width: 0; }
-.rc-meta dt { font-size: 6.8pt; letter-spacing: .09em; text-transform: uppercase; color: var(--r-muted); font-weight: 700; margin: 0; }
+.rc-meta dt { font-size: 6.8pt; letter-spacing: .09em; text-transform: uppercase; color: var(--r-muted); font-weight: 700; margin: 0;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
+/* each label in English and, from the other edge, in Arabic */
+.rc-ar { font-size: 8pt; letter-spacing: 0; text-transform: none; direction: rtl; font-weight: 600; }
 .rc-meta dd { margin: 1mm 0 0; font-size: 9.5pt; font-weight: 600; overflow-wrap: anywhere; }
 .rc-meta .rc-wide { grid-column: span 2; }
 
@@ -132,7 +135,14 @@ table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowra
 .rc-sign div {
   border-top: 1px solid var(--r-ink); padding-top: 1.6mm; font-size: 8pt;
   letter-spacing: .08em; text-transform: uppercase; color: var(--r-muted); font-weight: 600;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 3mm;
 }
+.rc-sign .rc-ar { font-size: 9pt; }
+.rc-sign span { white-space: nowrap; }
+.rc-sign div > span:first-child { letter-spacing: .04em; }
+.rc-items .rc-kind { width: 22mm; font-weight: 600; color: var(--r-navy); }
+.rc-items .rc-qty { width: 14mm; text-align: center; }
+.rc-items tfoot .rc-counts { font-size: 8pt; font-weight: 600; color: var(--r-muted); margin-left: 3mm; letter-spacing: 0; }
 .rc-note {
   margin-top: 5mm; padding-top: 2.5mm; border-top: 1px solid var(--r-line);
   font-size: 7pt; color: var(--r-muted); display: flex; justify-content: space-between; gap: 6mm;
@@ -204,21 +214,22 @@ export function receiptHTML(c) {
     </header>
 
     <dl class="rc-meta">
-      <div><dt>Date</dt><dd>${esc(fmtDay(c.date))}</dd></div>
-      <div><dt>Branch</dt><dd>${esc(locName(c.branch))}</dd></div>
-      <div><dt>Bill Number</dt><dd>${esc(c.billNo || '—')}</dd></div>
-      <div><dt>Invoice No.</dt><dd>${esc(c.ref)}</dd></div>
-      <div class="rc-wide"><dt>Customer Name</dt><dd>${esc(c.customer || '—')}</dd></div>
-      <div class="rc-wide"><dt>Member ID</dt><dd>${esc(c.memberId || '—')}</dd></div>
+      <div><dt>Date<span class="rc-ar" lang="ar">التاريخ</span></dt><dd>${esc(fmtDay(c.date))}</dd></div>
+      <div><dt>Branch<span class="rc-ar" lang="ar">الفرع</span></dt><dd>${esc(locName(c.branch))}</dd></div>
+      <div><dt>Bill Number<span class="rc-ar" lang="ar">رقم الإيصال</span></dt><dd>${esc(c.billNo || '—')}</dd></div>
+      <div><dt>Invoice No.<span class="rc-ar" lang="ar">رقم الفاتورة</span></dt><dd>${esc(c.ref)}</dd></div>
+      <div class="rc-wide"><dt>Customer Name<span class="rc-ar" lang="ar">اسم العميل</span></dt><dd>${esc(c.customer || '—')}</dd></div>
+      <div class="rc-wide"><dt>Member ID<span class="rc-ar" lang="ar">رقم العضوية</span></dt><dd>${esc(c.memberId || '—')}</dd></div>
     </dl>
 
     <h3 class="rc-sec">Products</h3>
     <table class="rc-tbl rc-items">
-      <thead><tr><th>Description</th><th class="num" style="width:40mm">Amount (${CURRENCY})</th></tr></thead>
+      <thead><tr><th class="rc-kind">Item</th><th>Description</th><th class="rc-qty">Qty</th><th class="num" style="width:40mm">Amount (${CURRENCY})</th></tr></thead>
       <tbody>
-        ${items.map(i => `<tr><td>${esc(i.name || '')}</td><td class="num">${!i.name && i.price == null ? '' : money(i.price)}</td></tr>`).join('')}
+        ${items.map(i => { const blank = !i.name && i.price == null; return `<tr><td class="rc-kind">${esc(ITEM_KINDS[i.kind]?.label ?? '')}</td><td>${esc(i.name || '')}</td>`
+          + `<td class="rc-qty">${blank ? '' : itemQty(i)}</td><td class="num">${blank ? '' : money(itemAmount(i))}</td></tr>`; }).join('')}
       </tbody>
-      <tfoot><tr><td>Total</td><td class="num">${money(total)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="3">Total${itemCounts(items) ? `<span class="rc-counts">${esc(itemCounts(items))}</span>` : ''}</td><td class="num">${money(total)}</td></tr></tfoot>
     </table>
 
     <h3 class="rc-sec">Prescription</h3>
@@ -236,8 +247,8 @@ export function receiptHTML(c) {
       </div>
 
       <div class="rc-sign">
-        <div>Optician — Name &amp; Signature</div>
-        <div>Customer Signature</div>
+        <div><span>Optician — Name &amp; Signature</span><span class="rc-ar" lang="ar">اسم وتوقيع أخصائي البصريات</span></div>
+        <div><span>Customer Signature</span><span class="rc-ar" lang="ar">توقيع العميل</span></div>
       </div>
 
       <div class="rc-note">
@@ -502,9 +513,9 @@ export function claimsView(me, kind = 'claim') {
         </div>
         <h3 class="tl-h">${icons.receipt} Products</h3>
         <table class="lines">
-          <thead><tr><th>Description</th><th class="num">Amount (${CURRENCY})</th></tr></thead>
-          <tbody>${items.map(i => `<tr><td>${esc(i.name || '—')}</td><td class="num">${money(i.price)}</td></tr>`).join('')}</tbody>
-          <tfoot><tr><td>Total</td><td class="num">${money(claimTotal(c))} ${CURRENCY}</td></tr></tfoot>
+          <thead><tr><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Amount (${CURRENCY})</th></tr></thead>
+          <tbody>${items.map(i => `<tr><td>${esc(ITEM_KINDS[i.kind]?.label ?? '—')}</td><td>${esc(i.name || '—')}</td><td class="num">${itemQty(i)}</td><td class="num">${money(itemAmount(i))}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td colspan="3">Total${itemCounts(items) ? ` <span class="muted">· ${esc(itemCounts(items))}</span>` : ''}</td><td class="num">${money(claimTotal(c))} ${CURRENCY}</td></tr></tfoot>
         </table>
         ${hasRx ? `
         <h3 class="tl-h">${icons.glasses} Prescription</h3>
@@ -612,10 +623,10 @@ export function claimsView(me, kind = 'claim') {
       : {
         date: today(), branch: isAdmin ? BRANCHES[0].code : me.code, billNo: '', customer: '',
         memberId: '', insurer: '', employeeId: '', employeeName: '',
-        payment: 'cash', items: [{ name: '', price: '' }], rx: blankRx(),
+        payment: 'cash', items: [{ kind: 'frame', name: '', qty: 1, price: '' }, { kind: 'lens', name: '', qty: 1, price: '' }], rx: blankRx(),
       };
 
-    const total = () => draft.items.reduce((t, i) => t + (Number(i.price) || 0), 0);
+    const total = () => draft.items.reduce((t, i) => t + itemAmount(i), 0);
 
     // Direct insurance: the insurer, and the salesperson — typed and picked
     // from the schedule's roster, one list in alphabetical order, each name
@@ -639,10 +650,17 @@ export function claimsView(me, kind = 'claim') {
           </label>
         </div>`;
 
+    // Each product is a frame or lenses (older ones may be neither), with a
+    // quantity and a price per piece.
     const itemRow = (it, i) => `
       <div class="ci-row">
-        <input placeholder="e.g. Ray-Ban RB5154 frame" value="${esc(it.name)}" data-it="name" data-i="${i}">
-        <input type="number" min="0" step="0.001" placeholder="0.000" value="${esc(it.price ?? '')}" data-it="price" data-i="${i}">
+        <select data-it="kind" data-i="${i}" aria-label="Item">
+          ${Object.entries(ITEM_KINDS).map(([k, d]) => `<option value="${k}" ${it.kind === k ? 'selected' : ''}>${d.label}</option>`).join('')}
+          ${it.kind ? '' : '<option value="" selected>Other</option>'}
+        </select>
+        <input placeholder="${esc(ITEM_KINDS[it.kind]?.hint ?? 'Description')}" value="${esc(it.name)}" data-it="name" data-i="${i}">
+        <input type="number" min="1" step="1" value="${esc(it.qty ?? 1)}" data-it="qty" data-i="${i}" aria-label="Quantity">
+        <input type="number" min="0" step="0.001" placeholder="0.000" value="${esc(it.price ?? '')}" data-it="price" data-i="${i}" aria-label="Price each">
         <button class="icon-btn" data-rm="${i}" ${draft.items.length === 1 ? 'disabled' : ''} title="Remove">${icons.x}</button>
       </div>`;
 
@@ -673,10 +691,13 @@ export function claimsView(me, kind = 'claim') {
         </label>
 
         <div class="fieldset">
-          <div class="fs-head"><span>Products</span><span class="muted sm">Price in ${CURRENCY}</span></div>
-          <div class="ci-head"><span>Description</span><span>Price</span><span></span></div>
+          <div class="fs-head"><span>Products</span><span class="muted sm">Price each, in ${CURRENCY}</span></div>
+          <div class="ci-head"><span>Item</span><span>Description</span><span>Qty</span><span>Price</span><span></span></div>
           <div id="ci-list">${draft.items.map(itemRow).join('')}</div>
-          <button class="btn btn-ghost btn-sm" data-add>${icons.plus} Add product</button>
+          <div class="ci-add">
+            <button class="btn btn-ghost btn-sm" data-add="frame">${icons.plus} Add frame</button>
+            <button class="btn btn-ghost btn-sm" data-add="lens">${icons.plus} Add lenses</button>
+          </div>
         </div>
 
         <div class="fieldset">
@@ -764,7 +785,8 @@ export function claimsView(me, kind = 'claim') {
       const t = e.target;
       if (t.dataset.it) {
         draft.items[+t.dataset.i][t.dataset.it] = t.value;
-        if (t.dataset.it === 'price') showTotal();
+        if (t.dataset.it === 'price' || t.dataset.it === 'qty') showTotal();
+        if (t.dataset.it === 'kind') t.nextElementSibling.placeholder = ITEM_KINDS[t.value]?.hint ?? 'Description';
         return;
       }
       if (t.dataset.rx) { setPath(draft.rx, t.dataset.rx, t.value); return; }
@@ -773,7 +795,8 @@ export function claimsView(me, kind = 'claim') {
     el.addEventListener('change', sync);
     el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
-      if (e.target.closest('[data-add]')) { sync(); draft.items.push({ name: '', price: '' }); redrawItems(); return; }
+      const add = e.target.closest('[data-add]');
+      if (add) { sync(); draft.items.push({ kind: add.dataset.add, name: '', qty: 1, price: '' }); redrawItems(); return; }
       const rm = e.target.closest('[data-rm]');
       if (rm) { sync(); draft.items.splice(+rm.dataset.rm, 1); redrawItems(); return; }
       if (e.target.closest('[data-save]')) {
