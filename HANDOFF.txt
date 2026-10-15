@@ -793,6 +793,12 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-34-order-edit-delete.sql  edit_order (bill + name, any stage),
+                             edit_outside_lens (until AV confirms),
+                             undo_order_step (back one step; foc.undo flag
+                             lets it past the lab gate), delete_order (only
+                             while nothing moved; reserved stock lenses go
+                             back on the shelf). Applied 2026-10-15.
   schema-33-lab-inhouse.sql  branches.bench_own_only; bench_off() = Off;
                              bench_closed() now = takes no work from other
                              branches (Off or In-house only); set_lab(code,
@@ -1160,6 +1166,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-15  Fix mistakes on a fitting order (schema-34, rehearsed incl. stock
+             going back on the shelf, applied). Drawer row under the step
+             buttons: Edit (bill + customer any stage; outside Rx + lens type
+             until AV confirms), Undo last step (origin, the order's fitter or
+             office; not past the first step, not back past lenses that came
+             in), Delete (origin or office; only before anything moved —
+             frame not sent, no lenses sent, outside order not confirmed).
+             data.js: canEditOrder / canEditOutsideRx / canDeleteOrder /
+             canUndoOrder / undoTarget.
  2026-10-14  Lab has three settings (schema-33, rehearsed, applied): On /
              In-house only (cuts its own jobs, other branches can't send it
              frames or lenses — greyed in their pickers) / Off (fitter on

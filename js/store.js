@@ -632,6 +632,31 @@ export const store = {
     })).then(row => (row ? this.order(row.id) : null));
   },
 
+  // ── fixing mistakes on an order (schema-34) ──
+  editOrder(id, { ref, customer }, by) {
+    return run(['orders', 'lensRequests'], async () => ok(await supabase.rpc('edit_order', { p_id: id, p_ref: ref, p_customer: customer })), {
+      by, module: 'fitting', title: `${by} edited ${ref}`, refs: [id],
+    });
+  },
+  editOutsideLens(id, { rx, lensType }, by) {
+    const x = (state.outsideOrders ?? []).find(y => y.id === id);
+    return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('edit_outside_lens', { p_id: id, p_rx: rx, p_lens_type: lensType })), {
+      by, module: 'fitting', title: `${by} edited the outside lenses`, refs: x ? [x.orderId] : [],
+    });
+  },
+  undoOrderStep(id, by) {
+    const o = this.order(id);
+    return run(['orders', 'outsideOrders'], async () => ok(await supabase.rpc('undo_order_step', { p_id: id })), {
+      by, module: 'fitting', title: `${by} undid a step on ${o?.ref ?? 'an order'}`, refs: [id],
+    });
+  },
+  deleteOrder(id, by) {
+    const o = this.order(id);
+    return run(['orders', 'outsideOrders', 'lensRequests', 'lensStock'], async () => { ok(await supabase.rpc('delete_order', { p_id: id })); return true; }, {
+      by, module: 'fitting', title: `${by} deleted ${o?.ref ?? 'an order'}`,
+    });
+  },
+
   // MGM sends lenses a branch is receiving (only once ordered; the database checks).
   sendOutsideLenses(id, by) {
     const x = (state.outsideOrders ?? []).find(y => y.id === id);

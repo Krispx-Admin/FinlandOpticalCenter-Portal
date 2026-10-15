@@ -360,6 +360,32 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
   return base;
 }
 
+// Fixing mistakes (schema-34, user 2026-10-15). The branch that logged an
+// order, or the office, edits it — the bill and the name at any stage, the
+// outside-lens prescription until the handler confirms it — and deletes it
+// while nothing has moved. Undo puts it back one step; the fitting centre on
+// the order may undo too. The database checks all of it again.
+const isAdminLoc = code => loc(code)?.role === 'admin';
+export const canEditOrder = (o, code) => o.origin === code || isAdminLoc(code);
+export const canEditOutsideRx = (o, code) => canEditOrder(o, code) && o.outsideLens?.status === 'to_order';
+export function canDeleteOrder(o, code) {
+  if (!canEditOrder(o, code) || !['pending', 'lenses_in'].includes(o.status)) return false;
+  if (o.outsideLens && o.outsideLens.status !== 'to_order') return false;
+  return !(o.lensRequest && ['sent', 'confirmed'].includes(o.lensRequest.status));
+}
+// The step an undo goes back to, or null when there is none.
+export function undoTarget(o) {
+  const f = flowFor(o), i = f.indexOf(o.status);
+  if (i < 1) return null;
+  const prev = f[i - 1], lr = o.lensRequest, ol = o.outsideLens;
+  if (prev === 'pending') {
+    if (lr?.fulfilment === 'send_frames' || ol?.fulfilment === 'send_frames') return null;   // it started with the frame going
+    if ((lr && ['sent', 'confirmed'].includes(lr.status)) || (ol && ol.branch !== outsideHandler())) return null;   // lenses came in
+  }
+  return prev;
+}
+export const canUndoOrder = (o, code) => !!undoTarget(o) && (o.origin === code || o.fitter === code || isAdminLoc(code));
+
 export const nextFitStatus = o => {
   const f = flowFor(o);
   const i = f.indexOf(o.status);

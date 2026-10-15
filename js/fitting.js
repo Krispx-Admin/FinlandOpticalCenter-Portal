@@ -6,6 +6,7 @@ import {
   isOutside, OUTSIDE_DEFAULT, outsideHandler, OUTSIDE_STATUS, OUTSIDE_FULFILMENT,
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
   isBenchClosed, isLabOff, labMode, LAB_MODES, benchNote,
+  canEditOrder, canEditOutsideRx, canDeleteOrder, canUndoOrder, undoTarget,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
@@ -95,6 +96,87 @@ export function fittingView(me) {
     for (const d of CHIP_DEFS.slice(1)) c[d.key] = all.filter(o => chipHas(d, o)).length;
     return c;
   };
+
+  // ── fixing mistakes: edit, undo the last step, delete (schema-34) ──
+  function toolsHTML(o) {
+    const edit = canEditOrder(o, me.code), undo = canUndoOrder(o, me.code), del = canDeleteOrder(o, me.code);
+    if (!edit && !undo && !del) return '';
+    return `<div class="dw-tools">
+      ${edit ? `<button class="btn btn-ghost btn-sm" data-edit-order="${o.id}">${icons.wrench} Edit</button>` : ''}
+      ${undo ? `<button class="btn btn-ghost btn-sm" data-undo-order="${o.id}">${icons.history} Undo last step</button>` : ''}
+      ${del ? `<button class="btn btn-ghost btn-sm btn-danger-text" data-delete-order="${o.id}">${icons.trash} Delete</button>` : ''}
+    </div>`;
+  }
+  const stepName = (o, s) => fitStep({ ...o, status: s, outsideLens: null, lensRequest: null }, { long: true }).label;
+  function undoStep(id) {
+    const o = store.order(id);
+    const to = o && undoTarget(o);
+    if (!to) return;
+    if (confirm(`Undo the last step on ${o.ref}?\n\nIt goes back to “${stepName(o, to)}”.`)) store.undoOrderStep(id, me.code);
+  }
+  function deleteOrder(id) {
+    const o = store.order(id);
+    if (!o) return;
+    const extra = o.lensRequest && ['reserved', 'requested'].includes(o.lensRequest.status) ? '\nThe stock lenses it reserved go back on the shelf.'
+      : o.outsideLens ? '\nIts outside lens order is removed too.' : '';
+    if (!confirm(`Delete ${o.ref}${o.customer ? ` (${o.customer})` : ''}?\n\nThis can’t be undone.${extra}`)) return;
+    drawer?.close();
+    store.deleteOrder(id, me.code);
+  }
+  function editModal(id) {
+    const o = store.order(id);
+    if (!o) return;
+    const ol = o.outsideLens, rxOk = canEditOutsideRx(o, me.code);
+    const v = (eye, k) => esc(ol?.rx?.[eye]?.[k] ?? '');
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">Edit fitting order</div><h2>${esc(o.ref)}</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form" id="eo">
+        <div class="grid2">
+          <label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>
+          <label>Customer name <input name="customer" required value="${esc(o.customer ?? '')}"></label>
+        </div>
+        ${ol ? (rxOk ? `
+        <div class="fieldset ol-fields">
+          <div class="fs-head"><span>Prescription</span></div>
+          <table class="ol-rx-in">
+            <thead><tr><th></th><th>SPH</th><th>CYL</th><th>AXIS</th><th>ADD</th></tr></thead>
+            <tbody>${['r', 'l'].map(eye => `<tr><th>${eye.toUpperCase()}</th>${['sph', 'cyl', 'axis', 'add'].map(k =>
+              `<td><input name="${eye}_${k}" inputmode="decimal" autocomplete="off" value="${v(eye, k)}" placeholder="${k === 'axis' ? '0–180' : '0.00'}"></td>`).join('')}</tr>`).join('')}</tbody>
+          </table>
+          <label>Lens type <input name="lensType" value="${esc(ol.lensType ?? '')}" autocomplete="off"></label>
+        </div>` : `<p class="muted sm">The outside lenses were confirmed with the supplier — their prescription can no longer be changed here.</p>`) : ''}
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} Save changes</button>
+        </div>
+      </form>`);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.querySelector('#eo').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const val = k => String(f.get(k) ?? '').trim();
+      const ref = val('ref'), customer = val('customer');
+      e.target.elements.ref.value = ref; e.target.elements.customer.value = customer;
+      if (!e.target.reportValidity()) return;
+      let rx = null, lensType = null;
+      if (ol && rxOk) {
+        rx = Object.fromEntries(['r', 'l'].map(eye => [eye, Object.fromEntries(['sph', 'cyl', 'axis', 'add'].map(k => [k, val(`${eye}_${k}`)]))]));
+        lensType = val('lensType');
+        if (!rx.r.sph && !rx.l.sph) return toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' });
+        if (!lensType) return toast({ title: 'Type the lens type', tone: 'stock' });
+      }
+      const go = e.target.querySelector('[type=submit]');
+      go.disabled = true;
+      let ok = true;
+      if (ref !== o.ref || customer !== (o.customer ?? '')) ok = !!(await store.editOrder(id, { ref, customer }, me.code));
+      const rxChanged = rx && (lensType !== ol.lensType || JSON.stringify(rx) !== JSON.stringify(Object.fromEntries(['r', 'l'].map(eye => [eye, Object.fromEntries(['sph', 'cyl', 'axis', 'add'].map(k => [k, String(ol.rx?.[eye]?.[k] ?? '')]))]))));
+      if (ok && rxChanged) ok = !!(await store.editOutsideLens(ol.id, { rx, lensType }, me.code));
+      if (ok) layer.close(); else go.disabled = false;
+    });
+  }
 
   // ── status tags ──
   // One tag; or, for outside lenses on their own road, two — the frame's and
@@ -329,6 +411,7 @@ export function fittingView(me) {
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
         </div>
+        ${viewOnly ? '' : toolsHTML(o)}
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
           ${[...o.timeline].reverse().map((t, i) => `
@@ -409,6 +492,12 @@ export function fittingView(me) {
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
       if (adv) return store.advanceOrders([adv.dataset.advance], me.code);
+      const ed = e.target.closest('[data-edit-order]');
+      if (ed) return editModal(ed.dataset.editOrder);
+      const un = e.target.closest('[data-undo-order]');
+      if (un) return undoStep(un.dataset.undoOrder);
+      const dl = e.target.closest('[data-delete-order]');
+      if (dl) return deleteOrder(dl.dataset.deleteOrder);
 
     });
   }
