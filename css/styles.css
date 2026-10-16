@@ -762,6 +762,10 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .fulfil-opt.is-off { opacity: .5; cursor: not-allowed; }
 .br-lens.br-bench { grid-column: 2 / -1; }
 /* Settings → Branches & people: the people under their own heading */
+/* the same controls on every account; ones that cannot apply are greyed */
+.br-opts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
+.br-opts .br-lens { grid-column: auto; }
+.br-lens.is-off, .br-open.is-off { opacity: .45; cursor: not-allowed; }
 .br-sub { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px 4px; }
 .br-kind { margin: 0 0 12px; width: fit-content; }
 .br-person-role { align-self: center; }

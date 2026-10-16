@@ -793,6 +793,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
+                             kind for any account; last-admin + self guards.
+                             Applied 2026-10-17.
   schema-40-people-not-branches.sql  set_collect: a branch only (retail /
                              fitting / clinic). Applied 2026-10-17.
   schema-39-scale.sql        every RLS helper wrapped (select f()) — once per
@@ -1188,6 +1191,19 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  SETTINGS → ACCOUNTS (was Branches & people; schema-41, rehearsed,
+             applied). Every account has the same controls: name, kind (one
+             list — Branch: retail / fitting / clinic; Person: view-only
+             admin, schedule editor, office admin), sign-in code, open/closed,
+             delete, and under the name Lab · Holds lens stock · Can export
+             Insurance Sales — greyed with the reason where they cannot apply
+             (lab + lens stock: open fitting centres only; the office can
+             always export). Any account can switch kind, be closed or deleted
+             (if nothing is recorded under it), EXCEPT: one open office admin
+             always remains, you cannot delete the account you are signed in
+             with, a lens holder stays an open fitting centre. Leaving
+             'fitting' clears the lab settings. Add form: Branch (kind) or
+             Person (view-only admin / schedule editor / office admin).
  2026-10-17  PEOPLE ARE NOT BRANCHES (schema-40, rehearsed, applied). Omar
              (OFC), Ghiath, Wijdan and Sarah sign in but are never a place:
              "Customer collects at" lists branches only (fitting.js

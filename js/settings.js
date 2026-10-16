@@ -107,6 +107,10 @@ export function settingsView(me) {
   // caller is the office, so a branch calling it directly gets nothing back.
   const kindOptions = sel => BRANCH_KINDS.map(k =>
     `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('');
+  // Every account: a branch, or a person (schema-41).
+  const PERSON_KINDS = ['manager', 'scheduler', 'admin'];
+  const accountOptions = sel => `<optgroup label="Branch">${kindOptions(sel)}</optgroup>
+    <optgroup label="Person">${PERSON_KINDS.map(k => `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('')}</optgroup>`;
 
   async function loadBranches() {
     const host = root.querySelector('#set-branches');
@@ -120,16 +124,19 @@ export function settingsView(me) {
     const ordered = [...rows.filter(r => !isPerson(r)), ...rows.filter(isPerson)];
     const firstPerson = ordered.find(isPerson)?.code;
     host.innerHTML = ordered.map(r => {
-      const fixed = !BRANCH_KINDS.includes(r.role);
-      // A view-only admin (Wijdan, Sarah) can be closed; the office and Ghiath cannot.
-      const keep = (fixed && r.role !== 'manager') || r.holds_lens_stock;
+      const lensLocked = r.holds_lens_stock;      // a lens holder stays an open fitting centre
+      const fitting = r.role === 'fitting' && r.active;
+      const office = r.role === 'admin';
+      const canExport = office || !!LOCATIONS.find(l => l.code === r.code)?.canExport;
+      // Every account has the same controls (user, 2026-10-17); one that
+      // cannot apply to this kind of account is greyed out, saying why.
+      const off = (on, why) => (on ? '' : `disabled title="${esc(why)}"`);
       return `${r.code === firstPerson ? '<h3 class="br-sub">People</h3>' : ''}
       <div class="br-row ${r.active ? '' : 'is-closed'}" data-branch="${esc(r.code)}">
         <span class="loc-chip">${esc(r.code)}</span>
         <input class="br-name" data-br-name="${esc(r.code)}" value="${esc(r.name)}" aria-label="Name of ${esc(r.code)}" required>
-        ${fixed ? `<span class="br-fixed">${esc(ROLES[r.role]?.label ?? r.role)}</span>`
-          : `<select class="br-role" data-br-role="${esc(r.code)}" aria-label="What ${esc(r.code)} is"
-               ${r.holds_lens_stock ? 'disabled title="Holds lens stock, so it stays a fitting centre"' : ''}>${kindOptions(r.role)}</select>`}
+        <select class="br-role" data-br-role="${esc(r.code)}" aria-label="What ${esc(r.code)} is"
+          ${lensLocked ? 'disabled title="Holds lens stock, so it stays a fitting centre"' : ''}>${accountOptions(r.role)}</select>
         <div class="ba-seen muted sm">${!r.active ? 'closed — cannot sign in' : r.has_account
           ? (r.last_sign_in ? 'last signed in ' + relTime(Date.parse(r.last_sign_in)) : 'never signed in')
           : 'no account'}</div>
@@ -138,23 +145,24 @@ export function settingsView(me) {
                  placeholder="new code" ${r.has_account && r.active ? '' : 'disabled'} autocomplete="off">
           <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account && r.active ? '' : 'disabled'}>Set</button>
         </form>
-        ${keep ? `<span class="br-open muted sm" title="${fixed ? 'The office and the schedule editor are always open' : 'Holds lens stock'}">Always open</span>`
-          : `<label class="br-open"><span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''}><i></i></span><span>${r.active ? 'Open' : 'Closed'}</span></label>`}
-        ${fixed ? '<span></span>' : `<button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${r.holds_lens_stock ? 'Holds lens stock — stop that first' : 'Delete this branch'}" ${r.holds_lens_stock ? 'disabled' : ''}>${icons.trash}</button>`}
-        ${r.role === 'fitting' && r.active ? `
-        <label class="br-lens br-bench" title="In-house only: it cuts its own jobs, other branches can't send any. Off: nothing.">
-          <span>Lab</span>
-          <select class="sel sel-sm" data-br-lab="${esc(r.code)}">${LAB_MODES.map(([k, l]) => `<option value="${k}" ${labMode(r.code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-        </label>
-        <label class="br-lens" title="Keeps loose-lens stock other branches can request from">
-          <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''}><i></i></span>
-          <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
-        </label>` : ''}
-        ${r.role === 'manager' ? `
-        <label class="br-lens" title="Shows the Export (Insurance Sales) button in Direct Insurance">
-          <span class="sw"><input type="checkbox" data-br-export="${esc(r.code)}" ${LOCATIONS.find(l => l.code === r.code)?.canExport ? 'checked' : ''}><i></i></span>
-          <span>Can export Insurance Sales</span>
-        </label>` : ''}
+        <label class="br-open ${lensLocked ? 'is-off' : ''}" ${lensLocked ? 'title="Holds lens stock, so it stays open"' : ''}>
+          <span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''} ${lensLocked ? 'disabled' : ''}><i></i></span>
+          <span>${r.active ? 'Open' : 'Closed'}</span></label>
+        <button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${lensLocked ? 'Holds lens stock — stop that first' : 'Delete this account'}" ${lensLocked || r.code === me.code ? 'disabled' : ''}>${icons.trash}</button>
+        <div class="br-opts">
+          <label class="br-lens br-bench ${fitting ? '' : 'is-off'}" title="${fitting ? 'In-house only: it cuts its own jobs, other branches can’t send any. Off: nothing.' : 'Only an open fitting centre has a lab'}">
+            <span>Lab</span>
+            <select class="sel sel-sm" data-br-lab="${esc(r.code)}" ${off(fitting, 'Only an open fitting centre has a lab')}>${LAB_MODES.map(([k, l]) => `<option value="${k}" ${fitting && labMode(r.code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          </label>
+          <label class="br-lens ${fitting ? '' : 'is-off'}" title="${fitting ? 'Keeps loose-lens stock other branches can request from' : 'Only an open fitting centre can hold lens stock'}">
+            <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(fitting, 'Only an open fitting centre can hold lens stock')}><i></i></span>
+            <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
+          </label>
+          <label class="br-lens ${office ? 'is-off' : ''}" title="${office ? 'The office can always export' : 'Shows the Export (Insurance Sales) button in Direct Insurance'}">
+            <span class="sw"><input type="checkbox" data-br-export="${esc(r.code)}" ${canExport ? 'checked' : ''} ${off(!office, 'The office can always export')}><i></i></span>
+            <span>Can export Insurance Sales</span>
+          </label>
+        </div>
         <div class="ba-msg"></div>
       </div>`;
     }).join('');
@@ -182,7 +190,7 @@ export function settingsView(me) {
     msg.textContent = 'Adding…';
     // A person is a view-only admin (role 'manager'); a branch is what was chosen.
     const person = root.querySelector('#add-kind .chip.on')?.dataset.kind === 'person';
-    const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: person ? 'manager' : d.get('role'), pin });
+    const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: person ? d.get('personRole') : d.get('role'), pin });
     if (!done) { msg.textContent = ''; return; }
     form.reset();
     msg.classList.add('good');
@@ -198,6 +206,14 @@ export function settingsView(me) {
     if (!b || role === b.role) return;
     const away = store.state.orders.filter(o => o.fitter === code && !['delivered', 'collected'].includes(o.status)).length;
     const what = ROLES[role].label.toLowerCase();
+    const toPerson = !BRANCH_KINDS.includes(role), fromPerson = !BRANCH_KINDS.includes(b.role);
+    if (toPerson !== fromPerson) {
+      const ask = toPerson
+        ? `Make ${b.name} a person (${ROLES[role].label})?\n\nIt stops being a branch: it leaves the branch lists and can no longer be sent frames or chosen for collection. Everything it recorded stays.`
+        : `Make ${b.name} a branch (${ROLES[role].label})?\n\nIt becomes a place: it can log orders and appears in the branch lists.`;
+      if (!confirm(ask)) { sel.value = b.role; return; }
+      return store.saveBranch(code, { role });
+    }
     const note = role === 'fitting'
       ? `${b.name} will be offered in “Send to fitter” from now on.`
       : b.role === 'fitting'
@@ -376,8 +392,8 @@ export function settingsView(me) {
     { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'],
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
-    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Branches & people', sections: ['branches', 'addBranch'],
-      desc: 'Add branches and people, rename them, set what each branch is, close one, and the code each signs in with',
+    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Accounts', sections: ['branches', 'addBranch'],
+      desc: 'Every sign-in — branches and people: add, rename, set what each one is, close or delete, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
     { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'],
       desc: 'Everyone on the staff schedule and the Direct Insurance salesperson list',
@@ -439,7 +455,7 @@ export function settingsView(me) {
     branches: () => `
       <section class="set-card">
         <div class="set-card-head">
-          <h2>${icons.warehouse} Branches</h2>
+          <h2>${icons.warehouse} Accounts</h2>
         </div>
         <div id="set-branches"><p class="muted sm">Loading…</p></div>
       </section>`,
@@ -464,7 +480,7 @@ export function settingsView(me) {
           <input name="code" class="br-code-in" placeholder="Code — e.g. NGM" maxlength="10" required>
           <input name="name" placeholder="Name — e.g. Nizwa Grand Mall" required>
           <select name="role" aria-label="What it is">${kindOptions('retail')}</select>
-          <span class="br-fixed br-person-role" hidden>${esc(ROLES.manager.label)}</span>
+          <select name="personRole" class="br-person-role" aria-label="What kind of person" hidden>${PERSON_KINDS.map(k => `<option value="${k}">${esc(ROLES[k].label)}</option>`).join('')}</select>
           <input name="pin" class="br-pin-in" inputmode="numeric" maxlength="6" placeholder="Sign-in code" required>
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} <span class="br-add-l">Add branch</span></button>
         </form>
