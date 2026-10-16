@@ -1196,6 +1196,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Bot check: Turnstile SITE key filled in (widget "FOC Portal
+             sign-in", hostname foc-portal.org, Managed) and published — step 2
+             of the order below. The page now gets a token before every
+             sign-in; Supabase does not check it until the user switches
+             CAPTCHA on there (step 3).
  2026-10-17  Text no longer cut off (user screenshots). New fitting order →
              Lens stock: the lens box is the portal's own dropdown (no more
              browser datalist) — the list spans the whole row, long names wrap,
