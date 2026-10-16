@@ -117,7 +117,8 @@ export function fittingView(me) {
   };
 
   // ── where the customer collects (schema-36) ──
-  const collectBranches = () => LOCATIONS.filter(l => l.active !== false && !['admin', 'scheduler'].includes(l.role));
+  // Branches only — the office, Ghiath, Wijdan and Sarah are people, not places.
+  const collectBranches = () => BRANCHES;
   const collectOptions = pick => collectBranches().map(l => `<option value="${l.code}" ${l.code === pick ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   function collectModal(id) {
     const o = store.order(id);

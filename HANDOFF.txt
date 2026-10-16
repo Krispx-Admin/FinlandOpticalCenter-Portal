@@ -793,6 +793,8 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-40-people-not-branches.sql  set_collect: a branch only (retail /
+                             fitting / clinic). Applied 2026-10-17.
   schema-39-scale.sql        every RLS helper wrapped (select f()) — once per
                              query, not per row; FK indexes. Applied 2026-10-16.
   schema-38-stock-partial.sql  stock_request_lines.done_at;
@@ -1186,6 +1188,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  PEOPLE ARE NOT BRANCHES (schema-40, rehearsed, applied). Omar
+             (OFC), Ghiath, Wijdan and Sarah sign in but are never a place:
+             "Customer collects at" lists branches only (fitting.js
+             collectBranches = BRANCHES) and set_collect refuses anything but
+             an open retail / fitting / clinic. Settings → "Branches & people":
+             branches first, then a People heading; the add form asks Branch
+             or Person (a person is "Admin · view only", role 'manager').
+             Sign-in: the layout switch is now a clear pill under the cards
+             ("Try the new layout · Test" / "Back to the classic layout"),
+             hidden while the code box shows.
  2026-10-17  SIGN-IN LAYOUT TRIAL. The classic layout (Office panel, then
              Retail / Fitting / Clinics columns) is kept as the default,
              unchanged. A link at the bottom-left, "Try the new layout" /

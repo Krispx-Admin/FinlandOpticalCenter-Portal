@@ -214,9 +214,14 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .lp-inner h2 { font-size: 23px; }
 /* ── Sign-in, new layout (TRIAL): a directory for 30+ locations ── */
-.lp-layout { position: absolute; left: 22px; bottom: 18px; z-index: 2; border: none; background: none; padding: 4px 6px;
-  font-size: 12px; font-weight: 600; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.lp-layout:hover { color: var(--brand); }
+/* the layout switch: a clear pill at the bottom centre, not a corner link */
+.lp-layout-row { display: flex; justify-content: center; margin-top: 26px; }
+.lp-layout { cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: var(--brand); background: var(--surface);
+  border: 1px solid var(--border-strong); box-shadow: var(--shadow); }
+.lp-layout:hover { border-color: var(--brand); background: var(--brand-soft); }
+.lp-layout em { font-style: normal; font-size: 10.5px; font-weight: 700; color: #b45309; background: #fdf1e3; border-radius: 999px; padding: 1px 7px; }
 .lp2 { width: min(980px, 100%); margin: 0 auto; }
 .lp2-last { display: flex; align-items: center; gap: 12px; margin: 0 auto 18px; padding: 10px 16px 10px 12px; cursor: pointer;
   background: var(--brand); color: #fff; border: none; border-radius: 12px; font-size: 14px; box-shadow: var(--shadow); }
@@ -756,6 +761,10 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .br-bench .sel-sm { height: 30px; font-size: 12px; padding-top: 0; padding-bottom: 0; }
 .fulfil-opt.is-off { opacity: .5; cursor: not-allowed; }
 .br-lens.br-bench { grid-column: 2 / -1; }
+/* Settings → Branches & people: the people under their own heading */
+.br-sub { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px 4px; }
+.br-kind { margin: 0 0 12px; width: fit-content; }
+.br-person-role { align-self: center; }
 /* outside lenses: a small tag under the status */
 .ol-tag { display: inline-block; width: fit-content; font-size: 9.5px; font-weight: 700; letter-spacing: .01em;
   padding: 1px 7px; border-radius: 999px; margin-top: 3px; white-space: nowrap; border: 1px solid transparent; }

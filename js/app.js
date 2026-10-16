@@ -166,9 +166,11 @@ function renderLogin(preselect = null) {
         </section>
 
         <section class="lp-step" id="step-code" hidden></section>
+        <div class="lp-layout-row" id="lp-layout-row">
+          <button class="lp-layout" id="lp-layout">${newLayout() ? 'Back to the classic layout' : 'Try the new layout <em>Test</em>'}</button>
+        </div>
       </div>
     </main>
-    <button class="lp-layout" id="lp-layout">${newLayout() ? 'Back to the classic layout' : 'Try the new layout'}</button>
   </div>`;
   app.querySelector('#lp-layout').addEventListener('click', () => {
     store_.set(LAYOUT_KEY, newLayout() ? 'classic' : 'new');
@@ -189,10 +191,12 @@ function showCodeStep(code) {
   const step = app.querySelector('#step-code');
   pick.hidden = true;
   step.hidden = false;
+  const sw = app.querySelector('#lp-layout-row'); if (sw) sw.hidden = true;
   step.innerHTML = pinHTML(code);
   step.querySelector('[data-back]')?.addEventListener('click', () => {
     step.hidden = true;
     pick.hidden = false;
+    const sw = app.querySelector('#lp-layout-row'); if (sw) sw.hidden = false;
   });
   wirePin(code);
 }

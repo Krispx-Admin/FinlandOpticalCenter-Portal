@@ -114,11 +114,16 @@ export function settingsView(me) {
     const { rows, error } = await branchAccess();
     if (!root.contains(host)) return;
     if (error) { host.innerHTML = `<p class="muted sm">Could not load the branches — ${esc(error)}</p>`; return; }
-    host.innerHTML = rows.map(r => {
+    // Branches first, then the people — the office, Ghiath and the view-only
+    // admins sign in too, but are never a place (user, 2026-10-17).
+    const isPerson = r => !BRANCH_KINDS.includes(r.role);
+    const ordered = [...rows.filter(r => !isPerson(r)), ...rows.filter(isPerson)];
+    const firstPerson = ordered.find(isPerson)?.code;
+    host.innerHTML = ordered.map(r => {
       const fixed = !BRANCH_KINDS.includes(r.role);
       // A view-only admin (Wijdan, Sarah) can be closed; the office and Ghiath cannot.
       const keep = (fixed && r.role !== 'manager') || r.holds_lens_stock;
-      return `
+      return `${r.code === firstPerson ? '<h3 class="br-sub">People</h3>' : ''}
       <div class="br-row ${r.active ? '' : 'is-closed'}" data-branch="${esc(r.code)}">
         <span class="loc-chip">${esc(r.code)}</span>
         <input class="br-name" data-br-name="${esc(r.code)}" value="${esc(r.name)}" aria-label="Name of ${esc(r.code)}" required>
@@ -155,6 +160,19 @@ export function settingsView(me) {
     }).join('');
   }
 
+  // Branch or Person: a person has no kind to choose — it is a view-only admin.
+  function setAddKind(kind) {
+    const person = kind === 'person';
+    root.querySelectorAll('#add-kind .chip').forEach(c => c.classList.toggle('on', c.dataset.kind === kind));
+    const f = root.querySelector('#add-branch');
+    if (!f) return;
+    f.elements.role.hidden = person;
+    f.querySelector('.br-person-role').hidden = !person;
+    f.elements.code.placeholder = person ? 'Code — e.g. WIJDAN' : 'Code — e.g. NGM';
+    f.elements.name.placeholder = person ? 'Name — e.g. Wijdan' : 'Name — e.g. Nizwa Grand Mall';
+    f.querySelector('.br-add-l').textContent = person ? 'Add person' : 'Add branch';
+  }
+
   async function addBranch(form) {
     const d = new FormData(form);
     const msg = root.querySelector('#add-branch-msg');
@@ -162,7 +180,9 @@ export function settingsView(me) {
     msg.className = 'ba-msg';
     if (!/^\d{6}$/.test(pin)) { msg.classList.add('bad'); msg.textContent = 'The sign-in code is six digits.'; return; }
     msg.textContent = 'Adding…';
-    const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: d.get('role'), pin });
+    // A person is a view-only admin (role 'manager'); a branch is what was chosen.
+    const person = root.querySelector('#add-kind .chip.on')?.dataset.kind === 'person';
+    const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: person ? 'manager' : d.get('role'), pin });
     if (!done) { msg.textContent = ''; return; }
     form.reset();
     msg.classList.add('good');
@@ -356,8 +376,8 @@ export function settingsView(me) {
     { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'],
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
-    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Branches', sections: ['branches', 'addBranch'],
-      desc: 'Add branches, rename them, set what each one is, close one, and the code each signs in with',
+    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Branches & people', sections: ['branches', 'addBranch'],
+      desc: 'Add branches and people, rename them, set what each branch is, close one, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
     { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'],
       desc: 'Everyone on the staff schedule and the Direct Insurance salesperson list',
@@ -434,14 +454,19 @@ export function settingsView(me) {
     addBranch: () => `
       <section class="set-card">
         <div class="set-card-head">
-          <h2>${icons.plus} Add a branch</h2>
+          <h2>${icons.plus} Add a branch or a person</h2>
+        </div>
+        <div class="chips status-chips br-kind" id="add-kind">
+          <button type="button" class="chip on" data-kind="branch">Branch</button>
+          <button type="button" class="chip" data-kind="person">Person</button>
         </div>
         <form class="set-add br-add" id="add-branch" autocomplete="off">
           <input name="code" class="br-code-in" placeholder="Code — e.g. NGM" maxlength="10" required>
           <input name="name" placeholder="Name — e.g. Nizwa Grand Mall" required>
-          <select name="role" aria-label="What it is">${kindOptions('retail')}<option value="manager">${esc(ROLES.manager.label)}</option></select>
+          <select name="role" aria-label="What it is">${kindOptions('retail')}</select>
+          <span class="br-fixed br-person-role" hidden>${esc(ROLES.manager.label)}</span>
           <input name="pin" class="br-pin-in" inputmode="numeric" maxlength="6" placeholder="Sign-in code" required>
-          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add branch</button>
+          <button class="btn btn-primary btn-sm" type="submit">${icons.plus} <span class="br-add-l">Add branch</span></button>
         </form>
         <div class="ba-msg" id="add-branch-msg"></div>
       </section>`,
@@ -609,6 +634,8 @@ export function settingsView(me) {
     });
 
     root.addEventListener('click', e => {
+      const kind = e.target.closest('#add-kind [data-kind]');
+      if (kind) return setAddKind(kind.dataset.kind);
       const bd = e.target.closest('[data-br-del]');
       if (bd) return deleteBranchModal(bd.dataset.brDel);
       if (e.target.closest('[data-emp-new]')) return employeeModal(null);
