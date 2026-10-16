@@ -1196,6 +1196,18 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  SIGN-IN TRIAL 2 — "split" design (the directory trial was rejected
+             as "just rearranged tabs" and is removed). Classic stays the
+             default; "Try the new design" (or foc-portal.org/?layout=new,
+             ?layout=classic) switches this device. Left: navy brand panel,
+             live clock + date, the schedule link. Right: one card — type to
+             find a location (live suggestions, ↑/↓/Enter, codes first), or
+             "Browse all locations"; "Recent on this device" chips
+             (focp.recentLocations, last 4 good sign-ins); then the code box
+             with an on-screen keypad, signing in by itself at the 6th digit
+             (typed or tapped). Stacks on narrow screens. app.js splitHTML /
+             wireSplit / showSplitCode; CSS .lp3-*. Tested under the live CSP
+             against live data: 0 violations, 0 errors.
  2026-10-17  Security, from a full client audit (XSS sweep of every innerHTML /
              attribute / print window / toast): escaping is consistent; fixed
              the one gap (outside-lens form, handler branch name → esc()).
