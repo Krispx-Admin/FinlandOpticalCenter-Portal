@@ -1186,6 +1186,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Profiles WIJDAN (Wijdan) and SARAH (Sarah) created as "Admin · view
+             only" (add_branch as the office), each with a random 6-digit code
+             generated inside the database and never shown — nobody can sign
+             in as them until the office sets a code in Settings → Branches
+             (row → new code → Set). Sarah: "Can export Direct Insurance" on.
  2026-10-16  Avenues (the outside-lens handler) keeps every other branch's
              outside-lens order in its Fitting Log for the whole job (was:
              until the lenses arrived; canSeeOrder). New tab "Outside Lens
