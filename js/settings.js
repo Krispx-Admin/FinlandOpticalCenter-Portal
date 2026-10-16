@@ -146,9 +146,9 @@ export function settingsView(me) {
           <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
         </label>` : ''}
         ${r.role === 'manager' ? `
-        <label class="br-lens" title="Shows the Export button in Direct Insurance">
+        <label class="br-lens" title="Shows the Export (Insurance Sales) button in Direct Insurance">
           <span class="sw"><input type="checkbox" data-br-export="${esc(r.code)}" ${LOCATIONS.find(l => l.code === r.code)?.canExport ? 'checked' : ''}><i></i></span>
-          <span>Can export Direct Insurance</span>
+          <span>Can export Insurance Sales</span>
         </label>` : ''}
         <div class="ba-msg"></div>
       </div>`;

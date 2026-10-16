@@ -1186,6 +1186,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Sidebar: on a short screen the tab list scrolls inside the sidebar
+             and the foot (Live · synced, who is signed in, Sign out) stays
+             in view (.side-nav overflow-y auto; .shell grid row minmax(0,1fr)).
+ 2026-10-17  Direct Insurance export is "Insurance Sales": window title, the
+             sheet and the file name ("Insurance Sales - <branch> - <insurer>
+             - <dates>.xlsx"); new Insurer filter (all or one) beside Branch.
+             Settings switch reads "Can export Insurance Sales".
  2026-10-17  Profiles WIJDAN (Wijdan) and SARAH (Sarah) created as "Admin · view
              only" (add_branch as the office), each with a random 6-digit code
              generated inside the database and never shown — nobody can sign

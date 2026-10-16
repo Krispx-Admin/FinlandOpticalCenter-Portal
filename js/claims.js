@@ -822,31 +822,36 @@ export function claimsView(me, kind = 'claim') {
   }
 
   // ── render ──
-  // ── Export to Excel (Sarah and the office; schema-37) ──
-  // Every Direct Insurance entry for one branch or all, over the last 1 / 7 /
+  // ── Export to Excel: "Insurance Sales" (Sarah and the office; schema-37) ──
+  // Every Direct Insurance entry for one branch or all, one insurer or all, over the last 1 / 7 /
   // 30 days or a range of dates — one row per invoice, and a second sheet with
   // every product line.
   function exportModal() {
     const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
-    const st = { branch: 'all', period: 7, from: daysAgo(7), to: iso(new Date()) };
+    const st = { branch: 'all', insurer: 'all', period: 7, from: daysAgo(7), to: iso(new Date()) };
     const range = () => (st.period === 'range' ? [st.from, st.to] : [daysAgo(st.period - 1), iso(new Date())]);
     const picked = () => {
       const [from, to] = range();
       return store.state.claims.filter(c => c.kind === 'direct' && (st.branch === 'all' || c.branch === st.branch)
-        && c.date >= from && c.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+        && (st.insurer === 'all' || c.insurer === st.insurer) && c.date >= from && c.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     };
     const layer = openLayer('modal', () => {
       const n = picked().length;
       return `
       <div class="dw-head">
-        <div><div class="dw-kicker">Direct Insurance</div><h2>Export to Excel</h2></div>
+        <div><div class="dw-kicker">Export to Excel</div><h2>Insurance Sales</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
-        <label>Branch
-          <select id="x-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${st.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
-        </label>
+        <div class="grid2">
+          <label>Branch
+            <select id="x-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${st.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
+          </label>
+          <label>Insurer
+            <select id="x-ins"><option value="all">All insurers</option>${insurerChoices().map(n => `<option value="${esc(n)}" ${st.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+          </label>
+        </div>
         <div class="fieldset">
           <div class="fs-head"><span>Period</span></div>
           <div class="chips status-chips" id="x-period">${[[1, 'Today'], [7, 'Last 7 days'], [30, 'Last 30 days'], ['range', 'Date range']].map(([k, l]) =>
@@ -865,6 +870,7 @@ export function claimsView(me, kind = 'claim') {
     const el = layer.el;
     el.addEventListener('change', e => {
       if (e.target.id === 'x-branch') st.branch = e.target.value;
+      if (e.target.id === 'x-ins') st.insurer = e.target.value;
       if (e.target.id === 'x-from') st.from = e.target.value;
       if (e.target.id === 'x-to') st.to = e.target.value;
       layer.update();
@@ -895,15 +901,15 @@ export function claimsView(me, kind = 'claim') {
         const wb = XLSX.utils.book_new();
         const s1 = XLSX.utils.json_to_sheet(rows);
         s1['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length, ...rows.map(r => String(r[k] ?? '').length)) + 2 }));
-        XLSX.utils.book_append_sheet(wb, s1, 'Direct Insurance');
+        XLSX.utils.book_append_sheet(wb, s1, 'Insurance Sales');
         if (lines.length) {
           const s2 = XLSX.utils.json_to_sheet(lines);
           s2['!cols'] = Object.keys(lines[0]).map(k => ({ wch: Math.max(k.length, ...lines.map(r => String(r[k] ?? '').length)) + 2 }));
           XLSX.utils.book_append_sheet(wb, s2, 'Products');
         }
         const [from, to] = range();
-        const who = st.branch === 'all' ? 'All branches' : st.branch;
-        XLSX.writeFile(wb, `Direct Insurance - ${who} - ${from === to ? from : `${from} to ${to}`}.xlsx`);
+        const who = [st.branch === 'all' ? 'All branches' : st.branch, st.insurer === 'all' ? '' : st.insurer].filter(Boolean).join(' - ');
+        XLSX.writeFile(wb, `Insurance Sales - ${who.replace(/[\/:*?"<>|]/g, '')} - ${from === to ? from : `${from} to ${to}`}.xlsx`);
         layer.close();
         toast({ title: `Exported ${list.length} entr${list.length === 1 ? 'y' : 'ies'}`, sub: 'The Excel file is in your downloads.', tone: 'info' });
       } catch (err) {

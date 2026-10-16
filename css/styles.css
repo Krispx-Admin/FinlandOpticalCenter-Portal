@@ -313,7 +313,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .demo-note code { background: var(--brand-soft); color: var(--brand); padding: 1px 6px; border-radius: 5px; font-weight: 700; }
 
 /* ── Shell ─────────────────────────────────────────────────────────────── */
-.shell { display: grid; grid-template-columns: 236px 1fr; height: 100%; transition: grid-template-columns var(--speed); }
+.shell { display: grid; grid-template-columns: 236px 1fr; grid-template-rows: minmax(0, 1fr); height: 100%; transition: grid-template-columns var(--speed); }
 .side {
   background: linear-gradient(180deg, var(--brand-dark), var(--brand));
   color: #fff; display: flex; flex-direction: column; padding: 20px 14px;
@@ -344,7 +344,14 @@ svg { width: 18px; height: 18px; flex: none; }
 .side-logo img { height: 32px; width: auto; }
 /* the mark alone is for the collapsed rail — see the 900px query */
 .side-mark { display: none; }
-.side-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; flex: 1; }
+/* The tab list scrolls inside the sidebar when the screen is short, so the
+   foot — live status, who is signed in, Sign out — is always in view. */
+.side-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent; padding-bottom: 8px; }
+.side-nav::-webkit-scrollbar { width: 6px; }
+.side-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 3px; }
+.side { min-height: 0; }
+.side-foot { flex: none; }
 .nav-item {
   display: flex; align-items: center; gap: 11px; padding: 10px 12px;
   color: rgba(255,255,255,.72); text-decoration: none; border-radius: 9px;
