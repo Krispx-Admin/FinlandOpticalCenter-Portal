@@ -620,7 +620,7 @@ export function fittingView(me) {
       <label class="fulfil-opt ${how === 'send_frames' ? 'on' : ''} ${open.length ? '' : 'is-off'}">
         <input type="radio" name="olHow" value="send_frames" ${how === 'send_frames' ? 'checked' : ''} ${open.length ? '' : 'disabled'}>
         <b>${esc(OUTSIDE_FULFILMENT.send_frames.label)}</b>
-        <span>${open.length ? `Your frame and ${hName}'s lenses both go there to be cut.` : 'No fitter is open right now.'}</span>
+        <span>${open.length ? `Your frame and ${esc(hName)}'s lenses both go there to be cut.` : 'No fitter is open right now.'}</span>
         ${open.length ? `<select name="olDest" class="ol-dest" aria-label="Fitter">${open.map(f => `<option value="${f.code}" ${f.code === dest ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>` : ''}
       </label>
       <label class="fulfil-opt ${how === 'receive_lens' ? 'on' : ''}">

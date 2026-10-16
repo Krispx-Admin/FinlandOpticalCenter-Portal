@@ -1196,6 +1196,14 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Security, from a full client audit (XSS sweep of every innerHTML /
+             attribute / print window / toast): escaping is consistent; fixed
+             the one gap (outside-lens form, handler branch name → esc()).
+             supabase-js pinned to an exact settled release (2.117.2, not the
+             floating @2) — bump it deliberately, to a release ≥ 2 weeks old.
+             Tested under the live CSP: sign-in loads, 0 violations. Not done
+             (needs the user): stronger sign-in than 6-digit codes;
+             scheduler.html is outside this audit (not to be changed).
  2026-10-17  SECURITY HARDENING. Audit first: as an outsider with only the
              public key, every data table read 0 rows and every write /
              admin call was refused — RLS already held. Then:

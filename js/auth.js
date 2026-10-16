@@ -1,7 +1,9 @@
 // ── Authentication: real sign-in against Supabase ──
 // The branch code lives in the token's app_metadata, which is set server-side
 // and cannot be rewritten by the browser — so a branch cannot promote itself.
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+// Pinned to one exact, settled release (security, 2026-10-17): a floating
+// "@2" would run whatever the CDN serves next with every user's session.
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, emailFor } from './supabase-config.js';
 import { loc } from './data.js';
 
