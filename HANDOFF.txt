@@ -1196,6 +1196,32 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Text no longer cut off (user screenshots). New fitting order →
+             Lens stock: the lens box is the portal's own dropdown (no more
+             browser datalist) — the list spans the whole row, long names wrap,
+             "n in stock" on the right; typing filters (every word must match:
+             "1.67 photo -3"), ↑/↓/Enter/Esc work. fitting.js lsMatches /
+             openMenu / pickLens; CSS .ls-pick / .ls-menu / .ls-opt. Stock
+             Request composer: modal 940px wide, Brand column wider, Qty box
+             66px (CSS .cl-row grid, .modal:has(.composer-lines)).
+ 2026-10-17  SIGN-IN TRIALS REMOVED ("delete the new design i dont like it keep
+             the old one"). The classic sign-in is the only one again: no
+             "Try the new design" switch, ?layout= is ignored, the .lp3-* /
+             .lp-layout CSS and focp.layout / focp.recentLocations are gone.
+             The two trial entries below are history only.
+ 2026-10-17  BOT CHECK ON SIGN-IN (Cloudflare Turnstile) — CODED, DORMANT.
+             js/captcha.js; the sign-in screen gets a box (#pin-captcha) that is
+             invisible unless Cloudflare has a doubt; auth.signIn passes the
+             token as captchaToken. OFF while TURNSTILE_SITE_KEY in
+             supabase-config.js is ''. _headers CSP allows
+             challenges.cloudflare.com (script, connect, frame).
+             TO SWITCH ON — IN THIS ORDER, or every sign-in fails:
+               1. user creates a Turnstile widget for foc-portal.org
+                  (dash.cloudflare.com → Turnstile), sends the SITE key (public)
+               2. put it in TURNSTILE_SITE_KEY, publish, test a real sign-in
+               3. only then the user pastes the SECRET key into Supabase →
+                  Authentication → Bot and Abuse Protection → CAPTCHA,
+                  provider Turnstile. The secret never goes in chat or code.
  2026-10-17  SIGN-IN TRIAL 2 — "split" design (the directory trial was rejected
              as "just rearranged tabs" and is removed). Classic stays the
              default; "Try the new design" (or foc-portal.org/?layout=new,

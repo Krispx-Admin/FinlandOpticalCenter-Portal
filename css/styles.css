@@ -213,80 +213,7 @@ svg { width: 18px; height: 18px; flex: none; }
   width: 158px; max-width: 34vw; height: auto;
 }
 .lp-inner h2 { font-size: 23px; }
-.lp-layout-row { display: flex; justify-content: center; margin-top: 26px; }
-.lp-layout { cursor: pointer;
-  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px;
-  font-size: 13px; font-weight: 600; color: var(--brand); background: var(--surface);
-  border: 1px solid var(--border-strong); box-shadow: var(--shadow); }
-.lp-layout:hover { border-color: var(--brand); background: var(--brand-soft); }
-.lp-layout em { font-style: normal; font-size: 10.5px; font-weight: 700; color: #b45309; background: #fdf1e3; border-radius: 999px; padding: 1px 7px; }
-/* ── Sign-in, split design (TRIAL 2) ── */
-.lp3 { display: grid; grid-template-columns: minmax(320px, 40%) 1fr; height: 100%; background: var(--page); }
-.lp3-brand { position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 36px 44px;
-  color: #fff; background: radial-gradient(120% 90% at 0% 0%, #1d4579 0%, var(--brand) 45%, var(--brand-dark) 100%); }
-.lp3-mark { position: absolute; right: -18%; bottom: -12%; width: 85%; opacity: .07; pointer-events: none; }
-.lp3-mark img { width: 100%; transform: rotate(-30deg); }
-.lp3-logo { height: 40px; width: auto; align-self: flex-start; position: relative; }
-.lp3-hello { margin: auto 0; position: relative; }
-.lp3-time { font-size: clamp(54px, 7vw, 88px); font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
-.lp3-date { font-size: 17px; opacity: .78; margin-top: 10px; }
-.lp3-tag { font-size: 15px; opacity: .62; margin: 26px 0 0; max-width: 340px; line-height: 1.5; }
-.lp3-foot { position: relative; }
-.lp3-foot .lp-view { position: static; display: inline-flex; background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.22); }
-.lp3-foot .lp-view.is-off { color: rgba(255,255,255,.55); }
-.lp3-main { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 28px; overflow-y: auto; }
-.lp3-card { width: min(440px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
-  box-shadow: 0 20px 50px rgba(19,48,86,.10); padding: 34px 32px 30px; animation: fadeUp .45s ease both; }
-.lp3-card h2 { font-size: 26px; }
-.lp3-sub { color: var(--ink-3); margin: 6px 0 22px; }
-.lp3-find { position: relative; display: flex; align-items: center; }
-.lp3-find svg { position: absolute; left: 14px; width: 18px; height: 18px; color: var(--ink-3); pointer-events: none; }
-.lp3-find input { width: 100%; height: 52px; padding: 0 16px 0 44px; font: inherit; font-size: 15.5px; color: var(--ink);
-  border: 1.5px solid var(--border-strong); border-radius: 12px; outline: none; background: var(--page); transition: border-color var(--speed), box-shadow var(--speed), background var(--speed); }
-.lp3-find input:focus { border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 4px rgba(19,48,86,.10); }
-.lp3-sug { margin-top: 8px; border: 1px solid var(--border); border-radius: 12px; overflow-y: auto; max-height: 300px; background: var(--surface); }
-.lp3-sug.is-all { max-height: 340px; }
-.lp3-opt { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 10px 14px;
-  background: none; border: none; border-bottom: 1px solid var(--border); text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
-.lp3-opt:last-child { border-bottom: none; }
-.lp3-opt:hover, .lp3-opt.on { background: var(--brand-soft); }
-.lp3-opt-name { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lp3-opt-kind { font-size: 11.5px; color: var(--ink-3); }
-.lp3-none { margin: 0; padding: 14px; color: var(--ink-3); font-size: 13px; }
-.lp3-recent { margin-top: 20px; }
-.lp3-recent > span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; }
-.lp3-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.lp3-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 7px 8px; border-radius: 999px; cursor: pointer;
-  background: var(--page); border: 1px solid var(--border); font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
-.lp3-chip:hover { border-color: var(--brand); background: var(--brand-soft); }
-.lp3-browse { margin-top: 18px; background: none; border: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--brand); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-.lp3 .loc-code.role-fitting { color: var(--st-teal); background: #e2f5f3; }
-.lp3 .loc-code.role-clinic { color: var(--st-purple); background: #faeafc; }
-.lp3 .loc-code.role-admin { color: #fff; background: var(--brand); }
-.lp3 .loc-code.role-scheduler { color: #fff; background: var(--st-blue); }
-/* the code step: the usual box, a keypad under it */
-.lp3 #lp3-code .pin-card { box-shadow: none; border: none; padding: 0; margin: 14px 0 0; animation: none; }
-.lp3 .pin-who { font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.lp3 #pin-form { flex-direction: column; }
-.lp3 #pin-input { width: 100%; height: 58px; font-size: 26px; text-align: center; letter-spacing: .5em; }
-.lp3 #pin-go { width: 100%; justify-content: center; height: 48px; }
-.lp3-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
-.lp3-pad button { height: 56px; border-radius: 14px; border: 1px solid var(--border); background: var(--page); cursor: pointer;
-  font: inherit; font-size: 21px; font-weight: 650; color: var(--brand-ink); transition: background var(--speed), transform .08s; }
-.lp3-pad button:hover { background: var(--brand-soft); border-color: var(--brand); }
-.lp3-pad button:active { transform: scale(.96); }
-.lp3-pad .lp3-pad-fn { font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.lp3-pad .lp3-pad-fn svg { width: 20px; height: 20px; transform: rotate(180deg); }
-.lp3-switch { margin-top: 4px; }
-@media (max-width: 860px) {
-  .lp3 { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; height: auto; min-height: 100%; }
-  .lp3-main { padding: 20px 16px; }
-  .lp3-card { padding: 26px 20px 22px; }
-  .lp3-brand { padding: 22px 22px 20px; }
-  .lp3-hello { margin: 18px 0 14px; }
-  .lp3-time { font-size: 44px; }
-  .lp3-tag { display: none; }
-}
+
 .lp-sub { color: var(--ink-2); margin: 5px 0 0; }
 /* No wrapper box: the location cards are already white, so a white panel
    around them just flattened everything. The groups simply float on the page. */
@@ -551,7 +478,19 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .lens-src .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .ls-fields { display: flex; flex-direction: column; gap: 10px; }
 .ls-lines { display: flex; flex-direction: column; gap: 8px; }
-.ls-row { display: grid; grid-template-columns: 1fr 76px 32px; gap: 4px 8px; align-items: center; }
+.ls-row { position: relative; display: grid; grid-template-columns: 1fr 76px 32px; gap: 4px 8px; align-items: center; }
+.ls-pick { position: relative; display: flex; align-items: center; }
+.ls-pick input { width: 100%; padding-right: 34px; }
+.ls-pick svg { position: absolute; right: 10px; width: 16px; height: 16px; transform: rotate(90deg); color: var(--ink-3); cursor: pointer; }
+/* the lens list: as wide as the whole row, long names wrap */
+.ls-menu { position: absolute; left: 0; right: 0; top: 46px; z-index: 30; max-height: 290px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 14px 34px rgba(19,48,86,.16); padding: 4px; }
+.ls-opt { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%; padding: 9px 12px; border: none; border-radius: 8px;
+  background: none; text-align: left; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.ls-opt span { white-space: normal; line-height: 1.35; }
+.ls-opt em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: var(--st-green); }
+.ls-opt:hover, .ls-opt.on { background: var(--brand-soft); }
+.ls-none { margin: 0; padding: 12px; font-size: 13px; color: var(--ink-3); }
 .ls-have { grid-column: 1 / -1; font-size: 11.5px; color: var(--st-green); font-weight: 600; padding-left: 4px; }
 .ls-own { grid-column: 1 / -1; margin: 0; }
 .ls-row input[type=number] { text-align: center; }
@@ -919,13 +858,15 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* ── Composer lines ── */
 .composer-lines { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
 .cl-head, .cl-row {
-  display: grid; grid-template-columns: 1.2fr 1.1fr .75fr 112px 1fr 36px;
+  display: grid; grid-template-columns: 1fr 1.55fr .8fr 128px .9fr 36px;
   gap: 8px; align-items: center; padding: 8px 12px;
 }
+/* the stock request form gets more room, so brands and quantities show in full */
+.modal:has(.composer-lines) { width: min(940px, 100%); }
 .qty-unit { display: flex; gap: 6px; align-items: center; min-width: 0; }
 /* Specificity has to beat `.cl-row input { width: 100% }` below, or the number
    field swallows the cell and squeezes the unit label out of sight. */
-.cl-row .qty-unit input { width: 52px; flex: 0 0 52px; }
+.cl-row .qty-unit input { width: 66px; flex: 0 0 66px; }
 /* The unit is fixed by the category — shown, not chosen. */
 .qty-u { font-size: 12px; color: var(--ink-2); font-weight: 600; white-space: nowrap; flex: none; }
 .cl-head { background: var(--page); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }

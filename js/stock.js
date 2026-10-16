@@ -314,7 +314,7 @@ export function stockView(me) {
           <div class="cl-head"><span>Category</span><span>Brand</span><span>Audience</span><span>Qty</span><span>Note</span><span></span></div>
           ${lines.map((l, i) => lineRow(l, i)).join('')}
         </div>
-        <button class="btn btn-ghost btn-sm" data-add>${icons.plus} Add line</button>
+        <button class="btn btn-ghost btn-sm dm-add" data-add>${icons.plus} Add line</button>
         <label>Request note <span class="opt">optional</span><input id="req-note" placeholder="e.g. Weekend promo prep"></label>
         <div class="form-foot">
           <span class="muted" id="comp-total"></span>

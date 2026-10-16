@@ -773,12 +773,15 @@ export function fittingView(me) {
     const lsLinesHTML = () => {
       const items = shelfItems();
       if (!items.length) return `<p class="muted sm">Nothing on ${esc(own() ? 'your' : `${locName(ls.holder)}'s`)} shelf right now.</p>`;
-      return `<datalist id="ls-dl">${items.map(i => `<option value="${esc(lensLabel(i))}" label="${i.qty} in stock"></option>`).join('')}</datalist>`
-        + ls.lines.map((l, n) => {
+      return ls.lines.map((l, n) => {
         const pick = store.lensItem(l.itemId);
         return `
         <div class="ls-row">
-          <input list="ls-dl" data-ls-item="${n}" value="${esc(pick ? lensLabel(pick) : (l.text ?? ''))}" placeholder="Type or pick a lens — e.g. 1.60 blue -2.00" autocomplete="off" aria-label="Lens">
+          <div class="ls-pick">
+            <input data-ls-item="${n}" value="${esc(pick ? lensLabel(pick) : (l.text ?? ''))}" placeholder="Type or pick a lens — e.g. 1.60 blue -2.00" autocomplete="off" aria-label="Lens" role="combobox" aria-expanded="false">
+            ${icons.chevronRight}
+          </div>
+          <div class="ls-menu" data-ls-menu="${n}" role="listbox" hidden></div>
           <input type="number" min="1" max="${pick?.qty ?? 99}" value="${esc(l.qty)}" data-ls-qty="${n}" aria-label="Quantity">
           <button type="button" class="icon-btn" data-ls-del="${n}" ${ls.lines.length === 1 ? 'disabled' : ''} title="Remove">${icons.x}</button>
           ${pick ? `<span class="ls-have">${pick.qty} in stock</span>` : ''}
@@ -846,6 +849,60 @@ export function fittingView(me) {
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
     // Regular / Lens stock / Outside lenses: each opens its own fields.
     const lsBox = () => layer.el.querySelector('#nf-ls-lines');
+    // The lens list: the portal's own dropdown, the full width of the row,
+    // so long names wrap instead of being cut (user, 2026-10-17). Every word
+    // typed must appear: "1.67 photo -3" finds the photochromic -3.00.
+    const lsMatches = text => {
+      const words = String(text ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+      return shelfItems().filter(i => words.every(w => lensLabel(i).toLowerCase().includes(w)));
+    };
+    const lsMenu = n => layer.el.querySelector(`[data-ls-menu="${n}"]`);
+    const openMenu = (n, text) => {
+      const m = lsMenu(n); if (!m) return;
+      const list = lsMatches(text);
+      m.innerHTML = list.length ? list.map((i, k) => `
+        <button type="button" class="ls-opt ${k === 0 ? 'on' : ''}" data-ls-opt="${n}" data-id="${i.id}" role="option">
+          <span>${esc(lensLabel(i))}</span><em>${i.qty} in stock</em>
+        </button>`).join('') : '<p class="ls-none">No lens on this shelf matches that.</p>';
+      m.hidden = false;
+      layer.el.querySelector(`[data-ls-item="${n}"]`)?.setAttribute('aria-expanded', 'true');
+    };
+    const closeMenu = n => { const m = lsMenu(n); if (m) m.hidden = true; layer.el.querySelector(`[data-ls-item="${n}"]`)?.setAttribute('aria-expanded', 'false'); };
+    const pickLens = (n, id) => {
+      const l = ls.lines[n], hit = store.lensItem(id);
+      if (!l || !hit) return;
+      l.itemId = hit.id; l.text = lensLabel(hit); l.qty = Math.min(Math.max(1, +l.qty || 1), hit.qty);
+      lsBox().innerHTML = lsLinesHTML();
+      layer.el.querySelector(`[data-ls-qty="${n}"]`)?.focus();
+    };
+    // Opening the box shows every lens; once one is chosen, it shows them all
+    // again rather than just the one already in the box.
+    layer.el.addEventListener('focusin', e => {
+      const it = e.target.closest('[data-ls-item]');
+      if (!it) return;
+      const chosen = store.lensItem(ls.lines[+it.dataset.lsItem]?.itemId);
+      openMenu(+it.dataset.lsItem, chosen && it.value === lensLabel(chosen) ? '' : it.value);
+    });
+    layer.el.addEventListener('focusout', e => { const it = e.target.closest('[data-ls-item]'); if (it) setTimeout(() => closeMenu(+it.dataset.lsItem), 150); });
+    layer.el.addEventListener('mousedown', e => { if (e.target.closest('[data-ls-opt]')) e.preventDefault(); });
+    layer.el.addEventListener('keydown', e => {
+      const it = e.target.closest('[data-ls-item]');
+      if (!it) return;
+      const n = +it.dataset.lsItem;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (lsMenu(n)?.hidden) openMenu(n, it.value);
+        const all = [...lsMenu(n).querySelectorAll('.ls-opt')];
+        if (!all.length) return;
+        const at = all.findIndex(o => o.classList.contains('on'));
+        const next = (at + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length;
+        all.forEach((o, k) => o.classList.toggle('on', k === next));
+        all[next].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        const on = lsMenu(n)?.hidden ? null : lsMenu(n)?.querySelector('.ls-opt.on');
+        if (on) { e.preventDefault(); pickLens(n, on.dataset.id); }
+      } else if (e.key === 'Escape') { closeMenu(n); }
+    });
     layer.el.addEventListener('change', e => {
       const src = e.target.closest('[name=lenses]');
       if (src) {
@@ -881,14 +938,17 @@ export function fittingView(me) {
       // Picking from the list fills the box in one go: take it at once.
       const it = e.target.closest('[data-ls-item]');
       if (it) {
+        // Typing narrows the list; the line holds a lens only once one is picked.
         const l = ls.lines[+it.dataset.lsItem];
-        const hit = findItem(it.value);
         l.text = it.value;
-        if (hit && hit.id !== l.itemId) { l.itemId = hit.id; l.qty = Math.min(Math.max(1, +l.qty || 1), hit.qty); lsBox().innerHTML = lsLinesHTML(); }
-        else if (!hit) l.itemId = '';
+        l.itemId = findItem(it.value)?.id ?? '';
+        openMenu(+it.dataset.lsItem, it.value);
       }
     });
     layer.el.addEventListener('click', e => {
+      const opt = e.target.closest('[data-ls-opt]');
+      if (opt) return pickLens(+opt.dataset.lsOpt, opt.dataset.id);
+      if (e.target.closest('.ls-pick svg')) { e.target.closest('.ls-pick').querySelector('input').focus(); return; }
       if (e.target.closest('[data-ls-add]')) { ls.lines.push({ itemId: '', qty: 1 }); lsBox().innerHTML = lsLinesHTML(); return; }
       const d = e.target.closest('[data-ls-del]');
       if (d) { ls.lines.splice(+d.dataset.lsDel, 1); lsBox().innerHTML = lsLinesHTML(); }

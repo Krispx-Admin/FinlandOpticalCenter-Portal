@@ -1,5 +1,6 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
 import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
+import { captchaOn, mountCaptcha } from './captcha.js';
 import { damagedView } from './damaged.js';
 import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
@@ -36,161 +37,9 @@ function refreshPublicOff() {
   }).catch(() => { /* keep what we had */ });
 }
 
-// ── Sign-in layout (TRIAL, user 2026-10-17) ──
-// The classic layout (every location on show in its column) stays the
-// default. "Try the new design" switches this device to the split design
-// below, and back again. Kept in localStorage per device.
-const LAYOUT_KEY = 'focp.loginLayout';
-const store_ = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
-                 set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } } };
-// A link can switch it too: foc-portal.org/?layout=new (or =classic).
-try {
-  const want = new URLSearchParams(location.search).get('layout');
-  if (want === 'new' || want === 'classic') store_.set(LAYOUT_KEY, want);
-} catch { /* no URL to read */ }
-const newLayout = () => store_.get(LAYOUT_KEY) === 'new';
-// The split design (TRIAL 2, user 2026-10-17 — the directory trial was "just
-// rearranged tabs"): a navy brand panel with a live clock on the left; on the
-// right one card — find your location by typing (live suggestions, or browse
-// all), one-tap "recent on this device", then a keypad for the code that signs
-// in by itself at the sixth digit. Works the same for 16 or 60 locations.
-const RECENT_KEY = 'focp.recentLocations';
-const recentCodes = () => { try { return JSON.parse(store_.get(RECENT_KEY) || '[]'); } catch { return []; } };
-const PEOPLE = ['admin', 'scheduler', 'manager'];
-const kindOf = l => (PEOPLE.includes(l.role) ? 'Office' : ROLES[l.role]?.label ?? '');
-let splitClock = null;
-
-function splitHTML() {
-  const recent = recentCodes().map(c => loc(c)).filter(l => l && l.active !== false);
-  return `
-  <div class="lp3">
-    <aside class="lp3-brand">
-      <div class="lp3-mark"><img src="img/foc-logomark.png" alt=""></div>
-      <img class="lp3-logo" src="img/foc-portal-white-v2.png" alt="FOC Portal">
-      <div class="lp3-hello">
-        <div class="lp3-time" id="lp3-time"></div>
-        <div class="lp3-date" id="lp3-date"></div>
-        <p class="lp3-tag">Every frame, every lens, every branch — in one place.</p>
-      </div>
-      <div class="lp3-foot">${viewScheduleHTML()}</div>
-    </aside>
-    <main class="lp3-main">
-      <div class="lp3-card">
-        <section id="lp3-pick">
-          <h2>Sign in</h2>
-          <p class="lp3-sub">Find your location, then enter its code.</p>
-          <div class="lp3-find">
-            ${icons.search}
-            <input id="lp3-q" placeholder="Branch or person — name or code" autocomplete="off" spellcheck="false" aria-label="Find your location" role="combobox" aria-expanded="false" aria-controls="lp3-sug">
-          </div>
-          <div class="lp3-sug" id="lp3-sug" role="listbox" hidden></div>
-          ${recent.length ? `<div class="lp3-recent"><span>Recent on this device</span>
-            <div class="lp3-chips">${recent.map(l => `<button class="lp3-chip" data-loc="${l.code}"><span class="loc-code role-${l.role}">${l.code}</span>${esc(l.name)}</button>`).join('')}</div></div>` : ''}
-          <button class="lp3-browse" id="lp3-browse">Browse all locations</button>
-        </section>
-        <section id="lp3-code" hidden></section>
-      </div>
-      <button class="lp-layout lp3-switch" id="lp-layout">Back to the classic layout</button>
-    </main>
-  </div>`;
-}
-
-function wireSplit(preselect) {
-  const open = LOCATIONS.filter(l => l.active !== false && (PEOPLE.includes(l.role) || ['retail', 'fitting', 'clinic'].includes(l.role)));
-  const q = app.querySelector('#lp3-q'), box = app.querySelector('#lp3-sug');
-  let shown = [], active = 0;
-  const tick = () => {
-    const now = new Date(), el = app.querySelector('#lp3-time');
-    if (!el) { clearInterval(splitClock); splitClock = null; return; }
-    el.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    app.querySelector('#lp3-date').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  };
-  clearInterval(splitClock); tick(); splitClock = setInterval(tick, 15000);
-
-  const draw = (list, all = false) => {
-    shown = list; active = 0;
-    box.hidden = !list.length && !q.value.trim();
-    q.setAttribute('aria-expanded', String(!box.hidden));
-    box.classList.toggle('is-all', all);
-    box.innerHTML = list.length ? list.map((l, n) => `
-      <button class="lp3-opt ${n === 0 ? 'on' : ''}" data-loc="${l.code}" role="option">
-        <span class="loc-code role-${l.role}">${l.code}</span>
-        <span class="lp3-opt-name">${esc(l.name)}</span>
-        <span class="lp3-opt-kind">${esc(kindOf(l))}</span>
-      </button>`).join('') : '<p class="lp3-none">No location matches that.</p>';
-  };
-  const search = () => {
-    const term = q.value.trim().toLowerCase();
-    if (!term) { box.hidden = true; q.setAttribute('aria-expanded', 'false'); return; }
-    // Codes that start with what was typed come first, then names that contain it.
-    const hits = open.filter(l => `${l.code} ${l.name}`.toLowerCase().includes(term))
-      .sort((a, b) => (b.code.toLowerCase().startsWith(term) - a.code.toLowerCase().startsWith(term)) || a.name.localeCompare(b.name));
-    draw(hits);
-  };
-  const move = d => {
-    const opts = box.querySelectorAll('.lp3-opt');
-    if (!opts.length) return;
-    opts[active]?.classList.remove('on');
-    active = (active + d + opts.length) % opts.length;
-    opts[active].classList.add('on'); opts[active].scrollIntoView({ block: 'nearest' });
-  };
-  q.addEventListener('input', search);
-  q.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-    else if (e.key === 'Enter' && shown[active]) { e.preventDefault(); showSplitCode(shown[active].code); }
-    else if (e.key === 'Escape') { q.value = ''; search(); }
-  });
-  app.querySelector('#lp3-browse').addEventListener('click', () => {
-    q.value = '';
-    const order = ['admin', 'scheduler', 'manager', 'retail', 'fitting', 'clinic'];
-    draw([...open].sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role) || a.name.localeCompare(b.name)), true);
-    box.hidden = false;
-  });
-  app.querySelector('.lp3-card').addEventListener('click', e => {
-    const pick = e.target.closest('[data-loc]');
-    if (pick) showSplitCode(pick.dataset.loc);
-  });
-  app.querySelector('#lp-layout').addEventListener('click', () => { store_.set(LAYOUT_KEY, 'classic'); renderLogin(); });
-  if (preselect) showSplitCode(preselect);
-  else if (window.matchMedia('(pointer: fine)').matches) q.focus();
-}
-
-// The code step: the usual code box (wirePin signs in) with a keypad under it.
-function showSplitCode(code) {
-  const pick = app.querySelector('#lp3-pick'), step = app.querySelector('#lp3-code');
-  pick.hidden = true; step.hidden = false;
-  step.innerHTML = pinHTML(code) + `
-    <div class="lp3-pad" role="group" aria-label="Keypad">
-      ${['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => `<button type="button" data-key="${d}">${d}</button>`).join('')}
-      <button type="button" data-key="clear" class="lp3-pad-fn">Clear</button>
-      <button type="button" data-key="0">0</button>
-      <button type="button" data-key="back" class="lp3-pad-fn" aria-label="Delete">${icons.chevronRight}</button>
-    </div>`;
-  step.querySelector('[data-back]')?.addEventListener('click', () => { step.hidden = true; pick.hidden = false; app.querySelector('#lp3-q')?.focus(); });
-  wirePin(code);
-  const input = step.querySelector('#pin-input'), form = step.querySelector('#pin-form');
-  // Six digits sign in by themselves, typed or tapped.
-  const auto = () => { if (/^\d{6}$/.test(input.value) && !input.disabled) form.requestSubmit(); };
-  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 6); auto(); });
-  step.querySelector('.lp3-pad').addEventListener('click', e => {
-    const k = e.target.closest('[data-key]')?.dataset.key;
-    if (!k || input.disabled) return;
-    if (k === 'clear') input.value = '';
-    else if (k === 'back') input.value = input.value.slice(0, -1);
-    else if (input.value.length < 6) input.value += k;
-    auto();
-  });
-}
-
 function renderLogin(preselect = null) {
   teardownShell();
   refreshPublicOff();
-  if (newLayout()) {
-    app.innerHTML = splitHTML();
-    wireSplit(preselect);
-    return;
-  }
   // The office and Ghiath sit on their own panel above the rest; the other
   // three run side by side so every location is on screen at once.
   const columns = [
@@ -229,16 +78,9 @@ function renderLogin(preselect = null) {
         </section>
 
         <section class="lp-step" id="step-code" hidden></section>
-        <div class="lp-layout-row" id="lp-layout-row">
-          <button class="lp-layout" id="lp-layout">Try the new design <em>Test</em></button>
-        </div>
       </div>
     </main>
   </div>`;
-  app.querySelector('#lp-layout').addEventListener('click', () => {
-    store_.set(LAYOUT_KEY, 'new');
-    renderLogin();
-  });
 
   // Picking a location swaps the grid for the code box, so the field is always
   // in view — it used to sit below a long list and need scrolling to reach.
@@ -253,12 +95,10 @@ function showCodeStep(code) {
   const step = app.querySelector('#step-code');
   pick.hidden = true;
   step.hidden = false;
-  const sw = app.querySelector('#lp-layout-row'); if (sw) sw.hidden = true;
   step.innerHTML = pinHTML(code);
   step.querySelector('[data-back]')?.addEventListener('click', () => {
     step.hidden = true;
     pick.hidden = false;
-    const sw = app.querySelector('#lp-layout-row'); if (sw) sw.hidden = false;
   });
   wirePin(code);
 }
@@ -274,6 +114,7 @@ function pinHTML(code) {
                maxlength="6" pattern="\\d{6}" placeholder="••••••" aria-label="Six digit code" autofocus>
         <button class="btn btn-primary" type="submit" id="pin-go">Sign in ${icons.arrowRight}</button>
       </form>
+      <div class="pin-captcha" id="pin-captcha"></div>
       <div class="pin-err" id="pin-err"></div>
     </div>`;
 }
@@ -284,6 +125,9 @@ function wirePin(code) {
   const btn = app.querySelector('#pin-go');
   const err = app.querySelector('#pin-err');
   input?.focus();
+  // The bot check, when it is switched on (js/captcha.js).
+  let cap = null;
+  mountCaptcha(app.querySelector('#pin-captcha')).then(c => { cap = c; }).catch(e => { err.textContent = e.message; });
 
   form?.addEventListener('submit', async e => {
     e.preventDefault();
@@ -299,10 +143,15 @@ function wirePin(code) {
     const was = btn.innerHTML;
     btn.textContent = 'Checking…';
 
-    const { branch, error } = await auth.signIn(code, entered);
+    let token = null;
+    if (captchaOn()) {
+      try { token = await (cap ?? await mountCaptcha(app.querySelector('#pin-captcha'))).token(); }
+      catch (ex) { btn.disabled = false; input.disabled = false; btn.innerHTML = was; err.textContent = ex.message; return; }
+    }
+    const { branch, error } = await auth.signIn(code, entered, token);
+    cap?.reset();   // a token is good for one attempt
 
     if (branch) {
-      store_.set(RECENT_KEY, JSON.stringify([code, ...recentCodes().filter(c => c !== code)].slice(0, 4)));   // "Recent on this device"
       store.session = branch;
       location.hash = homeOf(branch);
       enterShell();

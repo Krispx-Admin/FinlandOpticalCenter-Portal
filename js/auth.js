@@ -23,10 +23,11 @@ export async function currentBranch() {
   return branchOf(data?.session?.user);
 }
 
-export async function signIn(branchCode, code) {
+export async function signIn(branchCode, code, captchaToken = null) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: emailFor(branchCode),
     password: code,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
   });
 
   if (error) {
@@ -36,6 +37,8 @@ export async function signIn(branchCode, code) {
       ? 'That code is not right for this branch.'
       : /rate|too many/i.test(error.message)
         ? 'Too many attempts. Wait a minute and try again.'
+        : /captcha/i.test(error.message)
+          ? 'The bot check failed — wait a moment and try again.'
         : error.message;
     return { error: msg };
   }
