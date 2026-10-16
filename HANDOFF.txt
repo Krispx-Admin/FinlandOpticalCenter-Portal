@@ -793,6 +793,8 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
+                             own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
                              kind for any account; last-admin + self guards.
                              Applied 2026-10-17.
@@ -1191,6 +1193,14 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Lens stock in New fitting order: a lens holder (MGM) can use its
+             OWN shelf ("Your shelf — …", listed first) — schema-42
+             use_own_lens_stock takes the lenses off at once and opens the
+             order at Send to Fitter (lenses in hand; keep it or send it),
+             recorded as a self lens request 'confirmed'; delete_order puts
+             own-shelf lenses back. The lens picker is a type-or-pick box
+             (input + datalist: "1.60 blue -2"), showing "34 in stock" once a
+             lens is matched; text that is not a lens on the shelf is refused.
  2026-10-17  SETTINGS → ACCOUNTS (was Branches & people; schema-41, rehearsed,
              applied). Every account has the same controls: name, kind (one
              list — Branch: retail / fitting / clinic; Person: view-only

@@ -488,6 +488,16 @@ export const store = {
   // lens request with no job behind it the first time someone retyped a bill
   // number. The function also decides the fitter, so a branch cannot name
   // itself one. The lenses come off the holder's shelf in the same call.
+  // A lens holder takes lenses off its own shelf for its own order (schema-42).
+  useOwnStock({ lines, billNo, customer }, by) {
+    return run(['lensRequests', 'orders', 'lensStock'], async () => {
+      const row = ok(await supabase.rpc('use_own_lens_stock', { p_bill: billNo, p_customer: customer, p_lines: lines }));
+      return { ...row, pcs: lines.reduce((s, l) => s + (l.qty || 0), 0) };
+    }, r => ({
+      by, module: 'fitting', title: `${by} logged ${billNo} with its own lens stock`, sub: `${r.pcs} pcs off the shelf`, refs: [r.order_id],
+    })).then(r => (r ? this.lensRequest(r.id) : null));
+  },
+
   createLensRequest({ lines, billNo, customer, fulfilment, holder }, by) {
     return run(['lensRequests', 'orders', 'lensStock'], async () => {
       const row = ok(await supabase.rpc('create_lens_request', {

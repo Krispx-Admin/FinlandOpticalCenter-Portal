@@ -758,27 +758,36 @@ export function fittingView(me) {
   function newOrderModal() {
     // Lens stock (user, 2026-10-17): order the lenses from a shelf right here —
     // the same request the Lens Stock page makes. Not from your own shelf.
-    const shelves = LENS_HOLDERS.filter(h => h.code !== me.code && h.active !== false)
-      .sort((a, b) => (b.code === FIRST_SHELF) - (a.code === FIRST_SHELF));   // Muscat Grand Mall first, as on Lens Stock
+    // Your own shelf first (a holder uses its own stock — schema-42), then the
+    // others with Muscat Grand Mall first, as on Lens Stock.
+    const shelves = LENS_HOLDERS.filter(h => h.active !== false)
+      .sort((a, b) => (b.code === me.code) - (a.code === me.code) || (b.code === FIRST_SHELF) - (a.code === FIRST_SHELF));
+    const shelfName = h => (h.code === me.code ? `Your shelf — ${h.name}` : h.name);
+    const own = () => ls.holder === me.code;
     const ls = { holder: shelves[0]?.code ?? null, lines: [{ itemId: '', qty: 1 }] };
     const lensLabel = i => `${i.type} ${i.index}${i.coating && i.coating !== 'None' ? ` ${i.coating}` : ''} · SPH ${fmtPwr(i.sph)}${i.cyl ? ` CYL ${fmtPwr(i.cyl)}` : ''}`;
     const shelfItems = () => store.state.lensStock.filter(i => i.holder === ls.holder && i.qty > 0)
       .sort((a, b) => lensLabel(a).localeCompare(lensLabel(b), undefined, { numeric: true }));
+    // Each lens line: type to search ("1.60", "blue", "-2") or open the list.
+    const findItem = text => shelfItems().find(i => lensLabel(i).toLowerCase() === String(text).trim().toLowerCase());
     const lsLinesHTML = () => {
       const items = shelfItems();
-      if (!items.length) return `<p class="muted sm">Nothing on ${esc(locName(ls.holder))}'s shelf right now.</p>`;
-      return ls.lines.map((l, n) => {
+      if (!items.length) return `<p class="muted sm">Nothing on ${esc(own() ? 'your' : `${locName(ls.holder)}'s`)} shelf right now.</p>`;
+      return `<datalist id="ls-dl">${items.map(i => `<option value="${esc(lensLabel(i))}" label="${i.qty} in stock"></option>`).join('')}</datalist>`
+        + ls.lines.map((l, n) => {
         const pick = store.lensItem(l.itemId);
         return `
         <div class="ls-row">
-          <select data-ls-item="${n}" aria-label="Lens"><option value="">Choose a lens…</option>${items.map(i =>
-            `<option value="${i.id}" ${i.id === l.itemId ? 'selected' : ''}>${esc(lensLabel(i))} — ${i.qty} in stock</option>`).join('')}</select>
+          <input list="ls-dl" data-ls-item="${n}" value="${esc(pick ? lensLabel(pick) : (l.text ?? ''))}" placeholder="Type or pick a lens — e.g. 1.60 blue -2.00" autocomplete="off" aria-label="Lens">
           <input type="number" min="1" max="${pick?.qty ?? 99}" value="${esc(l.qty)}" data-ls-qty="${n}" aria-label="Quantity">
           <button type="button" class="icon-btn" data-ls-del="${n}" ${ls.lines.length === 1 ? 'disabled' : ''} title="Remove">${icons.x}</button>
+          ${pick ? `<span class="ls-have">${pick.qty} in stock</span>` : ''}
         </div>`;
       }).join('');
     };
     const lsWayHTML = () => {
+      // Your own shelf: the lenses are already here — nothing to send.
+      if (own()) return `<p class="muted sm ls-own">The lenses come off your shelf now — the order starts at “Send to Fitter”, where you keep it here or send it.</p>`;
       const shut = isBenchClosed(ls.holder);
       const how = shut ? 'receive_lens' : (layer?.el.querySelector('[name=lsHow]:checked')?.value ?? 'send_frames');
       return Object.entries(FULFILMENT).map(([k, f]) => `
@@ -810,8 +819,8 @@ export function fittingView(me) {
         </div>
         ${shelves.length ? `
         <div class="fieldset ls-fields" id="nf-ls" hidden>
-          <div class="fs-head"><span>Lens stock</span>${shelves.length === 1 ? `<span class="muted sm">from ${esc(shelves[0].name)}</span>` : ''}</div>
-          ${shelves.length > 1 ? `<label>Shelf <select name="lsHolder">${shelves.map(h => `<option value="${h.code}">${esc(h.name)}</option>`).join('')}</select></label>` : ''}
+          <div class="fs-head"><span>Lens stock</span>${shelves.length === 1 ? `<span class="muted sm">from ${esc(shelfName(shelves[0]))}</span>` : ''}</div>
+          ${shelves.length > 1 ? `<label>Shelf <select name="lsHolder">${shelves.map(h => `<option value="${h.code}">${esc(shelfName(h))}</option>`).join('')}</select></label>` : ''}
           <div class="ls-lines" id="nf-ls-lines">${lsLinesHTML()}</div>
           <button type="button" class="btn btn-ghost btn-sm dm-add" data-ls-add>${icons.plus} Add lens</button>
           <div class="fulfil" id="nf-ls-way">${lsWayHTML()}</div>
@@ -858,15 +867,26 @@ export function fittingView(me) {
       }
       const it = e.target.closest('[data-ls-item]');
       if (it) {
-        const l = ls.lines[+it.dataset.lsItem]; l.itemId = it.value;
-        const max = store.lensItem(it.value)?.qty ?? 99;
-        l.qty = Math.min(Math.max(1, +l.qty || 1), max);
+        // Leaving the box: keep what was typed; show the stock if it is a lens.
+        const l = ls.lines[+it.dataset.lsItem];
+        const hit = findItem(it.value);
+        l.itemId = hit?.id ?? ''; l.text = it.value;
+        if (hit) l.qty = Math.min(Math.max(1, +l.qty || 1), hit.qty);
         lsBox().innerHTML = lsLinesHTML();
       }
     });
     layer.el.addEventListener('input', e => {
       const q = e.target.closest('[data-ls-qty]');
       if (q) ls.lines[+q.dataset.lsQty].qty = q.value;
+      // Picking from the list fills the box in one go: take it at once.
+      const it = e.target.closest('[data-ls-item]');
+      if (it) {
+        const l = ls.lines[+it.dataset.lsItem];
+        const hit = findItem(it.value);
+        l.text = it.value;
+        if (hit && hit.id !== l.itemId) { l.itemId = hit.id; l.qty = Math.min(Math.max(1, +l.qty || 1), hit.qty); lsBox().innerHTML = lsLinesHTML(); }
+        else if (!hit) l.itemId = '';
+      }
     });
     layer.el.addEventListener('click', e => {
       if (e.target.closest('[data-ls-add]')) { ls.lines.push({ itemId: '', qty: 1 }); lsBox().innerHTML = lsLinesHTML(); return; }
@@ -903,8 +923,11 @@ export function fittingView(me) {
         }
         const lines = [...byItem].map(([id, qty]) => { const i = store.lensItem(id); return { itemId: i.id, type: i.type, index: i.index, coating: i.coating, sph: i.sph, cyl: i.cyl, qty }; });
         if (!lines.length) { toast({ title: 'Choose the lenses', sub: `Pick at least one lens from ${locName(ls.holder)}'s shelf.`, tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
+        if (ls.lines.some(l => (l.text ?? '').trim() && !l.itemId)) { toast({ title: 'Pick a lens from the list', sub: 'A line has text that is not a lens on the shelf.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         const how = String(f.get('lsHow') || (isBenchClosed(ls.holder) ? 'receive_lens' : 'send_frames'));
-        const r = await store.createLensRequest({ lines, billNo: ref, customer, fulfilment: how, holder: ls.holder }, me.code);
+        const r = own()
+          ? await store.useOwnStock({ lines, billNo: ref, customer }, me.code)
+          : await store.createLensRequest({ lines, billNo: ref, customer, fulfilment: how, holder: ls.holder }, me.code);
         o = r?.orderId ? store.order(r.orderId) : null;
         if (o && collect !== me.code) await store.setCollect(o.id, collect, me.code);
         if (r && !o) { layer.close(); return; }
@@ -924,7 +947,7 @@ export function fittingView(me) {
       layer.close();
       toast({
         title: `${o.ref} logged`,
-        sub: src === 'stock' ? `Lenses requested from ${locName(ls.holder)}`
+        sub: src === 'stock' ? (own() ? 'Lenses taken off your shelf — use “Send to fitter” to keep it here or send it' : `Lenses requested from ${locName(ls.holder)}`)
           : me.role === 'fitting'
             ? 'Use “Send to fitter” when the lenses arrive'
             : 'Use “Send to fitter” when it leaves your branch',

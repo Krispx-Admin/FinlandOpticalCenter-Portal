@@ -124,6 +124,7 @@ Applied in order:
 | `supabase/schema-39-scale.sql` | ready for 50 people at once: permission checks once per query, missing indexes |
 | `supabase/schema-40-people-not-branches.sql` | people (office, Ghiath, view-only admins) can't be chosen as a branch |
 | `supabase/schema-41-accounts.sql` | Accounts: any account can be a branch or a person; one office admin always remains |
+| `supabase/schema-42-own-lens-stock.sql` | a lens holder uses its own shelf for its own fitting orders |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences
