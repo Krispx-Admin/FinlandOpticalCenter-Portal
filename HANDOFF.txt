@@ -1196,6 +1196,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Browser-tab icon is the FOC portal mark (navy + red ring), not the
+             generic glasses: img/favicon-64.png + img/apple-touch-icon.png
+             (180px, white ground), both cut from img/foc-logomark.png. The
+             white mark the user sent would vanish on a light tab bar.
+             Bot check verified LIVE on foc-portal.org: key + hostname accepted,
+             no CSP errors; an automated browser is shown the "Verify you are
+             human" tick box (expected), people normally see nothing.
  2026-10-17  Bot check: Turnstile SITE key filled in (widget "FOC Portal
              sign-in", hostname foc-portal.org, Managed) and published — step 2
              of the order below. The page now gets a token before every
