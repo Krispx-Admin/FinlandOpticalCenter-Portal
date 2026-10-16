@@ -1196,6 +1196,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  BOT CHECK ON (step 3 done by the user in Supabase → Attack
+             Protection → CAPTCHA, Turnstile). Verified: a sign-in with no token
+             is refused ("captcha_failed"). A good token could not be produced
+             by an automated browser (Cloudflare shows it the tick box and holds
+             it), so the user's own sign-in is the proof the secret matches.
+             If sign-ins fail: switch CAPTCHA off in Supabase first, then fix.
+             Note: headless Edge logs one inline-script CSP error
+             (about:srcdoc, sha256-BkKP2…) even on a blank page — it is Edge's
+             own, not the portal's or Turnstile's; ignore it.
  2026-10-17  Browser-tab icon is the FOC portal mark (navy + red ring) on a white
              rounded tile (user asked for the white ground), not the
              generic glasses: img/favicon-64.png + img/apple-touch-icon.png
