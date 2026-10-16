@@ -10,7 +10,7 @@ import {
   collectOf, frameLoc, canChangeCollect, LOCATIONS,
 } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
 // on Completed, by the day it was completed. 0 = any time.
@@ -857,7 +857,8 @@ export function fittingView(me) {
       <section class="chips status-chips" id="f-chips">${chipsHTML()}</section>
       <div id="f-bulk">${bulkHTML()}</div>
       <div id="f-selall">${selectAllHTML()}</div>
-      <section class="list" id="f-list">${rowsHTML()}</section>`;
+      <section class="list" id="f-list">${rowsHTML()}</section>
+      <div id="f-older">${ui.chip === 'collected' ? olderHTML(store.historyDays, store.olderLoaded('orders')) : ''}</div>`;
     wire();
     markSeen();
   }
@@ -868,6 +869,8 @@ export function fittingView(me) {
     root.querySelector('#f-days').innerHTML = daysHTML();
     root.querySelector('#f-bulk').innerHTML = bulkHTML();
     root.querySelector('#f-selall').innerHTML = selectAllHTML();
+    const fo = root.querySelector('#f-older');
+    if (fo) fo.innerHTML = ui.chip === 'collected' ? olderHTML(store.historyDays, store.olderLoaded('orders')) : '';
     const fbn = root.querySelector('#f-bench');
     if (fbn) fbn.innerHTML = benchBtnHTML();
     root.querySelector('#f-list').innerHTML = rowsHTML();
@@ -952,6 +955,7 @@ export function fittingView(me) {
     root.addEventListener('click', e => {
       const chip = e.target.closest('[data-chip]');
       if (chip) { ui.chip = chip.dataset.chip; ui.selected.clear(); refreshLists(); return; }
+      if (e.target.closest('[data-older]')) { e.target.closest('[data-older]').disabled = true; store.loadOlder('orders'); return; }
       const dd = e.target.closest('[data-days]');
       if (dd) { ui.days = +dd.dataset.days; ui.selected.clear(); refreshLists(); return; }
       const sa = e.target.closest('[data-sel-all]');

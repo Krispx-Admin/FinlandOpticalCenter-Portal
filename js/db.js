@@ -211,12 +211,49 @@ const SELECTS = {
 
 export const COLLECTIONS = Object.keys(SELECTS);
 
-async function fetchCollection(key) {
+// ── Scale (user, 2026-10-16: smooth with 50 people at once) ──
+// Finished work older than this stays in the database, not in every browser:
+// a sign-in loads what is open plus the last HISTORY_DAYS of finished jobs,
+// and "Load older" fetches the rest when someone needs it. Measured on a
+// year of synthetic data: the office's load went from 25 MB to 3 MB.
+export const HISTORY_DAYS = 45;
+const since = () => new Date(Date.now() - HISTORY_DAYS * 864e5).toISOString();
+const RECENT = {
+  orders:       q => q.or(`status.neq.collected,updated_at.gte.${since()}`),
+  requests:     q => q.or(`status.eq.placed,updated_at.gte.${since()}`),
+  lensRequests: q => q.or(`status.in.(reserved,requested),updated_at.gte.${since()}`),
+};
+const OLDER = {
+  orders:       q => q.eq('status', 'collected').lt('updated_at', since()),
+  requests:     q => q.neq('status', 'placed').lt('updated_at', since()),
+  lensRequests: q => q.not('status', 'in', '(reserved,requested)').lt('updated_at', since()),
+};
+export const hasOlder = key => !!OLDER[key];
+
+async function fetchCollection(key, { older = false } = {}) {
   const [table, select, order, map] = SELECTS[key];
-  const { data, error } = await supabase.from(table).select(select)
-    .order(order.column, { ascending: order.asc });
+  let q = supabase.from(table).select(select);
+  const limit = older ? OLDER[key] : RECENT[key];
+  if (limit) q = limit(q);
+  const { data, error } = await q.order(order.column, { ascending: order.asc });
   if (error) throw new Error(`${table}: ${error.message}`);
   return data.map(map);
+}
+// The finished work older than the window, on request.
+export const fetchOlder = key => fetchCollection(key, { older: true });
+
+// Just these rows (by id), for a change somebody else made — about 1 KB for
+// an order, instead of every order every time. Missing ids are rows this
+// location can no longer see, or that were deleted.
+export async function fetchRows(key, ids) {
+  const [table, select, , map] = SELECTS[key];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase.from(table).select(select).in('id', ids.slice(i, i + 100));
+    if (error) throw new Error(`${table}: ${error.message}`);
+    out.push(...data.map(map));
+  }
+  return out;
 }
 
 // Before anyone signs in, for the sign-in screen (readable without a session).
@@ -313,8 +350,22 @@ const EVENT_PARENT = {
   lens_request_events: 'request_id',
 };
 
+// For each table, the collection it belongs to and the column naming the
+// row of that collection it changed. Anything not here reloads whole (small:
+// settings, the lens lists, branches).
+const TABLE_PARENT = {
+  orders: ['orders', 'id'], order_events: ['orders', 'order_id'],
+  stock_requests: ['requests', 'id'], stock_request_lines: ['requests', 'request_id'], stock_request_events: ['requests', 'request_id'],
+  lens_stock: ['lensStock', 'id'],
+  lens_requests: ['lensRequests', 'id'], lens_request_lines: ['lensRequests', 'request_id'], lens_request_events: ['lensRequests', 'request_id'],
+  claims: ['claims', 'id'], claim_items: ['claims', 'claim_id'], claim_prescriptions: ['claims', 'claim_id'],
+  outside_lens_orders: ['outsideOrders', 'id'],
+  damaged_reports: ['damaged', 'id'], damaged_lines: ['damaged', 'report_id'],
+};
+
 // Collapses the burst of rows a single action produces (parent + lines +
-// event) into one reload, and skips work while the tab is in the background.
+// event) into one refresh of just the rows it touched, and waits while the
+// tab is in the background — a screen nobody is looking at does no work.
 export function watch(onChange) {
   // Realtime applies the same row level security as a query, which means it
   // needs this branch's token. supabase-js normally hands it over on its own;
@@ -324,25 +375,41 @@ export function watch(onChange) {
     if (token) supabase.realtime.setAuth(token);
   });
 
-  let pending = new Set();
+  // full: collections to reload whole; ids: rows to refetch; gone: rows deleted.
+  let change = { full: new Set(), ids: new Map(), gone: new Map() };
   let notices = [];
   let timer = null;
+  const add = (map, key, id) => { if (!map.has(key)) map.set(key, new Set()); map.get(key).add(id); };
 
   const flush = () => {
     timer = null;
-    const keys = [...pending];
-    const news = notices;
-    pending = new Set();
+    if (document.hidden) return;              // picked up when the tab is shown again
+    const c = change, news = notices;
+    change = { full: new Set(), ids: new Map(), gone: new Map() };
     notices = [];
-    if (keys.length) onChange(keys, news);
+    // A long time in the background piles up: past a few hundred rows a
+    // whole reload is the cheaper way back.
+    for (const [k, s] of c.ids) if (s.size > 300) { c.full.add(k); c.ids.delete(k); }
+    if (c.full.size || c.ids.size || c.gone.size) onChange(c, news);
   };
+  const onVisible = () => { if (!document.hidden) flush(); };
+  document.addEventListener('visibilitychange', onVisible);
 
   const channel = supabase.channel('focp-live');
   for (const table of Object.keys(TABLE_COLLECTION)) {
     channel.on('postgres_changes', { event: '*', schema: 'public', table }, payload => {
-      pending.add(TABLE_COLLECTION[table]);
+      const parent = TABLE_PARENT[table];
+      if (!parent) change.full.add(TABLE_COLLECTION[table]);
+      else {
+        const [key, col] = parent;
+        const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
+        const id = row?.[col];
+        if (payload.eventType === 'DELETE' && col === 'id' && id) add(change.gone, key, id);
+        else if (id) add(change.ids, key, id);
+        else change.full.add(key);            // a deleted line names only itself: reload that list
+      }
       // Lens confirmation deducts stock in the same transaction as the event.
-      if (table === 'lens_request_events') pending.add('lensStock');
+      if (table === 'lens_request_events') change.full.add('lensStock');
 
       const mod = EVENT_MODULE[table];
       if (mod && payload.eventType === 'INSERT') {
@@ -360,5 +427,5 @@ export function watch(onChange) {
   }
   channel.subscribe();
 
-  return () => { clearTimeout(timer); supabase.removeChannel(channel); };
+  return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible); supabase.removeChannel(channel); };
 }

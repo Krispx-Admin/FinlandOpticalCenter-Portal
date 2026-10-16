@@ -1178,6 +1178,29 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-16  READY FOR 50 AT ONCE. Measured on a year of synthetic data
+             (15,000 orders, 90,000 events; rolled back): an office sign-in
+             pulled 25 MB in 15.3 s, and EVERY open screen redid that load
+             whenever anyone pressed a button.
+             1. schema-39 (rehearsed: same rows visible for 7 roles × 12
+                tables; applied, re-checked live): every policy's no-argument
+                helper wrapped as (select public.f()) — run once per query,
+                not per row. Office load 15.3 s → 1.8 s. + FK indexes.
+             2. Live changes refresh only the rows they touched (db.watch →
+                {full, ids, gone}; store.pullChange / pullRows): ~1 KB per
+                change instead of whole tables. Deleted child rows (no parent
+                id in the payload) fall back to reloading that one list.
+                The acting screen also refreshes just the orders it named.
+             3. Sign-in loads open work + the last 45 days of finished
+                orders / stock requests / lens requests (db.HISTORY_DAYS,
+                RECENT/OLDER filters): office 3 MB in 0.25 s. "Load older"
+                under Completed (Fitting Log), the finished stock-request
+                chips and the lens-request Sent/Declined/All chips fetches the
+                rest; it is kept through later reloads.
+             4. A tab in the background does no refreshing; it catches up in
+                one go when shown (more than 300 rows → one full reload).
+             Not changed: claims, damaged reports, lens stock still load whole
+             (small); Direct Insurance export reads the loaded claims.
  2026-10-16  DATA WIPED again (no backup), this time KEEPING MGM's lens stock:
              lenses set aside for unsent requests went back on the shelf
              first (10 items, 158 pcs left — 2 had been sent). Everything else

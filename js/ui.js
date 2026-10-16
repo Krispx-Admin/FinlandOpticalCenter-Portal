@@ -76,6 +76,12 @@ export const pill = (def, key, opts) => stepPill(def[key], opts);
 
 // A filter chip's count. Orange when some of it is waiting on whoever is
 // looking (the same orange as the sidebar badge); faded when it is nothing.
+// Under a list of finished work: only the last N days came with sign-in.
+export function olderHTML(days, loaded) {
+  return loaded ? '' : `<div class="list-older"><span>Showing what finished in the last ${days} days</span>
+    <button class="btn btn-ghost btn-sm" data-older>Load older</button></div>`;
+}
+
 export function chipCount(n, act = 0) {
   return `<span class="chip-n${n ? '' : ' zero'}${act ? ' act' : ''}"${act ? ` title="${act} need${act === 1 ? 's' : ''} your action"` : ''}>${n}</span>`;
 }

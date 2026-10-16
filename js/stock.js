@@ -1,7 +1,7 @@
 // ── Module 2: Stock Requests — branch composer + office fulfilment queue ──
 import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 const CHIPS = [
   { key: 'placed', label: 'To fulfil' },
@@ -419,7 +419,8 @@ export function stockView(me) {
         ${overseer ? `<select class="sel" id="s-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${ui.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
       </section>
       <section class="chips status-chips" id="s-chips">${chipsHTML()}</section>
-      <section class="list" id="s-list">${rowsHTML()}</section>`;
+      <section class="list" id="s-list">${rowsHTML()}</section>
+      <div id="s-older">${ui.chip !== 'placed' ? olderHTML(store.historyDays, store.olderLoaded('requests')) : ''}</div>`;
     wire();
     markSeen();
   }
@@ -428,6 +429,7 @@ export function stockView(me) {
     root.querySelector('#s-stats').innerHTML = statsHTML();
     root.querySelector('#s-chips').innerHTML = chipsHTML();
     root.querySelector('#s-list').innerHTML = rowsHTML();
+    root.querySelector('#s-older').innerHTML = ui.chip !== 'placed' ? olderHTML(store.historyDays, store.olderLoaded('requests')) : '';
     markSeen();
     const f = document.activeElement;
     if (!(drawer && f && drawer.el.contains(f) && f.matches('input,select,textarea'))) drawer?.update();
@@ -444,6 +446,7 @@ export function stockView(me) {
     root.addEventListener('click', e => {
       const chip = e.target.closest('[data-chip]');
       if (chip) { ui.chip = chip.dataset.chip; refreshLists(); return; }
+      if (e.target.closest('[data-older]')) { e.target.closest('[data-older]').disabled = true; store.loadOlder('requests'); return; }
       const pr = e.target.closest('[data-print]');
       if (pr) { e.stopPropagation(); printRequest(store.request(pr.dataset.print)); return; }
       const cp = e.target.closest('[data-complete]');

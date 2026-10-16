@@ -38,7 +38,31 @@ function notify(event) { subs.forEach(fn => fn(event)); }
 // A local write: the rows are already refreshed, so just tell the UI.
 function commit(event) { notify(event ? { ...event, remote: false } : null); }
 
-async function pull(keys) { Object.assign(state, await db.reload(keys)); linkLensRequests(); applyBranches(); }
+// Older finished rows a person asked for ("Load older"), kept through reloads.
+const older = {};
+const SORT = { orders: 'updatedAt', requests: 'createdAt', lensStock: 'updatedAt', lensRequests: 'createdAt', claims: 'createdAt', outsideOrders: 'createdAt', damaged: 'createdAt' };
+const sorted = (key, list) => (SORT[key] ? list.sort((a, b) => (b[SORT[key]] ?? 0) - (a[SORT[key]] ?? 0)) : list);
+function keepOlder(fresh) {
+  for (const [key, ids] of Object.entries(older)) {
+    if (!fresh[key]) continue;
+    const have = new Set(fresh[key].map(r => r.id));
+    fresh[key] = sorted(key, [...fresh[key], ...(state[key] ?? []).filter(r => ids.has(r.id) && !have.has(r.id))]);
+  }
+  return fresh;
+}
+async function pull(keys) { Object.assign(state, keepOlder(await db.reload(keys))); linkLensRequests(); applyBranches(); }
+// Put just these rows back (or take them out): what a change touched.
+async function pullRows(key, ids) {
+  const rows = await db.fetchRows(key, ids);
+  const touched = new Set(ids);
+  state[key] = sorted(key, [...rows, ...(state[key] ?? []).filter(r => !touched.has(r.id))]);
+}
+async function pullChange({ full, ids, gone }) {
+  if (full.size) Object.assign(state, keepOlder(await db.reload([...full])));
+  await Promise.all([...ids].filter(([k]) => !full.has(k) && state[k]).map(([k, s]) => pullRows(k, [...s])));
+  for (const [k, s] of gone) if (state[k]) state[k] = state[k].filter(r => !s.has(r.id));
+  linkLensRequests(); applyBranches();
+}
 
 // The branches came from the database: make them the portal's locations —
 // and the settings say who orders outside lenses.
@@ -80,7 +104,16 @@ async function run(keys, work, describe) {
   try {
     const out = await work();
     if (out === SKIP) return null;
-    await pull(keys);
+    // An action on named orders refreshes just those orders; the other
+    // collections it touched are small and reload whole.
+    let refs = [];
+    try { refs = (typeof describe === 'function' ? describe(out) : describe)?.refs ?? []; } catch { refs = []; }
+    if (keys.includes('orders') && refs.length) {
+      await Promise.all([pullRows('orders', refs), ...(keys.length > 1 ? [pull(keys.filter(k => k !== 'orders'))] : [])]);
+      linkLensRequests();
+    } else {
+      await pull(keys);
+    }
     const event = typeof describe === 'function' ? describe(out) : describe;
     commit(event);
     return out;
@@ -128,9 +161,10 @@ export const store = {
     applyBranches();
     loaded = true;
     unwatch?.();
-    unwatch = db.watch(async (keys, notices) => {
+    unwatch = db.watch(async (change, notices) => {
+      const keys = [...new Set([...change.full, ...change.ids.keys(), ...change.gone.keys()])];
       try {
-        await pull(keys);
+        await pullChange(change);
       } catch { return; } // a dropped refresh is not worth a popup
       // Our own writes come back over realtime as well. The local commit has
       // already announced those, so narrate only what other branches did.
@@ -145,7 +179,24 @@ export const store = {
     });
   },
 
-  stop() { unwatch?.(); unwatch = null; loaded = false; },
+  stop() { unwatch?.(); unwatch = null; loaded = false; for (const k of Object.keys(older)) delete older[k]; },
+
+  // Finished work older than the window (db.HISTORY_DAYS), fetched on request.
+  get historyDays() { return db.HISTORY_DAYS; },
+  olderLoaded(key) { return !!older[key]; },
+  async loadOlder(key) {
+    if (older[key] || !db.hasOlder(key)) return;
+    try {
+      const rows = await db.fetchOlder(key);
+      older[key] = new Set(rows.map(r => r.id));
+      const have = new Set(state[key].map(r => r.id));
+      state[key] = sorted(key, [...state[key], ...rows.filter(r => !have.has(r.id))]);
+      linkLensRequests();
+      notify({ module: MODULE_OF[key] });
+    } catch (e) {
+      toast({ title: 'Could not load older records', sub: explain(e), tone: 'stock' });
+    }
+  },
 
   // ── Queries (already permission-scoped) ──
   // RLS has filtered these server-side too; the predicates stay so the

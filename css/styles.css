@@ -512,6 +512,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .dm-row input[type=number] { text-align: center; }
 .mono { font-family: Consolas, ui-monospace, monospace; }
 .dm-add { align-self: flex-start; }
+/* under a list of finished work: the rest is a click away */
+.list-older { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 14px 0 4px; font-size: 12.5px; color: var(--ink-3); }
 /* Complete a stock request: tick what was sent */
 .form .cm-all { padding: 0 0 4px 14px; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; }
 .cm-lines { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }

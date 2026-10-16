@@ -5,7 +5,7 @@ import {
   isBenchClosed, benchNote,
 } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount } from './ui.js';
+import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount, olderHTML } from './ui.js';
 
 const REQ_CHIPS = [
   { key: 'requested', label: 'Lenses to send' },
@@ -271,7 +271,8 @@ export function lensView(me) {
         const act = ui.tab === 'queue' && isOwner && !isAdmin && (d.key === 'requested' || d.key === 'all') ? c.requested : 0;
         return `${d.key === 'all' ? '<span class="chip-sep"></span>' : ''}<button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">${esc(d.label)}${chipCount(c[d.key], act)}</button>`;
       }).join('')}</section>
-      <section class="list" id="l-list">${reqRowsHTML()}</section>`;
+      <section class="list" id="l-list">${reqRowsHTML()}</section>
+      ${['sent', 'declined', 'all'].includes(ui.chip) ? olderHTML(store.historyDays, store.olderLoaded('lensRequests')) : ''}`;
   }
 
   // ── owner: shelf editor ──
@@ -753,6 +754,7 @@ export function lensView(me) {
       if (e.target.closest('[data-clear-filters]')) { ui.type = ui.index = ui.coating = 'all'; ui.inStock = true; refreshBody(); return; }
       const chip = e.target.closest('[data-chip]');
       if (chip) { ui.chip = chip.dataset.chip; refreshBody(); return; }
+      if (e.target.closest('[data-older]')) { e.target.closest('[data-older]').disabled = true; store.loadOlder('lensRequests'); return; }
 
       const add = e.target.closest('[data-add]');
       if (add) { bump(add.dataset.add, 1); refreshBody(); return; }
