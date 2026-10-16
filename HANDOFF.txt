@@ -793,6 +793,14 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-39-scale.sql        every RLS helper wrapped (select f()) — once per
+                             query, not per row; FK indexes. Applied 2026-10-16.
+  schema-38-stock-partial.sql  stock_request_lines.done_at;
+                             complete_stock_lines(). Applied 2026-10-15.
+  schema-37-admins-damaged.sql  role 'manager' (view-only admin),
+                             branches.can_export_insurance, damaged_reports +
+                             damaged_lines, create_damaged_report(); OFC named
+                             Omar. Applied 2026-10-15.
   schema-36-collect-at.sql   orders.collect_code (null = where sold),
                              frame_at, to_code, stops[]; trigger
                              orders_route_gate keeps them right on every step
