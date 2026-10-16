@@ -587,7 +587,7 @@ export function itemCounts(items) {
 export function canSeeOrder(o, code) {
   return seesAll(loc(code)?.role) || onRoute(o, code)
     || o.lensRequest?.holder === code   // the stock holder, for the whole job (user, 2026-10-15)
-    || (!!o.outsideLens && code === outsideHandler() && !o.outsideLens.receivedAt);   // the handler, until the lenses arrive
+    || (!!o.outsideLens && code === outsideHandler());   // the handler, for the whole job (user, 2026-10-16)
 }
 // The handler has sent the outside lenses and they have not arrived yet: the
 // order sits under its "In transit" chip (user, 2026-10-14).
@@ -603,6 +603,8 @@ export function handlerStage(o, code) {
 export const outsideInTransit = (o, code) => handlerStage(o, code) === 'to_fitter';
 // Another branch's order that uses this branch's stock lenses.
 export const onMyStock = (o, code) => o.lensRequest?.holder === code && o.origin !== code;
+// Another branch's order whose outside lenses this location (the handler) supplies.
+export const onMyOutside = (o, code) => !!o.outsideLens && code === outsideHandler() && o.origin !== code;
 
 // An outside order whose lenses travel from the handler has two roads, and a
 // tag for each (user, 2026-10-14): where the frame is, and where the lenses are.

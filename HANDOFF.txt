@@ -1186,6 +1186,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-16  Avenues (the outside-lens handler) keeps every other branch's
+             outside-lens order in its Fitting Log for the whole job (was:
+             until the lenses arrived; canSeeOrder). New tab "Outside Lens
+             Orders" — only the handler sees it (onMyOutside) — lists them all,
+             like a stock holder's "Stock Lens" tab. Once the lenses have
+             arrived, an order whose frame is not Avenues' sits only there
+             (and Completed), not in the frame tabs. No DB change.
  2026-10-16  READY FOR 50 AT ONCE. Measured on a year of synthetic data
              (15,000 orders, 90,000 events; rolled back): an office sign-in
              pulled 25 MB in 15.3 s, and EVERY open screen redid that load
