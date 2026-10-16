@@ -487,13 +487,14 @@ export function fittingView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="dw-body">
+        ${viewOnly ? '' : toolsHTML(o)}
         <div class="dw-status-row">${twoRoads(o) ? `${tagsHTML(o, false, true)}` : stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
         ${journey(o, true)}
         <div class="kv">
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
           <div><span>Fitting centre</span><b>${isOutside(o) ? `<span class="loc-chip">OUT</span> ${esc(o.outside)} <span class="muted">· outside, 3rd party</span>`
             : o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}${isSelfFit(o) ? ' <span class="muted">· in-house</span>' : ''}` : '<span class="muted">Not assigned yet</span>'}</b></div>
-          <div><span>Collect at</span><b>${locChip(collectOf(o))} ${esc(locName(collectOf(o)))}${collectOf(o) === o.origin ? ' <span class="muted">· where it was sold</span>' : ''}
+          <div class="kv-wide"><span>Collect at</span><b>${locChip(collectOf(o))} ${esc(locName(collectOf(o)))}${collectOf(o) === o.origin ? ' <span class="muted">· where it was sold</span>' : ''}
             ${canChangeCollect(o, me.code) && !viewOnly ? `<button class="btn btn-ghost btn-sm kv-btn" data-collect="${o.id}">${icons.history} Change</button>` : ''}</b></div>
           ${o.note ? `<div class="kv-wide"><span>Note</span><b>${esc(o.note)}</b></div>` : ''}
         </div>
@@ -507,7 +508,6 @@ export function fittingView(me) {
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
         </div>
-        ${viewOnly ? '' : toolsHTML(o)}
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
           ${[...o.timeline].reverse().map((t, i) => `

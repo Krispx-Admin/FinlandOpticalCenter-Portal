@@ -1196,6 +1196,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Order panel (Fitting Log drawer): Edit / Undo last step / Delete
+             moved from under the step buttons to a bar at the TOP of the
+             panel, full-size buttons sharing the width (Delete red-outlined).
+             "Collect at" box spans the full width (kv-wide), Change button at
+             the right end; "· where it was sold" no longer in small capitals
+             (.kv b .muted).
  2026-10-17  BOT CHECK ON (step 3 done by the user in Supabase → Attack
              Protection → CAPTCHA, Turnstile). Verified: a sign-in with no token
              is refused ("captcha_failed"). A good token could not be produced

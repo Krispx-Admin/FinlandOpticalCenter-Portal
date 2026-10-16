@@ -796,8 +796,12 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .dw-status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .dw-when { color: var(--ink-3); font-size: 12px; }
 .dw-actions { display: flex; gap: 10px; margin: 16px 0 6px; flex-wrap: wrap; align-items: center; }
-/* fixing mistakes: Edit / Undo last step / Delete, quiet under the step buttons */
-.dw-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; padding-top: 12px; border-top: 1px dashed var(--border); }
+/* fixing mistakes: Edit / Undo last step / Delete, a bar at the top of the
+   order so they are easy to find (user, 2026-10-17) */
+.dw-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.dw-tools .btn { flex: 1 1 0; justify-content: center; min-width: 120px; font-size: 13px; padding: 8px 12px; }
+.dw-tools .btn-danger-text { border-color: color-mix(in srgb, var(--st-red) 45%, var(--border)); }
+.dw-tools .btn-danger-text:hover { border-color: var(--st-red); background: color-mix(in srgb, var(--st-red) 8%, var(--surface)); }
 .pad { padding: 30px; color: var(--ink-3); }
 
 .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-top: 14px; }
@@ -805,6 +809,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .kv-wide { grid-column: 1 / -1; }
 .kv span { font-size: 11px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .kv b { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.kv b .muted { font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.kv b .kv-btn { margin-left: auto; }
 
 /* ── Timeline ── */
 .tl-h { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); margin: 22px 0 12px; text-transform: uppercase; letter-spacing: .06em; }
