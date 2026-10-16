@@ -210,7 +210,7 @@ export const FIT_STATUS = {
   pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lens received', actor: 'origin', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
   to_fitter: { label: 'In transit',           color: 'blue',   action: 'Frame received', actor: 'fitter', done: 'Frame received at fitting centre' },
-  at_fitter: { label: 'Waiting to be Fitted', color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
+  at_fitter: { label: 'In Fitting',           color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
   ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'here',   done: 'Handed to driver — returning to branch' },
   returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'to',     done: 'Delivered back at origin branch' },
   delivered: { label: 'Ready for collection', color: 'green',  action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
@@ -224,7 +224,7 @@ const SELF_STATUS = {
   // bench is waiting on the lenses, not on anyone choosing where to send it.
   pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens received', actor: 'fitter', done: 'Lenses delivered at the branch' },
   lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
-  at_fitter: { label: 'In fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
+  at_fitter: { label: 'In Fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
   delivered: { label: 'Ready for collection', color: 'green', action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',          color: 'done',   action: null,            actor: null,     done: null },
 };

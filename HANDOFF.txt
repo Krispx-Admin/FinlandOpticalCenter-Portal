@@ -189,7 +189,7 @@ LONG ROAD (FIT_FLOW):
   pending    Waiting for Lenses    slate       Lens received      origin
   lenses_in  Lenses Delivered      cyan        Send to fitter     origin
   to_fitter  In transit to X       blue        Frame received     fitter
-  at_fitter  Waiting to be Fitted  purple      Mark ready         fitter
+  at_fitter  In Fitting            purple      Mark ready         fitter
   ready      Ready                 green       Send to branch     fitter
   returning  Returning to X        teal        Frame received     origin
   delivered  Ready for collection  green       Handed to customer origin
@@ -1178,6 +1178,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-16  The tag for a frame at the fitter reads "In Fitting" (was "Waiting
+             to be Fitted"; in-house jobs "In fitting") — the same words as
+             its tab.
  2026-10-16  DATA WIPED again at the user's request (no backup): orders + events,
              outside lens orders, stock requests, lens stock + requests,
              claims + Direct Insurance, damaged stock reports. Numbering
