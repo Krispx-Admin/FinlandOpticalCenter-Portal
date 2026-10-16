@@ -1178,6 +1178,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-16  DATA WIPED again (no backup), this time KEEPING MGM's lens stock:
+             lenses set aside for unsent requests went back on the shelf
+             first (10 items, 158 pcs left — 2 had been sent). Everything else
+             as the previous wipe; numbering restarted.
  2026-10-16  The tag for a frame at the fitter reads "In Fitting" (was "Waiting
              to be Fitted"; in-house jobs "In fitting") — the same words as
              its tab.
