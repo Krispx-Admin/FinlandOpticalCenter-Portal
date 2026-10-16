@@ -7,7 +7,7 @@ import {
   outsideLensState, canSendOutside, canReceiveOutside, outsideBlocked, outsideCanChange, canCutOwnLenses, awaitingOutside,
   isBenchClosed, isLabOff, labMode, LAB_MODES, benchNote,
   canEditOrder, canEditOutsideRx, canDeleteOrder, canUndoOrder, undoTarget,
-  collectOf, frameLoc, canChangeCollect, LOCATIONS,
+  collectOf, frameLoc, canChangeCollect, LOCATIONS, LENS_HOLDERS, FIRST_SHELF,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
@@ -755,7 +755,40 @@ export function fittingView(me) {
 
   // ── new order modal — bill number only ──
   function newOrderModal() {
-    const layer = openLayer('modal', () => `
+    // Lens stock (user, 2026-10-17): order the lenses from a shelf right here —
+    // the same request the Lens Stock page makes. Not from your own shelf.
+    const shelves = LENS_HOLDERS.filter(h => h.code !== me.code && h.active !== false)
+      .sort((a, b) => (b.code === FIRST_SHELF) - (a.code === FIRST_SHELF));   // Muscat Grand Mall first, as on Lens Stock
+    const ls = { holder: shelves[0]?.code ?? null, lines: [{ itemId: '', qty: 1 }] };
+    const lensLabel = i => `${i.type} ${i.index}${i.coating && i.coating !== 'None' ? ` ${i.coating}` : ''} · SPH ${fmtPwr(i.sph)}${i.cyl ? ` CYL ${fmtPwr(i.cyl)}` : ''}`;
+    const shelfItems = () => store.state.lensStock.filter(i => i.holder === ls.holder && i.qty > 0)
+      .sort((a, b) => lensLabel(a).localeCompare(lensLabel(b), undefined, { numeric: true }));
+    const lsLinesHTML = () => {
+      const items = shelfItems();
+      if (!items.length) return `<p class="muted sm">Nothing on ${esc(locName(ls.holder))}'s shelf right now.</p>`;
+      return ls.lines.map((l, n) => {
+        const pick = store.lensItem(l.itemId);
+        return `
+        <div class="ls-row">
+          <select data-ls-item="${n}" aria-label="Lens"><option value="">Choose a lens…</option>${items.map(i =>
+            `<option value="${i.id}" ${i.id === l.itemId ? 'selected' : ''}>${esc(lensLabel(i))} — ${i.qty} in stock</option>`).join('')}</select>
+          <input type="number" min="1" max="${pick?.qty ?? 99}" value="${esc(l.qty)}" data-ls-qty="${n}" aria-label="Quantity">
+          <button type="button" class="icon-btn" data-ls-del="${n}" ${ls.lines.length === 1 ? 'disabled' : ''} title="Remove">${icons.x}</button>
+        </div>`;
+      }).join('');
+    };
+    const lsWayHTML = () => {
+      const shut = isBenchClosed(ls.holder);
+      const how = shut ? 'receive_lens' : (layer?.el.querySelector('[name=lsHow]:checked')?.value ?? 'send_frames');
+      return Object.entries(FULFILMENT).map(([k, f]) => `
+        <label class="fulfil-opt ${how === k ? 'on' : ''} ${k === 'send_frames' && shut ? 'is-off' : ''}">
+          <input type="radio" name="lsHow" value="${k}" ${how === k ? 'checked' : ''} ${k === 'send_frames' && shut ? 'disabled' : ''}>
+          <b>${esc(f.label)}</b>
+          <span>${esc(k === 'send_frames' && shut ? benchNote(ls.holder) : !canCutOwnLenses(me.role) && f.subShop ? f.subShop : f.sub)}</span>
+        </label>`).join('');
+    };
+    let layer = null;
+    layer = openLayer('modal', () => `
       <div class="dw-head">
         <div><div class="dw-kicker">New fitting order</div><h2>Log a frame for lens fitting</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
@@ -766,10 +799,22 @@ export function fittingView(me) {
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <label>Customer collects at <select name="collect">${collectOptions(me.code)}</select></label>
-        <label class="ol-switch">
-          <span class="sw"><input type="checkbox" name="outside" id="nf-outside"><i></i></span>
-          <span><b>Outside lenses</b> <span class="muted">· other brands</span></span>
-        </label>
+        <div class="lens-src" role="radiogroup" aria-label="Lenses">
+          <span class="lens-src-l">Lenses</span>
+          <div class="chips status-chips">
+            <label class="chip on"><input type="radio" name="lenses" value="none" checked>Regular</label>
+            ${shelves.length ? '<label class="chip"><input type="radio" name="lenses" value="stock">Lens stock</label>' : ''}
+            <label class="chip"><input type="radio" name="lenses" value="outside">Outside lenses</label>
+          </div>
+        </div>
+        ${shelves.length ? `
+        <div class="fieldset ls-fields" id="nf-ls" hidden>
+          <div class="fs-head"><span>Lens stock</span>${shelves.length === 1 ? `<span class="muted sm">from ${esc(shelves[0].name)}</span>` : ''}</div>
+          ${shelves.length > 1 ? `<label>Shelf <select name="lsHolder">${shelves.map(h => `<option value="${h.code}">${esc(h.name)}</option>`).join('')}</select></label>` : ''}
+          <div class="ls-lines" id="nf-ls-lines">${lsLinesHTML()}</div>
+          <button type="button" class="btn btn-ghost btn-sm dm-add" data-ls-add>${icons.plus} Add lens</button>
+          <div class="fulfil" id="nf-ls-way">${lsWayHTML()}</div>
+        </div>` : ''}
         <div class="fieldset ol-fields" id="nf-ol" hidden>
           <div class="fs-head"><span>Prescription</span></div>
           <table class="ol-rx-in">
@@ -789,9 +834,44 @@ export function fittingView(me) {
       </form>
     `);
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
-    // The outside-lens fields open under the switch.
-    const outsideBox = layer.el.querySelector('#nf-outside');
-    outsideBox.addEventListener('change', () => { layer.el.querySelector('#nf-ol').hidden = !outsideBox.checked; });
+    // Regular / Lens stock / Outside lenses: each opens its own fields.
+    const lsBox = () => layer.el.querySelector('#nf-ls-lines');
+    layer.el.addEventListener('change', e => {
+      const src = e.target.closest('[name=lenses]');
+      if (src) {
+        layer.el.querySelectorAll('.lens-src .chip').forEach(c => c.classList.toggle('on', c.contains(src)));
+        layer.el.querySelector('#nf-ol').hidden = src.value !== 'outside';
+        const lsf = layer.el.querySelector('#nf-ls');
+        if (lsf) lsf.hidden = src.value !== 'stock';
+        return;
+      }
+      if (e.target.name === 'lsHolder') {
+        ls.holder = e.target.value; ls.lines = [{ itemId: '', qty: 1 }];
+        lsBox().innerHTML = lsLinesHTML();
+        layer.el.querySelector('#nf-ls-way').innerHTML = lsWayHTML();
+        return;
+      }
+      if (e.target.name === 'lsHow') {
+        layer.el.querySelectorAll('#nf-ls-way .fulfil-opt').forEach(o => o.classList.toggle('on', o.contains(e.target)));
+        return;
+      }
+      const it = e.target.closest('[data-ls-item]');
+      if (it) {
+        const l = ls.lines[+it.dataset.lsItem]; l.itemId = it.value;
+        const max = store.lensItem(it.value)?.qty ?? 99;
+        l.qty = Math.min(Math.max(1, +l.qty || 1), max);
+        lsBox().innerHTML = lsLinesHTML();
+      }
+    });
+    layer.el.addEventListener('input', e => {
+      const q = e.target.closest('[data-ls-qty]');
+      if (q) ls.lines[+q.dataset.lsQty].qty = q.value;
+    });
+    layer.el.addEventListener('click', e => {
+      if (e.target.closest('[data-ls-add]')) { ls.lines.push({ itemId: '', qty: 1 }); lsBox().innerHTML = lsLinesHTML(); return; }
+      const d = e.target.closest('[data-ls-del]');
+      if (d) { ls.lines.splice(+d.dataset.lsDel, 1); lsBox().innerHTML = lsLinesHTML(); }
+    });
     wireWay(layer.el);
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
@@ -812,7 +892,22 @@ export function fittingView(me) {
       const was = go.innerHTML;
       go.textContent = 'Saving…';
       let o;
-      if (f.get('outside')) {
+      const src = String(f.get('lenses') || 'none');
+      if (src === 'stock') {
+        // One line per lens, the same lens twice adds up; never more than the shelf holds.
+        const byItem = new Map();
+        for (const l of ls.lines) {
+          const i = store.lensItem(l.itemId);
+          if (i) byItem.set(i.id, Math.min(i.qty, (byItem.get(i.id) ?? 0) + Math.max(1, parseInt(l.qty, 10) || 1)));
+        }
+        const lines = [...byItem].map(([id, qty]) => { const i = store.lensItem(id); return { itemId: i.id, type: i.type, index: i.index, coating: i.coating, sph: i.sph, cyl: i.cyl, qty }; });
+        if (!lines.length) { toast({ title: 'Choose the lenses', sub: `Pick at least one lens from ${locName(ls.holder)}'s shelf.`, tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
+        const how = String(f.get('lsHow') || (isBenchClosed(ls.holder) ? 'receive_lens' : 'send_frames'));
+        const r = await store.createLensRequest({ lines, billNo: ref, customer, fulfilment: how, holder: ls.holder }, me.code);
+        o = r?.orderId ? store.order(r.orderId) : null;
+        if (o && collect !== me.code) await store.setCollect(o.id, collect, me.code);
+        if (r && !o) { layer.close(); return; }
+      } else if (src === 'outside') {
         const val = k => String(f.get(k) ?? '').trim();
         const rx = Object.fromEntries(['r', 'l'].map(eye => [eye, Object.fromEntries(['sph', 'cyl', 'axis', 'add'].map(k => [k, val(`${eye}_${k}`)]))]));
         const lensType = val('lensType');
@@ -828,9 +923,10 @@ export function fittingView(me) {
       layer.close();
       toast({
         title: `${o.ref} logged`,
-        sub: me.role === 'fitting'
-          ? 'Use “Send to fitter” when the lenses arrive'
-          : 'Use “Send to fitter” when it leaves your branch',
+        sub: src === 'stock' ? `Lenses requested from ${locName(ls.holder)}`
+          : me.role === 'fitting'
+            ? 'Use “Send to fitter” when the lenses arrive'
+            : 'Use “Send to fitter” when it leaves your branch',
         tone: 'info',
       });
     });

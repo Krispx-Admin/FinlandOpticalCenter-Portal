@@ -1186,6 +1186,18 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Sign-in page: the sign-in block sits 30px higher (.lp-inner padding
+             30px top / 54px bottom).
+ 2026-10-17  Lens Stock shelf tabs: a closed tab stops 1px above the panel's
+             top line with no bottom border, so at any browser zoom it never
+             runs over the line; only the open tab dips in (white bottom).
+ 2026-10-17  New fitting order: "Lenses — Regular / Lens stock / Outside
+             lenses" (replaces the Outside lenses switch). Lens stock picks a
+             shelf (Muscat Grand Mall first; not your own), one or more
+             lenses with quantities (never more than in stock; the same lens
+             twice adds up), and Send the frame / Receive the lenses — then
+             makes the same create_lens_request as the Lens Stock page, and
+             sets Collect at if another branch was chosen.
  2026-10-17  Sidebar: on a short screen the tab list scrolls inside the sidebar
              and the foot (Live · synced, who is signed in, Sign out) stays
              in view (.side-nav overflow-y auto; .shell grid row minmax(0,1fr)).

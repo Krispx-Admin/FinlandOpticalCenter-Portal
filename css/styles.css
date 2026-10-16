@@ -201,8 +201,10 @@ svg { width: 18px; height: 18px; flex: none; }
 .login-mark img { width: min(820px, 120vh); opacity: .045; transform: rotate(-30deg); }
 
 .login-panel { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: flex; }
+/* The sign-in block sits 30px above centre (user, 2026-10-17): 30px moved
+   from the top padding to the bottom, so the box keeps its size. */
 .lp-inner {
-  width: min(1060px, 100%); margin: auto; padding: 60px 28px 24px;
+  width: min(1060px, 100%); margin: auto; padding: 30px 28px 54px;
   animation: fadeUp .45s ease both; display: flex; flex-direction: column;
 }
 .lp-head { text-align: center; margin-bottom: 12px; }
@@ -468,6 +470,15 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .ol-switch, .form .ol-switch { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
 .ol-switch b { font-weight: 650; }
 .ol-fields { display: flex; flex-direction: column; gap: 10px; }
+/* New fitting order: where the lenses come from */
+.lens-src { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lens-src-l { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.form .lens-src .chip { flex-direction: row; align-items: center; cursor: pointer; }
+.lens-src .chip input { position: absolute; opacity: 0; pointer-events: none; }
+.ls-fields { display: flex; flex-direction: column; gap: 10px; }
+.ls-lines { display: flex; flex-direction: column; gap: 8px; }
+.ls-row { display: grid; grid-template-columns: 1fr 76px 32px; gap: 8px; align-items: center; }
+.ls-row input[type=number] { text-align: center; }
 .ol-rx-in { border-collapse: separate; border-spacing: 6px 4px; margin: 0 -6px; }
 .ol-rx-in th { font-size: 11px; font-weight: 700; color: var(--ink-3); text-align: center; }
 .ol-rx-in tbody th { color: var(--brand); width: 24px; }
@@ -1082,11 +1093,14 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   display: flex; align-items: flex-end; gap: 6px; padding: 0; margin: 4px 0 -1px;
   overflow-x: auto; scrollbar-width: thin; position: relative; z-index: 1;
 }
+/* A closed tab stops just above the panel's top line (no bottom border, 1px
+   clear), so at any zoom it never runs over it; only the open tab dips into
+   the panel and its white bottom hides the line (user, 2026-10-17). */
 .shelf-tab {
   flex: 0 0 auto; min-width: 176px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  padding: 9px 16px 10px; margin-bottom: 0; position: relative; cursor: pointer; text-align: left;
+  padding: 9px 16px 10px; margin-bottom: 1px; position: relative; cursor: pointer; text-align: left;
   font: inherit; color: var(--ink-2); background: #e9edf3;
-  border: 1px solid var(--border); border-radius: 12px 12px 0 0;
+  border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0;
   transition: background var(--speed), color var(--speed), padding var(--speed);
 }
 .shelf-tab b { font-size: 13px; font-weight: 650; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -1099,7 +1113,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
    square halo around the open tab's rounded top */
 .shelf-tab.on {
   min-width: 220px; padding: 15px 20px 16px; background: var(--surface); color: var(--ink);
-  border-bottom-color: var(--surface);
+  margin-bottom: 0; border-bottom: 1px solid var(--surface); z-index: 1;
 }
 .shelf-tab.on b { font-size: 15.5px; font-weight: 700; color: var(--brand-ink); }
 .shelf-tab.on span { color: var(--brand); font-weight: 600; }
