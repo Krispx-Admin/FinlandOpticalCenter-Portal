@@ -793,6 +793,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              send/receive_outside_lenses, change(…, dest),
                              open_fitter(); gate: no cut before received.
                              APPLIED 2026-10-13 by Claude.
+  schema-43-security.sql     anon: branches + disabled_tabs/schedule_view
+                             only; functions closed to PUBLIC; default
+                             privileges closed. Applied 2026-10-17.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1193,6 +1196,27 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  SECURITY HARDENING. Audit first: as an outsider with only the
+             public key, every data table read 0 rows and every write /
+             admin call was refused — RLS already held. Then:
+             1. schema-43 (rehearsed: same rows for 8 roles, branch writes +
+                triggers + RPCs fine, anon refused; applied; outsider probe
+                re-run live): anon keeps ONLY select on branches and execute
+                on disabled_tabs() + schedule_view(); every other table
+                privilege and function (Postgres' default EXECUTE to PUBLIC)
+                revoked from anon/public, explicitly granted to authenticated;
+                default privileges closed for new objects; search_path fixed
+                on the 6 flagged functions.
+             2. _headers (Netlify): HSTS, nosniff, X-Frame-Options SAMEORIGIN,
+                Referrer-Policy, Permissions-Policy on everything; a strict
+                Content-Security-Policy on the portal page (scripts: self +
+                cdn.jsdelivr.net; connect: this Supabase project only; no
+                plugins; no framing by other sites). Tested locally under the
+                exact header: both sign-in layouts load, 0 violations.
+                scheduler.html deliberately has no CSP (not to be changed).
+             Still open (needs the user): sign-in codes are 6 digits — see
+             the security notes in section 9 / the chat for CAPTCHA or longer
+             codes.
  2026-10-17  Lens stock in New fitting order: a lens holder (MGM) can use its
              OWN shelf ("Your shelf — …", listed first) — schema-42
              use_own_lens_stock takes the lenses off at once and opens the

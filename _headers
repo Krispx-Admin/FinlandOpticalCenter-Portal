@@ -1,0 +1,27 @@
+# Security headers, served by Netlify (user, 2026-10-17: make the site as hard
+# to breach as possible). Everything here is standard hardening:
+#   HSTS            browsers only ever use HTTPS for this site
+#   nosniff         files are only treated as what they say they are
+#   frame options   other sites cannot show the portal inside a frame
+#                   (clickjacking); the portal may frame its own schedule page
+#   referrer        other sites never see the portal's internal addresses
+#   permissions     no camera, microphone, location or payment access
+# and, for the portal page itself, a Content-Security-Policy: scripts only from
+# this site and the CDN the app loads its libraries from (jsdelivr: Supabase,
+# SheetJS), data only to this project's Supabase, no plugins, no other site
+# allowed to frame it. Inline styles stay allowed (the app's templates use
+# style=""). scheduler.html is left without a CSP: it is a separate bundled app
+# that is not to be changed.
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+
+/
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://vwwiyqmhljzsnyziouqz.supabase.co wss://vwwiyqmhljzsnyziouqz.supabase.co https://cdn.jsdelivr.net; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+
+/index.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://vwwiyqmhljzsnyziouqz.supabase.co wss://vwwiyqmhljzsnyziouqz.supabase.co https://cdn.jsdelivr.net; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
