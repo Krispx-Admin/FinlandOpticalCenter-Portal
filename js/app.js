@@ -36,6 +36,94 @@ function refreshPublicOff() {
   }).catch(() => { /* keep what we had */ });
 }
 
+// ── Sign-in layout (TRIAL, user 2026-10-17) ──
+// The classic layout (every location on show in its column) stays the
+// default. "Try the new layout" switches this device to a directory built for
+// 30+ locations — search, filter tabs, compact cards, "continue as" the last
+// location used here — and back again. Kept in localStorage per device.
+const LAYOUT_KEY = 'focp.loginLayout';
+const LAST_KEY = 'focp.lastLocation';
+const store_ = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+                 set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } } };
+const newLayout = () => store_.get(LAYOUT_KEY) === 'new';
+const LP2_GROUPS = [
+  { key: 'office', label: 'Office', roles: ['admin', 'scheduler', 'manager'] },
+  { key: 'retail', label: 'Retail', roles: ['retail'] },
+  { key: 'fitting', label: 'Fitting centres', roles: ['fitting'] },
+  { key: 'clinic', label: 'Clinics', roles: ['clinic'] },
+];
+
+function directoryHTML() {
+  const open = LOCATIONS.filter(l => l.active !== false && LP2_GROUPS.some(g => g.roles.includes(l.role)));
+  const last = loc(store_.get(LAST_KEY));
+  return `
+    <header class="lp-head">
+      <h2>Sign in</h2>
+      <p class="lp-sub">Choose your location.</p>
+    </header>
+    ${last && last.active !== false ? `<button class="lp2-last" data-loc="${last.code}">
+      <span class="loc-code role-${last.role}">${last.code}</span><span>Continue as <b>${esc(last.name)}</b></span>${icons.arrowRight}</button>` : ''}
+    <div class="lp2-bar">
+      <div class="searchbox lp2-search">${icons.search}<input id="lp2-q" placeholder="Find your location — name or code" autocomplete="off" spellcheck="false"></div>
+      <div class="chips status-chips lp2-tabs" id="lp2-tabs">
+        <button class="chip on" data-grp="all">All <span class="chip-n">${open.length}</span></button>
+        ${LP2_GROUPS.map(g => `<button class="chip" data-grp="${g.key}">${g.label} <span class="chip-n">${open.filter(l => g.roles.includes(l.role)).length}</span></button>`).join('')}
+      </div>
+    </div>
+    <div class="lp2-list" id="lp2-list">
+      ${LP2_GROUPS.map(g => {
+        // The office row reads Omar, Ghiath, then the view-only admins.
+        const list = open.filter(l => g.roles.includes(l.role)).sort((x, y) => g.roles.indexOf(x.role) - g.roles.indexOf(y.role));
+        return list.length ? `
+        <section class="lp2-sec" data-sec="${g.key}">
+          <h3>${g.label}</h3>
+          <div class="lp2-grid">${list.map(l => `
+            <button class="lp2-card" data-loc="${l.code}" data-find="${esc(`${l.code} ${l.name}`.toLowerCase())}">
+              <span class="loc-code role-${l.role}">${l.code}</span>
+              <span class="lp2-name">${esc(l.name)}</span>
+            </button>`).join('')}</div>
+        </section>` : '';
+      }).join('')}
+      <p class="lp2-none" id="lp2-none" hidden>No location matches that.</p>
+    </div>`;
+}
+
+function wireDirectory() {
+  const q = app.querySelector('#lp2-q');
+  let grp = 'all';
+  const apply = () => {
+    const term = q.value.trim().toLowerCase();
+    let shown = [];
+    app.querySelectorAll('.lp2-sec').forEach(sec => {
+      const inGrp = grp === 'all' || sec.dataset.sec === grp;
+      let any = false;
+      sec.querySelectorAll('.lp2-card').forEach(c => {
+        const ok = inGrp && (!term || c.dataset.find.includes(term));
+        c.hidden = !ok;
+        if (ok) { any = true; shown.push(c); }
+      });
+      sec.hidden = !any;
+    });
+    app.querySelector('#lp2-none').hidden = shown.length > 0;
+    return shown;
+  };
+  q.addEventListener('input', apply);
+  q.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const shown = apply();
+    if (shown.length === 1) showCodeStep(shown[0].dataset.loc);
+  });
+  app.querySelector('#lp2-tabs').addEventListener('click', e => {
+    const b = e.target.closest('[data-grp]');
+    if (!b) return;
+    grp = b.dataset.grp;
+    app.querySelectorAll('#lp2-tabs .chip').forEach(c => c.classList.toggle('on', c === b));
+    apply();
+  });
+  // Typing anywhere on the page goes to the search.
+  if (window.matchMedia('(pointer: fine)').matches) q.focus();
+}
+
 function renderLogin(preselect = null) {
   teardownShell();
   refreshPublicOff();
@@ -64,7 +152,8 @@ function renderLogin(preselect = null) {
     ${viewScheduleHTML()}
     <main class="login-panel">
       <div class="lp-inner">
-        <section class="lp-step" id="step-pick">
+        <section class="lp-step ${newLayout() ? 'lp2' : ''}" id="step-pick">
+          ${newLayout() ? directoryHTML() : `
           <header class="lp-head">
             <h2>Sign in</h2>
             <p class="lp-sub">Choose your location.</p>
@@ -73,13 +162,19 @@ function renderLogin(preselect = null) {
           <div class="lp-cols">
             ${columns.map(c => `
               <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
-          </div>
+          </div>`}
         </section>
 
         <section class="lp-step" id="step-code" hidden></section>
       </div>
     </main>
+    <button class="lp-layout" id="lp-layout">${newLayout() ? 'Back to the classic layout' : 'Try the new layout'}</button>
   </div>`;
+  app.querySelector('#lp-layout').addEventListener('click', () => {
+    store_.set(LAYOUT_KEY, newLayout() ? 'classic' : 'new');
+    renderLogin();
+  });
+  if (newLayout()) wireDirectory();
 
   // Picking a location swaps the grid for the code box, so the field is always
   // in view — it used to sit below a long list and need scrolling to reach.
@@ -141,6 +236,7 @@ function wirePin(code) {
     const { branch, error } = await auth.signIn(code, entered);
 
     if (branch) {
+      store_.set(LAST_KEY, code);   // "Continue as …" on the new sign-in layout
       store.session = branch;
       location.hash = homeOf(branch);
       enterShell();

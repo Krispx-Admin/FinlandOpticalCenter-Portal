@@ -1186,6 +1186,17 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  SIGN-IN LAYOUT TRIAL. The classic layout (Office panel, then
+             Retail / Fitting / Clinics columns) is kept as the default,
+             unchanged. A link at the bottom-left, "Try the new layout" /
+             "Back to the classic layout", switches THIS DEVICE (localStorage
+             focp.loginLayout) to a directory built for 30+ locations:
+             search by name or code (Enter opens the only match), tabs All /
+             Office / Retail / Fitting centres / Clinics with counts, compact
+             cards in an auto-fill grid (31 locations fit one screen), and
+             "Continue as <last location used here>" (focp.lastLocation, set
+             on a successful sign-in). app.js directoryHTML / wireDirectory;
+             CSS .lp2-*. Waiting for the user's verdict.
  2026-10-17  Sign-in page: the sign-in block sits 30px higher (.lp-inner padding
              30px top / 54px bottom).
  2026-10-17  Lens Stock shelf tabs: a closed tab stops 1px above the panel's
