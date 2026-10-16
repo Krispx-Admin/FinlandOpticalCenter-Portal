@@ -45,6 +45,11 @@ const LAYOUT_KEY = 'focp.loginLayout';
 const LAST_KEY = 'focp.lastLocation';
 const store_ = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
                  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } } };
+// A link can switch it too: foc-portal.org/?layout=new (or =classic).
+try {
+  const want = new URLSearchParams(location.search).get('layout');
+  if (want === 'new' || want === 'classic') store_.set(LAYOUT_KEY, want);
+} catch { /* no URL to read */ }
 const newLayout = () => store_.get(LAYOUT_KEY) === 'new';
 const LP2_GROUPS = [
   { key: 'office', label: 'Office', roles: ['admin', 'scheduler', 'manager'] },
