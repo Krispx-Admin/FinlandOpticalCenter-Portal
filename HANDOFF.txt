@@ -1178,6 +1178,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-16  DATA WIPED again at the user's request (no backup): orders + events,
+             outside lens orders, stock requests, lens stock + requests,
+             claims + Direct Insurance, damaged stock reports. Numbering
+             restarted (SR/LR-1001, INV/DI-3001, DS-1001). KEPT: branches +
+             profiles, app_settings, lens lists, employees, schedule. Then 10
+             sample lens stock items put on MGM's shelf (160 pcs, single
+             vision 1.50–1.74, SPH +2.00 to -6.00).
  2026-10-15  Fitting Log Select all takes only the orders this location can act
              on now, grouped by their step ("Select all 2 — Lens received ·
              1 needs another step"); rows with nothing to press (e.g. waiting
