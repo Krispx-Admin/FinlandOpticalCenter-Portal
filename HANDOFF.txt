@@ -1198,6 +1198,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  LIVE DATABASE CLEARED again (user), shelves kept: 14 orders, 3
+             outside-lens orders, 3 lens / 1 stock request, 5 invoices, 1 damaged
+             report deleted; numbering restarted; 4 set-aside lenses back on the
+             shelf (10 rows, 154 pcs — 2 were sent during testing). The
+             practice copy is separate and was not touched.
  2026-10-17  Practice copy: ONE link for everyone — https://foc-portal.org/?practice
              (no code: each person picks their branch; each browser its own
              copy). BRANCHES ONLY: the people (Omar, Ghiath, Wijdan, Sarah) are
