@@ -10,6 +10,7 @@ import {
   collectOf, frameLoc, canChangeCollect, LOCATIONS, LENS_HOLDERS, FIRST_SHELF,
 } from './data.js';
 import { store } from './store.js';
+import { openShelfBrowser } from './lens.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -59,6 +60,7 @@ export function fittingView(me) {
     prevStatus: new Map(store.state.orders.map(o => [o.id, o.status])),
   };
   let root, drawer = null, drawerId = null;
+  let shelfView = null; // the Lens stock window, while open
   // The office and the schedule editor see every frame; only the office acts.
   const isAdmin = seesAll(me.role);
   const viewOnly = readOnly(me.role);
@@ -856,13 +858,19 @@ export function fittingView(me) {
       const words = String(text ?? '').toLowerCase().split(/\s+/).filter(Boolean);
       return shelfItems().filter(i => words.every(w => lensLabel(i).toLowerCase().includes(w)));
     };
-    const lsMenu = n => layer.el.querySelector(`[data-ls-menu="${n}"]`);
+    // Each lens in columns (user, 2026-10-17): type - index, then the powers
+    // in one box and the coating in another, lined up row under row.
+    const lensCols = i => `
+      <span class="ls-o-name">${esc(i.type)} - ${esc(i.index)}</span>
+      <span class="ls-o-rx">SPH <b>${fmtPwr(i.sph)}</b><i></i>CYL <b>${fmtPwr(i.cyl)}</b></span>
+      <span class="ls-o-coat">${i.coating && i.coating !== 'None' ? esc(i.coating) : '<i>No coating</i>'}</span>`;
+    const lsMenu = n =>layer.el.querySelector(`[data-ls-menu="${n}"]`);
     const openMenu = (n, text) => {
       const m = lsMenu(n); if (!m) return;
       const list = lsMatches(text);
       m.innerHTML = list.length ? list.map((i, k) => `
         <button type="button" class="ls-opt ${k === 0 ? 'on' : ''}" data-ls-opt="${n}" data-id="${i.id}" role="option">
-          <span>${esc(lensLabel(i))}</span><em>${i.qty} in stock</em>
+          ${lensCols(i)}<em>${i.qty} in stock</em>
         </button>`).join('') : '<p class="ls-none">No lens on this shelf matches that.</p>';
       m.hidden = false;
       layer.el.querySelector(`[data-ls-item="${n}"]`)?.setAttribute('aria-expanded', 'true');
@@ -1026,6 +1034,7 @@ export function fittingView(me) {
         </div>
         <div class="mod-head-acts">
         <span id="f-bench">${benchBtnHTML()}</span>
+        ${!isAdmin && LENS_HOLDERS.length ? `<button class="btn btn-ghost" data-shelves>${icons.lens} Lens stock</button>` : ''}
         ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>`
           : me.role === 'admin' ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
         </div>
@@ -1132,6 +1141,7 @@ export function fittingView(me) {
     root.querySelector('#f-q').addEventListener('input', e => { ui.q = e.target.value; refreshLists(); });
     root.querySelector('#f-branch')?.addEventListener('change', e => { ui.branch = e.target.value; ui.selected.clear(); refreshLists(); });
     root.querySelector('[data-new]')?.addEventListener('click', newOrderModal);
+    root.querySelector('[data-shelves]')?.addEventListener('click', () => { shelfView = openShelfBrowser(me, { onNew: newOrderModal }); });
     root.querySelector('[data-cutters]')?.addEventListener('click', cuttersModal);
     root.querySelector('#f-bench')?.addEventListener('click', e => { const b = e.target.closest('[data-lab]'); if (b && b.dataset.lab !== labMode(me.code)) store.setLab(me.code, b.dataset.lab); });
     root.querySelector('#f-origin')?.addEventListener('change', e => { ui.origin = e.target.value; refreshLists(); });
@@ -1192,7 +1202,7 @@ export function fittingView(me) {
 
   return {
     mount(container) { root = container; render(); },
-    onChange() { refreshLists(); },
+    onChange() { refreshLists(); shelfView?.refresh(); },
     unmount() { closeLayer(); },
   };
 }

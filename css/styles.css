@@ -489,6 +489,19 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   background: none; text-align: left; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
 .ls-opt span { white-space: normal; line-height: 1.35; }
 .ls-opt em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: var(--st-green); }
+/* columns: type - index │ [SPH  CYL] │ [coating] │ in stock — every row lines up */
+.ls-opt { display: grid; grid-template-columns: minmax(0, 1fr) 176px 128px 84px; align-items: center; gap: 12px; }
+.ls-opt em { text-align: right; }
+.ls-o-rx, .ls-o-coat { border-radius: 7px; padding: 3px 9px; font-size: 12px; text-align: center; white-space: nowrap; }
+.ls-o-rx { background: var(--page); border: 1px solid var(--border-strong); color: var(--ink-3); font-weight: 600; }
+.ls-o-rx b { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ink); margin-left: 3px; }
+.ls-o-rx i { display: inline-block; width: 12px; }
+.ls-o-coat { color: var(--st-teal); background: #e2f5f3; border: 1px solid #bde7e3; font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
+.ls-o-coat i { font-style: normal; color: var(--ink-3); font-weight: 500; }
+@media (max-width: 640px) {
+  .ls-opt { grid-template-columns: auto auto; justify-content: space-between; }
+  .ls-o-name { grid-column: 1 / -1; }
+}
 .ls-opt:hover, .ls-opt.on { background: var(--brand-soft); }
 .ls-none { margin: 0; padding: 12px; font-size: 13px; color: var(--ink-3); }
 .ls-have { grid-column: 1 / -1; font-size: 11.5px; color: var(--st-green); font-weight: 600; padding-left: 4px; }
@@ -1188,6 +1201,14 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
   .shelf-panel { padding: 14px; }
 }
 
+/* Lens stock, opened from the Fitting Log: the shelves, to look at */
+.modal:has(.shelf-browser) { width: min(1000px, 100%); }
+.shelf-browser .sb-shelves { margin-bottom: 0; }
+.sb-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sb-tools .searchbox { flex: 1 1 240px; }
+.shelf-browser .sb-tools .searchbox input { border: none; box-shadow: none; padding: 9px 0; width: auto; background: none; }
+.shelf-browser .sb-tools select.sel { width: auto; flex: 0 1 170px; }
+.sb-list { max-height: min(56vh, 560px); overflow-y: auto; padding: 2px; }
 .lens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 11px; }
 .lens-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);

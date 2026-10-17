@@ -1198,6 +1198,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  New fitting order → Lens stock: the lens list is in columns —
+             "Single vision - 1.60" │ [SPH -2.00  CYL 0.00] boxed │ [coating]
+             teal box │ "34 in stock"; rows line up (fitting.js lensCols, CSS
+             .ls-o-*; stacks on phones). Fitting Log header: "Lens stock"
+             button (branches, when any shelf exists) opens a window with every
+             shelf as the old tab showed it — MGM first, search + type / index /
+             coating, cards with what's in stock, live — to look, not to order;
+             "New fitting order" from there. lens.js openShelfBrowser(me,
+             {onNew}); CSS .shelf-browser / .sb-*.
  2026-10-17  Lens Stock tab hidden from branches that hold no lenses (they order
              shelf lenses in the new fitting order now). Shown to lens holders
              (isLensOwner — whatever Settings → Accounts says) and to the

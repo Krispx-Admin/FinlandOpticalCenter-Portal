@@ -28,6 +28,77 @@ const LENS_LISTS = [
   ['coatings', 'Coatings',   'e.g. Anti-fog'],
 ];
 
+// ── What's on the shelves, opened from the Fitting Log ──
+// Branches order shelf lenses inside a new fitting order, so the Lens Stock
+// tab is the holders' (user, 2026-10-17). This is the look the tab gave
+// everyone else: every shelf, MGM first, searchable — to look, not to order.
+// Returns { refresh, close }; refresh() redraws the cards after live changes.
+export function openShelfBrowser(me, { onNew } = {}) {
+  const shelves = [...LENS_HOLDERS].sort((a, b) => (b.code === FIRST_SHELF) - (a.code === FIRST_SHELF));
+  const st = { holder: shelves[0]?.code ?? null, q: '', type: 'all', index: 'all', coating: 'all' };
+  const sel = (k, label, opts) => `
+    <select class="sel" data-sb="${k}" aria-label="${label}"><option value="all">${esc(label)}</option>
+      ${opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+  const layer = openLayer('modal', () => `
+    <div class="dw-head">
+      <div><div class="dw-kicker">Lens stock</div><h2>Lenses on the shelves</h2></div>
+      <button class="icon-btn" data-close>${icons.x}</button>
+    </div>
+    <div class="form shelf-browser">
+      <div class="chips sb-shelves" id="sb-shelves"></div>
+      <div class="sb-tools">
+        <div class="searchbox">${icons.search}<input data-sb="q" placeholder="Search type, index, power, coating…" autocomplete="off"></div>
+        ${sel('type', 'All types', store.lensTypes)}${sel('index', 'All indices', store.lensIndices)}${sel('coating', 'All coatings', store.lensCoatings)}
+      </div>
+      <div class="sb-list" id="sb-list"></div>
+      <div class="form-foot">
+        <span class="muted">To use these, start a new fitting order and choose Lens stock.</span>
+        <button class="btn btn-ghost" data-close>Close</button>
+        ${onNew ? `<button class="btn btn-primary" data-sb-new>${icons.plus} New fitting order</button>` : ''}
+      </div>
+    </div>`);
+
+  const card = i => `
+    <div class="lens-card">
+      <div class="lens-card-top">
+        <b class="lens-name">${esc(i.type)} - ${esc(i.index)}</b>
+        ${i.coating && i.coating !== BARE_COATING ? `<span class="lens-coat">${esc(i.coating)}</span>` : ''}
+      </div>
+      <div class="lens-rx"><span>SPH <b>${fmtPwr(i.sph)}</b></span><span>CYL <b>${fmtPwr(i.cyl)}</b></span></div>
+      <div class="lens-card-foot"><span class="lens-qty ${isLow(i) ? 'low' : ''}"><b>${i.qty}</b> in stock</span></div>
+    </div>`;
+  function refresh() {
+    const tabs = layer.el.querySelector('#sb-shelves');
+    if (!tabs) return;
+    const inStock = code => store.lensStock.filter(i => i.holder === code && i.qty > 0);
+    tabs.innerHTML = shelves.map(h => `
+      <button type="button" class="chip ${st.holder === h.code ? 'on' : ''}" data-sb-shelf="${h.code}">
+        ${esc(h.name)}${h.code === me.code ? ' · yours' : ''} ${chipCount(inStock(h.code).length)}</button>`).join('');
+    const words = st.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const list = inStock(st.holder)
+      .filter(i => (st.type === 'all' || i.type === st.type) && (st.index === 'all' || i.index === st.index) && (st.coating === 'all' || i.coating === st.coating))
+      .filter(i => words.every(w => lensFull(i).toLowerCase().includes(w)))
+      .sort((a, b) => store.lensTypes.indexOf(a.type) - store.lensTypes.indexOf(b.type) || a.index.localeCompare(b.index) || a.sph - b.sph || a.cyl - b.cyl);
+    layer.el.querySelector('#sb-list').innerHTML = !st.holder
+      ? `<div class="empty">${icons.lens}<p>No branch holds lens stock yet.</p></div>`
+      : list.length ? `<section class="lens-grid">${list.map(card).join('')}</section>`
+      : `<div class="empty">${icons.lens}<p>${inStock(st.holder).length ? 'No lenses match.' : `Nothing in stock at ${esc(locName(st.holder))} right now.`}</p></div>`;
+  }
+  layer.el.addEventListener('input', e => {
+    const k = e.target.dataset?.sb;
+    if (k) { st[k] = e.target.value; refresh(); }
+  });
+  layer.el.addEventListener('click', e => {
+    if (e.target.closest('[data-close]')) return layer.close();
+    if (e.target.closest('[data-sb-new]')) { layer.close(); return onNew?.(); }
+    const sh = e.target.closest('[data-sb-shelf]');
+    if (sh) { st.holder = sh.dataset.sbShelf; refresh(); }
+  });
+  refresh();
+  layer.el.querySelector('[data-sb="q"]')?.focus();
+  return { refresh, close: () => layer.close() };
+}
+
 export function lensView(me) {
   const isOwner = isLensOwner(me.code);
   // The office and the schedule editor look on; neither shops the shelf.
