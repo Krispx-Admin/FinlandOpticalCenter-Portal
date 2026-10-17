@@ -252,7 +252,10 @@ const client = {
     async getSession() { return { data: { session: session() }, error: null }; },
     async signInWithPassword({ email }) {
       const local = String(email ?? '').split('@')[0];
-      const row = (await db.query(`select code from public.branches where lower(code) = lower($1)`, [local])).rows[0];
+      // Branches only: the people (Omar, Ghiath, Wijdan, Sarah) are not in
+      // the practice copy (user, 2026-10-17).
+      const row = (await db.query(`select code from public.branches where lower(code) = lower($1)
+        and role in ('retail', 'fitting', 'clinic')`, [local])).rows[0];
       if (!row) return { data: {}, error: { message: 'Invalid login credentials' } };
       as = row.code; store.set(as);
       emit('SIGNED_IN');

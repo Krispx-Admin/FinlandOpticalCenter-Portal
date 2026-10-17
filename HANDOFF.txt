@@ -1198,6 +1198,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Practice copy: ONE link for everyone — https://foc-portal.org/?practice
+             (no code: each person picks their branch; each browser its own
+             copy). BRANCHES ONLY: the people (Omar, Ghiath, Wijdan, Sarah) are
+             not listed, ?practice=OFC lands on the branch list, and js/demo.js
+             refuses a person's sign-in; a person's session left in a browser
+             is closed on load.
  2026-10-17  PRACTICE COPY — a link per location for staff to try the portal:
              https://foc-portal.org/?practice=<CODE> (e.g. ?practice=SCC).
              It runs the portal on a REAL Postgres inside the browser (PGlite

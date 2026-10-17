@@ -68,9 +68,9 @@ function renderLogin(preselect = null) {
         <section class="lp-step" id="step-pick">
           <header class="lp-head">
             <h2>Sign in</h2>
-            <p class="lp-sub">${auth.isPractice ? 'Practice copy — pick any location, no code needed.' : 'Choose your location.'}</p>
+            <p class="lp-sub">${auth.isPractice ? 'Practice copy — pick your branch, no code needed.' : 'Choose your location.'}</p>
           </header>
-          ${groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
+          ${auth.isPractice ? '' : groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
           <div class="lp-cols">
             ${columns.map(c => `
               <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
@@ -537,7 +537,9 @@ async function switchBranch(code, pin) {
   try { publicOff = await fetchDisabledTabs(); } catch { /* assume all on */ }
   store.session = await auth.currentBranch();
   practiceBar();
-  if (!store.session && auth.isPractice && loc(String(auth.PRACTICE).toUpperCase())) {
+  // Practice copy: branches only — a person's session left from before is closed.
+  if (auth.isPractice && store.session && !BRANCH_KINDS.includes(store.session.role)) { await auth.signOut(); store.session = null; }
+  if (!store.session && auth.isPractice && BRANCH_KINDS.includes(loc(String(auth.PRACTICE).toUpperCase())?.role)) {
     await practiceSignIn(String(auth.PRACTICE).toUpperCase());
   } else if (store.session) {
     if (isPublicRoute()) location.hash = '#/schedule';
