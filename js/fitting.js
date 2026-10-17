@@ -90,9 +90,14 @@ export function fittingView(me) {
   // they live under Stock Lens / Outside Lens Orders for the whole job (and
   // Completed, once collected), not in the frame tabs.
   const lensOnly = o => (onMyStock(o, me.code) || onMyOutside(o, me.code)) && o.fitter !== me.code && collectOf(o) !== me.code;
+  // For the handler (Avenues), a lens still to order sits under Outside Lens
+  // Orders; once ordered it moves to Waiting for Lenses — waiting on the
+  // supplier — and on from there (user, 2026-10-17).
+  const toOrder = o => !!o.outsideLens && me.code === outsideHandler() && o.outsideLens.status !== 'ordered' && !isBack(o);
   const chipHas = (d, o) => {
     if (d.key === 'stock') return onMyStock(o, me.code);
-    if (d.key === 'olorders') return onMyOutside(o, me.code);
+    if (d.key === 'olorders') return toOrder(o);
+    if (toOrder(o)) return false;
     const hs = handlerStage(o, me.code);
     if (hs) return d.key === hs;
     if (lensOnly(o)) return d.key === 'collected' && o.status === 'collected';
@@ -464,7 +469,7 @@ export function fittingView(me) {
   function chipsHTML() {
     const c = counts();
     // How many in each chip are waiting on this location.
-    const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'collected' && needsAction(o, me.code));
+    const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'collected' && (needsAction(o, me.code) || toOrder(o)));
     const act = d => (d.key === 'active' ? mine.length : mine.filter(o => chipHas(d, o)).length);
     return CHIP_DEFS.filter(d => (!d.holders || isLensOwner(me.code)) && (!d.handler || me.code === outsideHandler())).map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
       <button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">

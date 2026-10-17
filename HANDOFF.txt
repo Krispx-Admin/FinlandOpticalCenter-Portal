@@ -1198,6 +1198,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Fitting Log for the outside-lens handler (Avenues): an outside
+             lens still TO ORDER (any branch's, Avenues' own too) sits only
+             under "Outside Lens Orders", orange (it is Avenues' to do); once
+             confirmed ordered it moves to Waiting for Lenses (waiting on the
+             supplier), then Send to Fitter / In Transit as before. The
+             Outside Lens Orders chip no longer holds the whole job — only the
+             to-order ones. fitting.js toOrder / chipHas / chipsHTML mine.
  2026-10-17  New fitting order → Lens stock: the lens list is in columns —
              "Single vision - 1.60" │ [SPH -2.00  CYL 0.00] boxed │ [coating]
              teal box │ "34 in stock"; rows line up (fitting.js lensCols, CSS
