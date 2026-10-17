@@ -567,12 +567,14 @@ export function normaliseRx(rx) {
   }
   return out;
 }
-// A product is a frame or lenses, with a quantity; the price is per piece
-// (schema-35), so a line is price × qty.
+// A product is a frame or lenses, with a quantity. On a Reimbursement
+// Invoice the price is per piece (schema-35), so a line is price × qty; on
+// Direct Insurance the price typed is the whole line's (user, 2026-10-17:
+// "the price put in is total not each" — schema-44).
 export const ITEM_KINDS = { frame: { label: 'Frame', ar: 'إطار', hint: 'e.g. Ray-Ban RB5154' }, lens: { label: 'Lenses', ar: 'عدسات', hint: 'e.g. Essilor 1.6 blue-cut' } };
 export const itemQty = i => Math.max(1, parseInt(i.qty, 10) || 1);
-export const itemAmount = i => (Number(i.price) || 0) * itemQty(i);
-export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + itemAmount(i), 0);
+export const itemAmount = (i, kind = 'claim') => (Number(i.price) || 0) * (kind === 'direct' ? 1 : itemQty(i));
+export const claimTotal = c => (c.items ?? []).reduce((t, i) => t + itemAmount(i, c.kind), 0);
 // "2 frames · 2 lenses" — how many of each the invoice covers.
 export function itemCounts(items) {
   const n = k => (items ?? []).filter(i => i.kind === k).reduce((t, i) => t + itemQty(i), 0);

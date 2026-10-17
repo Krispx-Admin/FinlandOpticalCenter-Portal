@@ -227,7 +227,7 @@ export function receiptHTML(c) {
       <thead><tr><th class="rc-kind">Item</th><th>Description</th><th class="rc-qty">Qty</th><th class="num" style="width:40mm">Amount (${CURRENCY})</th></tr></thead>
       <tbody>
         ${items.map(i => { const blank = !i.name && i.price == null; return `<tr><td class="rc-kind">${esc(ITEM_KINDS[i.kind]?.label ?? '')}</td><td>${esc(i.name || '')}</td>`
-          + `<td class="rc-qty">${blank ? '' : itemQty(i)}</td><td class="num">${blank ? '' : money(itemAmount(i))}</td></tr>`; }).join('')}
+          + `<td class="rc-qty">${blank ? '' : itemQty(i)}</td><td class="num">${blank ? '' : money(itemAmount(i, c.kind))}</td></tr>`; }).join('')}
       </tbody>
       <tfoot><tr><td colspan="3">Total${itemCounts(items) ? `<span class="rc-counts">${esc(itemCounts(items))}</span>` : ''}</td><td class="num">${money(total)}</td></tr></tfoot>
     </table>
@@ -514,7 +514,7 @@ export function claimsView(me, kind = 'claim') {
         <h3 class="tl-h">${icons.receipt} Products</h3>
         <table class="lines">
           <thead><tr><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Amount (${CURRENCY})</th></tr></thead>
-          <tbody>${items.map(i => `<tr><td>${esc(ITEM_KINDS[i.kind]?.label ?? '—')}</td><td>${esc(i.name || '—')}</td><td class="num">${itemQty(i)}</td><td class="num">${money(itemAmount(i))}</td></tr>`).join('')}</tbody>
+          <tbody>${items.map(i => `<tr><td>${esc(ITEM_KINDS[i.kind]?.label ?? '—')}</td><td>${esc(i.name || '—')}</td><td class="num">${itemQty(i)}</td><td class="num">${money(itemAmount(i, c.kind))}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td colspan="3">Total${itemCounts(items) ? ` <span class="muted">· ${esc(itemCounts(items))}</span>` : ''}</td><td class="num">${money(claimTotal(c))} ${CURRENCY}</td></tr></tfoot>
         </table>
         ${hasRx ? `
@@ -626,7 +626,7 @@ export function claimsView(me, kind = 'claim') {
         payment: 'cash', items: [{ kind: 'frame', name: '', qty: 1, price: '' }, { kind: 'lens', name: '', qty: 1, price: '' }], rx: blankRx(),
       };
 
-    const total = () => draft.items.reduce((t, i) => t + itemAmount(i), 0);
+    const total = () => draft.items.reduce((t, i) => t + itemAmount(i, direct ? 'direct' : 'claim'), 0);
 
     // Direct insurance: the insurer, and the salesperson — typed and picked
     // from the schedule's roster, one list in alphabetical order, names only.
@@ -650,7 +650,8 @@ export function claimsView(me, kind = 'claim') {
         </div>`;
 
     // Each product is a frame or lenses (older ones may be neither), with a
-    // quantity and a price per piece.
+    // quantity and a price — per piece on an invoice, for the whole line on
+    // Direct Insurance.
     const itemRow = (it, i) => `
       <div class="ci-row">
         <select data-it="kind" data-i="${i}" aria-label="Item">
@@ -659,7 +660,7 @@ export function claimsView(me, kind = 'claim') {
         </select>
         <input placeholder="${esc(ITEM_KINDS[it.kind]?.hint ?? 'Description')}" value="${esc(it.name)}" data-it="name" data-i="${i}">
         <input type="number" min="1" step="1" value="${esc(it.qty ?? 1)}" data-it="qty" data-i="${i}" aria-label="Quantity">
-        <input type="number" min="0" step="0.001" placeholder="0.000" value="${esc(it.price ?? '')}" data-it="price" data-i="${i}" aria-label="Price each">
+        <input type="number" min="0" step="0.001" placeholder="0.000" value="${esc(it.price ?? '')}" data-it="price" data-i="${i}" aria-label="${direct ? 'Total price for this line' : 'Price each'}">
         <button class="icon-btn" data-rm="${i}" ${draft.items.length === 1 ? 'disabled' : ''} title="Remove">${icons.x}</button>
       </div>`;
 
@@ -690,8 +691,8 @@ export function claimsView(me, kind = 'claim') {
         </label>
 
         <div class="fieldset">
-          <div class="fs-head"><span>Products</span><span class="muted sm">Price each, in ${CURRENCY}</span></div>
-          <div class="ci-head"><span>Item</span><span>Description</span><span>Qty</span><span>Price</span><span></span></div>
+          <div class="fs-head"><span>Products</span><span class="muted sm">${direct ? `Total price for each line (all pieces), in ${CURRENCY}` : `Price each, in ${CURRENCY}`}</span></div>
+          <div class="ci-head"><span>Item</span><span>Description</span><span>Qty</span><span>${direct ? 'Total price' : 'Price'}</span><span></span></div>
           <div id="ci-list">${draft.items.map(itemRow).join('')}</div>
           <div class="ci-add">
             <button class="btn btn-ghost btn-sm" data-add="frame">${icons.plus} Add frame</button>
@@ -896,7 +897,8 @@ export function claimsView(me, kind = 'claim') {
         const lines = list.flatMap(c => (c.items ?? []).map(i => ({
           'Invoice No.': c.ref, Date: c.date, Branch: locName(c.branch), 'Customer Name': c.customer,
           Item: ITEM_KINDS[i.kind]?.label ?? '', Description: i.name, Qty: itemQty(i),
-          [`Price each (${CURRENCY})`]: Number(i.price) || 0, [`Amount (${CURRENCY})`]: Number(itemAmount(i).toFixed(3)),
+          ...(c.kind === 'direct' ? {} : { [`Price each (${CURRENCY})`]: Number(i.price) || 0 }),
+          [`Amount (${CURRENCY})`]: Number(itemAmount(i, c.kind).toFixed(3)),
         })));
         const wb = XLSX.utils.book_new();
         const s1 = XLSX.utils.json_to_sheet(rows);

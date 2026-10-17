@@ -1384,14 +1384,14 @@ end $function$;
 CREATE OR REPLACE FUNCTION public.recalc_claim_total()
  RETURNS trigger
  LANGUAGE plpgsql
- SET search_path TO 'public'
 AS $function$
 declare target uuid := coalesce(new.claim_id, old.claim_id);
 begin
-  update public.claims
-     set total = coalesce((select sum(price * qty) from public.claim_items where claim_id = target), 0),
+  update public.claims c
+     set total = coalesce((select sum(case when c.kind = 'direct' then i.price else i.price * i.qty end)
+                             from public.claim_items i where i.claim_id = target), 0),
          updated_at = now()
-   where id = target;
+   where c.id = target;
   return null;
 end $function$;
 
@@ -2023,8 +2023,6 @@ alter table public."stock_requests" enable row level security;
 
 alter table public."claim_items" enable row level security;
 
-alter table public."damaged_reports" enable row level security;
-
 alter table public."lens_catalogue" enable row level security;
 
 alter table public."schedule_branches" enable row level security;
@@ -2032,6 +2030,8 @@ alter table public."schedule_branches" enable row level security;
 alter table public."schedule_employees" enable row level security;
 
 alter table public."schedule_defaults" enable row level security;
+
+alter table public."damaged_reports" enable row level security;
 
 alter table public."schedule_weeks" enable row level security;
 

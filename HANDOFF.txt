@@ -798,6 +798,9 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-43-security.sql     anon: branches + disabled_tabs/schedule_view
                              only; functions closed to PUBLIC; default
                              privileges closed. Applied 2026-10-17.
+  schema-44-direct-line-total.sql  Direct Insurance: a line's price is the
+                             whole line's (total = sum(price)); invoices
+                             stay price × qty. Applied 2026-10-17.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1198,6 +1201,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Direct Insurance: the price typed on a product line is the TOTAL
+             for that line, not per piece (user) — 2 lenses at 40.000 count
+             40.000. schema-44 (rehearsed rolled back: direct 40+25 = 65,
+             invoice 2×40+25 = 105; applied; DI-3001 recounted 240 → 160).
+             data.js itemAmount(i, kind) / claimTotal by c.kind; form reads
+             "Total price" / "Total price for each line (all pieces)" on Direct
+             Insurance only; the Excel lines sheet drops "Price each" for
+             direct. The Reimbursement Invoice is unchanged (price each).
+             Practice copy rebuilt (demo/build.py) + VERSION 2.
  2026-10-17  LIVE DATABASE CLEARED again (user), shelves kept: 14 orders, 3
              outside-lens orders, 3 lens / 1 stock request, 5 invoices, 1 damaged
              report deleted; numbering restarted; 4 set-aside lenses back on the
