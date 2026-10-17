@@ -75,7 +75,18 @@ js/schedule.js      Module 6 — Schedule: hosts scheduler.html, keeps its data 
 scheduler.html      the staff scheduler, as built — only its storage now goes to the portal
 img/                brand logos used on the printed receipt
 supabase/*.sql      schema, row level security, functions, realtime
+js/demo.js          practice copy (?practice=SCC): the database inside the browser
+demo/               practice copy's layout + starting data, and build.py that makes them
 ```
+
+## Practice copy
+
+`https://foc-portal.org/?practice=SCC` (any location code) opens the portal on
+a database of its own, running inside that browser (PGlite) and saved there
+only — no code, nothing reaches the live data. `demo/schema.sql` is generated
+from the live catalog, so it behaves exactly like the real portal. After any
+migration: `python -I -X utf8 demo/build.py`, then bump `VERSION` in
+`js/demo.js`.
 
 ## Database
 

@@ -299,6 +299,23 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 #pin-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.13); }
 
+/* practice copy (?practice=SCC): a pill along the bottom, on every screen */
+.practice-bar {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 900;
+  display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  background: #fdf1e3; border: 1px solid #f5c98f; color: #7a3e00; border-radius: 999px;
+  padding: 6px 6px 6px 14px; font-size: 12.5px; box-shadow: 0 8px 24px rgba(19,48,86,.14);
+}
+.practice-bar b { font-weight: 750; white-space: nowrap; }
+.practice-bar span { color: #9a5a14; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.practice-bar button {
+  border: 1px solid #f5c98f; background: #fff; color: #7a3e00; border-radius: 999px;
+  padding: 4px 11px; font: inherit; font-weight: 650; cursor: pointer; white-space: nowrap;
+}
+.practice-bar button:hover { border-color: #b45309; }
+@media (max-width: 560px) { .practice-bar span { display: none; } }
+.live-ind.is-practice i { background: #f59e0b; animation: none; box-shadow: none; }
+
 /* sidebar live indicator */
 .live-ind i {
   width: 8px; height: 8px; border-radius: 50%; background: #4ade80;

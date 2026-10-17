@@ -1198,6 +1198,31 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  PRACTICE COPY — a link per location for staff to try the portal:
+             https://foc-portal.org/?practice=<CODE> (e.g. ?practice=SCC).
+             It runs the portal on a REAL Postgres inside the browser (PGlite
+             0.5.8 from jsdelivr, saved in IndexedDB "foc-practice-v<N>"),
+             nothing shared, nothing reaches the live database — auth.js does
+             not even create the live connection in practice mode. Opens
+             straight in as that location; Sign out shows every location, no
+             codes (one person can play both ends of a job). Starts like the
+             cleared portal with MGM's shelf full (10 rows, 156 pcs). Orange
+             "Practice copy" pill at the bottom; "Start over" wipes it.
+             Schedule tab and View schedule hidden (they are the live ones).
+             How: demo/prelude.sql (Supabase stand-ins: roles, auth.jwt(),
+             auth.users, pgcrypto), demo/schema.sql (GENERATED from the live
+             catalog: 23 tables, 54 functions, 15 triggers, 52 row rules),
+             demo/seed.sql (branches, settings, lens lists, shelves);
+             js/demo.js speaks the supabase-js calls the portal makes and runs
+             each as the signed-in location (role + token), like Supabase.
+             AFTER EVERY MIGRATION: python -I -X utf8 demo/build.py, then bump
+             VERSION in js/demo.js (old practice copies start over).
+             CSP: script-src gained 'wasm-unsafe-eval' (WebAssembly only; not
+             eval). Tested under the live CSP: Seeb logs a regular, a lens
+             stock (reserves 2 on MGM's shelf) and an outside-lens order; MGM
+             sees both frames + LR-1001 under Stock Lens; Avenues orders,
+             receives and sends the outside lenses → In Transit to Fitter; data
+             survives reloads. The real site is unchanged without ?practice.
  2026-10-17  TEST SIGN-IN — ON (user: "remove the codes for now, later I will
              put them back"). The 12 BRANCHES (retail / fitting / clinic) sign
              in with one click: js/app.js TEST_SIGN_IN fills the code and

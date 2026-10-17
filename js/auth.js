@@ -7,9 +7,16 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY, emailFor } from './supabase-config.js';
 import { loc } from './data.js';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-});
+// Practice copy (?practice=SCC — js/demo.js): the portal on a database inside
+// this browser. The live connection is never even created then, so nothing
+// done in practice can reach the real data.
+export const PRACTICE = new URLSearchParams(location.search).get('practice');
+export const isPractice = PRACTICE !== null;
+export const supabase = isPractice
+  ? await (await import('./demo.js')).practiceClient()
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  });
 
 // Turns a signed-in Supabase user into the location record the modules expect,
 // so nothing downstream has to know authentication changed.

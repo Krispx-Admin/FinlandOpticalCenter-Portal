@@ -24,7 +24,7 @@ let clockTimer = null;
 // Before signing in, the only setting the page needs: which tabs are off.
 let publicOff = [];
 const scheduleOff = () => publicOff.includes('schedule');
-const viewScheduleHTML = () => scheduleOff()
+const viewScheduleHTML = () => auth.isPractice ? '' : scheduleOff()
   ? `<span class="btn btn-ghost lp-view is-off" aria-disabled="true" title="The schedule is under maintenance">${icons.calendar} View schedule <i>— under maintenance</i></span>`
   : `<a class="btn btn-ghost lp-view" href="#/view-schedule">${icons.calendar} View schedule</a>`;
 // Refresh the list, and redraw the button if it changed while the page was open.
@@ -68,7 +68,7 @@ function renderLogin(preselect = null) {
         <section class="lp-step" id="step-pick">
           <header class="lp-head">
             <h2>Sign in</h2>
-            <p class="lp-sub">Choose your location.</p>
+            <p class="lp-sub">${auth.isPractice ? 'Practice copy — pick any location, no code needed.' : 'Choose your location.'}</p>
           </header>
           ${groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
           <div class="lp-cols">
@@ -85,9 +85,35 @@ function renderLogin(preselect = null) {
   // Picking a location swaps the grid for the code box, so the field is always
   // in view — it used to sit below a long list and need scrolling to reach.
   app.querySelectorAll('[data-loc]').forEach(btn => btn.addEventListener('click', () => {
+    if (auth.isPractice) return practiceSignIn(btn.dataset.loc);
     showCodeStep(btn.dataset.loc);
   }));
   if (preselect) showCodeStep(preselect);
+}
+
+// ── practice copy (?practice=SCC, js/demo.js) ──
+// No codes: the database is this browser's own. Picking a location opens it,
+// so one person can play every side of a job — send from Seeb, receive at MGM.
+async function practiceSignIn(code) {
+  const { branch, error } = await auth.signIn(code, 'practice');
+  if (!branch) { toast({ title: 'Could not open that location', sub: error ?? '', tone: 'stock' }); return; }
+  store.session = branch;
+  location.hash = homeOf(branch);
+  await enterShell();
+}
+function practiceBar() {
+  if (!auth.isPractice || document.querySelector('.practice-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'practice-bar';
+  bar.innerHTML = `<b>Practice copy</b><span>Saved in this browser only — nothing here is real</span>
+    <button type="button" data-practice-reset>Start over</button>`;
+  bar.querySelector('[data-practice-reset]').addEventListener('click', async () => {
+    if (!confirm('Start over?\n\nEverything entered in this practice copy is deleted.')) return;
+    store.stop();
+    await (await import('./demo.js')).resetPractice();
+    location.reload();
+  });
+  document.body.append(bar);
 }
 
 function showCodeStep(code) {
@@ -279,7 +305,7 @@ const homeOf = me => (me?.role === 'scheduler' ? '#/schedule' : '#/fitting');
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
-  return m && (!m.adminOnly || me?.role === 'admin') && (!m.only || m.only(me));
+  return m && (!m.adminOnly || me?.role === 'admin') && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
 }
 
 // A tab the office switched off in Settings is closed to everyone else; the
@@ -347,7 +373,7 @@ function renderShell() {
         </div>
         <div class="side-nav" id="nav"></div>
         <div class="side-foot">
-          <div class="live-ind"><i></i>Live · synced</div>
+          <div class="live-ind${auth.isPractice ? ' is-practice' : ''}"><i></i>${auth.isPractice ? 'Practice copy' : 'Live · synced'}</div>
           <div class="me-card">
             <span class="me-code role-${me.role}">${me.code}</span>
             <div class="me-meta">
@@ -510,7 +536,10 @@ async function switchBranch(code, pin) {
   try { setLocations(await fetchBranches()); } catch { /* fallback list */ }
   try { publicOff = await fetchDisabledTabs(); } catch { /* assume all on */ }
   store.session = await auth.currentBranch();
-  if (store.session) {
+  practiceBar();
+  if (!store.session && auth.isPractice && loc(String(auth.PRACTICE).toUpperCase())) {
+    await practiceSignIn(String(auth.PRACTICE).toUpperCase());
+  } else if (store.session) {
     if (isPublicRoute()) location.hash = '#/schedule';
     await enterShell();
   } else if (isPublicRoute()) renderPublicSchedule();
