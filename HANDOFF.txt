@@ -1198,6 +1198,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Avenues (handler) Fitting Log: outside lenses it has SENT go under
+             In Transit to Fitter when the frame went to a fitter (send_frames,
+             lenses follow it there) and under In Transit to BRANCH when the
+             branch chose to receive the lenses (receive_lens) — until that
+             branch marks them received, then out of Avenues' active tabs.
+             data.js handlerStage / outsideInTransit.
  2026-10-17  DATABASE CLEARED again (user), same as before: shelves kept (10
              lens rows, 156 pcs, the 1 set-aside lens returned); every order,
              outside-lens order and lens request deleted; numbering restarted.

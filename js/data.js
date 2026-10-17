@@ -598,9 +598,13 @@ export function canSeeOrder(o, code) {
 export function handlerStage(o, code) {
   const ol = o.outsideLens;
   if (!ol || code !== outsideHandler() || o.origin === code || ol.dest === code || ol.receivedAt || isBack(o)) return null;
-  return ol.sentAt ? 'to_fitter' : ol.arrivedAt ? 'lenses_in' : 'pending';
+  // Sent: to the fitter with the frame (send_frames) → In Transit to Fitter;
+  // to the branch receiving them (receive_lens) → In Transit to Branch, until
+  // that branch marks them received (user, 2026-10-17).
+  if (ol.sentAt) return ol.fulfilment === 'receive_lens' ? (o.status === 'pending' ? 'returning' : null) : 'to_fitter';
+  return ol.arrivedAt ? 'lenses_in' : 'pending';
 }
-export const outsideInTransit = (o, code) => handlerStage(o, code) === 'to_fitter';
+export const outsideInTransit = (o, code) => ['to_fitter', 'returning'].includes(handlerStage(o, code));
 // Another branch's order that uses this branch's stock lenses.
 export const onMyStock = (o, code) => o.lensRequest?.holder === code && o.origin !== code;
 // Another branch's order whose outside lenses this location (the handler) supplies.
