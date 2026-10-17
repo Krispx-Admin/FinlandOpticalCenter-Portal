@@ -27,7 +27,9 @@ Seven modules (sidebar order):
   1. Fitting Log        — a frame's physical journey branch -> fitting centre -> branch
   2. Stock Requests     — branch asks the office for stock (office and Ghiath see
                           it as "Office Queue" with a warehouse icon)
-  3. Lens Stock         — MGM holds the loose-lens shelf; everyone else shops it
+  3. Lens Stock         — the lens holders' shelves (MGM first). Tab shown only to
+                          holders + admins; other branches order shelf lenses
+                          inside New fitting order → Lens stock
   4. Reimbursement Invoice (was Insurance Claims) — printable A4 invoice (products, Rx grid, payment)
   5. Direct Insurance   — same record + insurer (OQIC/LIVA/Mednet) + salesperson;
                           office & Ghiath get a "paid by insurance" dashboard. 4.8
@@ -1196,6 +1198,20 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  Lens Stock tab hidden from branches that hold no lenses (they order
+             shelf lenses in the new fitting order now). Shown to lens holders
+             (isLensOwner — whatever Settings → Accounts says) and to the
+             see-all roles (Omar, Ghiath, Wijdan, Sarah). app.js MODULES.lens
+             .only. Checked: SCC no tab; MGM, SAL, OFC have it.
+             KNOWN GAP: tour.js (presenter mode) chapter "lens stock" still has
+             SCC shop the Lens Stock tab — that chapter needs rewriting before
+             the next recording.
+ 2026-10-17  DATABASE CLEARED again (user), keeping the lens shelves: every
+             order, outside-lens order, lens / stock request, invoice, Direct
+             Insurance record and damaged report deleted; numbering restarted
+             (SR 1001, LR 1001, claims 3001, damaged 1001). Lenses set aside for
+             requests went back on the shelf first (10 lens rows, 156 pcs).
+             Branches, accounts, settings, lens lists and the schedule kept.
  2026-10-17  Order panel (Fitting Log drawer): Edit / Undo last step / Delete
              moved from under the step buttons to a bar at the TOP of the
              panel, full-size buttons sharing the width (Delete red-outlined).

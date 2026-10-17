@@ -253,7 +253,10 @@ async function enterShell() {
 const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
   stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
-  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
+  // Branches order shelf lenses inside a new fitting order now, so the tab is
+  // for the branches that hold lenses, and the admins who look across
+  // everything (user, 2026-10-17).
+  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView, only: me => isLensOwner(me?.code) || seesAll(me?.role) },
   outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me?.role) },
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
