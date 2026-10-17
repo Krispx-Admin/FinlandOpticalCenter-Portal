@@ -1198,6 +1198,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  DATABASE CLEARED again (user), same as before: shelves kept (10
+             lens rows, 156 pcs, the 1 set-aside lens returned); every order,
+             outside-lens order and lens request deleted; numbering restarted.
  2026-10-17  Fitting Log for the outside-lens handler (Avenues): an outside
              lens still TO ORDER (any branch's, Avenues' own too) sits only
              under "Outside Lens Orders", orange (it is Avenues' to do); once
