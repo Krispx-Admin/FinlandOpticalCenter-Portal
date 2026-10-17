@@ -1198,6 +1198,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-17  TEST SIGN-IN — ON (user: "remove the codes for now, later I will
+             put them back"). The 12 BRANCHES (retail / fitting / clinic) sign
+             in with one click: js/app.js TEST_SIGN_IN fills the code and
+             submits; in the database every branch account is on that code.
+             The people (Omar, Ghiath, Wijdan, Sarah) still need their own
+             codes — untouched. Real branch codes: sealed copy (hash only) in
+             foc_private.code_backup (schema not reachable by the site's keys).
+             WHILE ON, ANYONE CAN OPEN ANY BRANCH. To end it: TEST_SIGN_IN = ''
+             + run supabase/test-sign-in-restore.sql (both, same time).
  2026-10-17  Avenues (handler) Fitting Log: outside lenses it has SENT go under
              In Transit to Fitter when the frame went to a fitter (send_frames,
              lenses follow it there) and under In Transit to BRANCH when the

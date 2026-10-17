@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
+import { LOCATIONS, ROLES, BRANCH_KINDS, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
 import { captchaOn, mountCaptcha } from './captcha.js';
 import { damagedView } from './damaged.js';
 import { outsideView } from './outside.js';
@@ -119,6 +119,14 @@ function pinHTML(code) {
     </div>`;
 }
 
+// TESTING ONLY (user, 2026-10-17: "remove the codes for now, later I will put
+// them back"). Every BRANCH signs in with one click — the database has them
+// all on this code for now. The people (Omar, Ghiath, Wijdan, Sarah) still
+// need their own. To end it: set this to '' and restore the codes
+// (HANDOFF: "TEST SIGN-IN").
+const TEST_SIGN_IN = '000000';
+const testOpen = code => !!TEST_SIGN_IN && BRANCH_KINDS.includes(loc(code)?.role);
+
 function wirePin(code) {
   const form = app.querySelector('#pin-form');
   const input = app.querySelector('#pin-input');
@@ -164,6 +172,7 @@ function wirePin(code) {
     form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
     input.select();
   });
+  if (testOpen(code)) { input.value = TEST_SIGN_IN; form.requestSubmit(); }
 }
 
 // ─────────────────────────── PUBLIC SCHEDULE ───────────────────────────
