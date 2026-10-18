@@ -583,6 +583,16 @@ export const store = {
       .then(c => (c ? this.claim(id) : null));
   },
 
+  // Direct Insurance: cancel — or take the cancel back. Never deleted, so it
+  // still shows, marked, and still exports (schema-47).
+  cancelClaim(id, cancel, by) {
+    const c = this.claim(id);
+    if (!c) return Promise.resolve(null);
+    return run(['claims'], async () => ok(await supabase.rpc('cancel_claim', { p_id: id, p_cancel: !!cancel })), {
+      by, module: 'claims', title: cancel ? `${c.ref} canceled` : `${c.ref} restored`, refs: [id],
+    });
+  },
+
   removeClaim(id, by) {
     const c = this.claim(id);
     if (!c) return Promise.resolve(null);

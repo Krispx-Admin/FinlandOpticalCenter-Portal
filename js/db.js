@@ -95,6 +95,8 @@ function toClaim(r) {
       .map(i => ({ id: i.id, kind: i.kind ?? '', name: i.name, qty: i.qty ?? 1, price: num(i.price) })),
     rx: normaliseRx(rx), payment: r.payment,
     createdAt: ts(r.created_at), updatedAt: ts(r.updated_at), by: r.created_by,
+    // Direct Insurance is canceled, never deleted (schema-47).
+    canceledAt: r.canceled_at ? ts(r.canceled_at) : null, canceledBy: r.canceled_by ?? null,
   };
 }
 

@@ -82,7 +82,9 @@ create table public."claims" (
   "insurer" text,
   "kind" text default 'claim'::text not null,
   "employee_id" text,
-  "employee_name" text
+  "employee_name" text,
+  "canceled_at" timestamp with time zone,
+  "canceled_by" text
 );
 
 create table public."damaged_lines" (
@@ -695,6 +697,31 @@ CREATE OR REPLACE FUNCTION public.can_schedule()
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$ select exists (select 1 from public.branches b where b.code = public.jwt_branch() and b.role in ('admin', 'scheduler')) $function$;
+
+CREATE OR REPLACE FUNCTION public.cancel_claim(p_id uuid, p_cancel boolean)
+ RETURNS claims
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  c  public.claims;
+  me text := public.jwt_branch();
+begin
+  select * into c from public.claims where id = p_id for update;
+  if not found then raise exception 'Record not found'; end if;
+  if not (c.branch_code = me or public.is_admin()) then
+    raise exception 'Only the branch that raised it, or the office, can cancel it';
+  end if;
+  if c.kind <> 'direct' then raise exception 'Only Direct Insurance records are canceled — delete an invoice instead'; end if;
+  update public.claims
+     set canceled_at = case when p_cancel then coalesce(canceled_at, now()) end,
+         canceled_by = case when p_cancel then coalesce(canceled_by, me) end,
+         updated_at = now()
+   where id = p_id
+   returning * into c;
+  return c;
+end $function$;
 
 CREATE OR REPLACE FUNCTION public.change_lens_fulfilment(p_request uuid, p_fulfilment text)
  RETURNS lens_requests
@@ -2005,9 +2032,9 @@ CREATE TRIGGER schedule_weeks_touch BEFORE INSERT OR UPDATE ON public.schedule_w
 
 CREATE TRIGGER stock_requests_touch BEFORE UPDATE ON public.stock_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
-alter table public."claim_prescriptions" enable row level security;
-
 alter table public."claims" enable row level security;
+
+alter table public."claim_prescriptions" enable row level security;
 
 alter table public."order_events" enable row level security;
 
@@ -2023,15 +2050,15 @@ alter table public."lens_stock" enable row level security;
 
 alter table public."branches" enable row level security;
 
+alter table public."employees" enable row level security;
+
+alter table public."app_settings" enable row level security;
+
 alter table public."stock_request_events" enable row level security;
 
 alter table public."stock_request_lines" enable row level security;
 
 alter table public."stock_requests" enable row level security;
-
-alter table public."employees" enable row level security;
-
-alter table public."app_settings" enable row level security;
 
 alter table public."claim_items" enable row level security;
 
@@ -2077,7 +2104,7 @@ create policy "claim_rx_all" on public."claim_prescriptions" as permissive for a
    FROM claims c
   WHERE ((c.id = claim_prescriptions.claim_id) AND ((c.branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin))))));
 
-create policy "claims_delete" on public."claims" as permissive for delete to authenticated using (((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin)));
+create policy "claims_delete" on public."claims" as permissive for delete to authenticated using ((((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin)) AND (kind <> 'direct'::text)));
 
 create policy "claims_read" on public."claims" as permissive for select to authenticated using (((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin)));
 

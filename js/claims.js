@@ -187,6 +187,191 @@ function rxTableHTML(rx) {
     </table>`;
 }
 
+// ── Insurance Sales workbook (user, 2026-10-18: "a much nicer layout with
+// titles and correct column sizing so we can easily read it") ──
+// ExcelJS (styles, frozen header, filters, number formats), loaded only when
+// someone exports. Three sheets: the entries, every product line, and the
+// sums by insurer, branch and salesperson. Canceled entries are listed —
+// grey, marked — but never added into a total.
+const XL = { navy: 'FF133056', navySoft: 'FFE8EEF6', zebra: 'FFF6F8FB', line: 'FFD5DCE6', grey: 'FF8A94A6', red: 'FFB42318', white: 'FFFFFFFF' };
+const MONEY_FMT = '#,##0.000';
+let excelLoading = null;
+function loadExcel() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  excelLoading ??= new Promise((ok, bad) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    s.onload = () => ok(window.ExcelJS);
+    s.onerror = () => { excelLoading = null; bad(new Error('The Excel tool could not load — check the connection and try again.')); };
+    document.head.append(s);
+  });
+  return excelLoading;
+}
+const asDate = iso => { const [y, m, d] = String(iso).split('-').map(Number); return y ? new Date(Date.UTC(y, m - 1, d)) : null; };
+
+// One sheet: a title band, the lines under it, then the table — its header
+// frozen and filterable, money as money, every column as wide as it needs.
+function xlTable(ws, { title = null, lines = [], cols, rows, totals = null, canceled = () => false, top = 1, section = null, freeze = true }) {
+  const n = cols.length;
+  const band = (r, text, font, fill, height) => {
+    ws.mergeCells(r, 1, r, n);
+    const c = ws.getCell(r, 1);
+    c.value = text; c.font = font; c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    if (fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+    ws.getRow(r).height = height;
+  };
+  let r0 = top;
+  if (title) {
+    band(r0++, title, { name: 'Calibri', size: 16, bold: true, color: { argb: XL.white } }, XL.navy, 30);
+    lines.forEach(text => band(r0++, text, { name: 'Calibri', size: 10.5, color: { argb: text === lines.at(-1) ? 'FF1F2A44' : XL.grey }, bold: text === lines.at(-1) }, XL.navySoft, 18));
+    r0++;                                   // one empty row above the table
+  }
+  if (section) {
+    const c = ws.getCell(r0, 1);
+    c.value = section; c.font = { size: 13, bold: true, color: { argb: XL.navy } };
+    ws.getRow(r0).height = 22; r0++;
+  }
+  const head = r0;
+  const hr = ws.getRow(head);
+  cols.forEach((c, i) => {
+    const cell = hr.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { bold: true, color: { argb: XL.white } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.navy } };
+    cell.alignment = { vertical: 'middle', horizontal: c.num ? 'right' : 'left', wrapText: true };
+    cell.border = { bottom: { style: 'thin', color: { argb: XL.navy } } };
+  });
+  hr.height = 22;
+  rows.forEach((r, k) => {
+    const row = ws.getRow(head + 1 + k);
+    const cx = canceled(r);
+    cols.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      const v = r[c.key];
+      cell.value = c.date ? asDate(v) : v ?? '';
+      if (c.date) cell.numFmt = 'dd mmm yyyy';
+      if (c.money) cell.numFmt = MONEY_FMT;
+      cell.alignment = { vertical: 'middle', horizontal: c.num ? 'right' : 'left' };
+      cell.border = { bottom: { style: 'hair', color: { argb: XL.line } } };
+      if (k % 2) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.zebra } };
+      if (cx) cell.font = { italic: true, color: { argb: XL.grey }, strike: !!c.money };
+      if (cx && c.key === 'status') cell.font = { bold: true, color: { argb: XL.red } };
+    });
+  });
+  let last = head + rows.length;
+  if (totals) {
+    last += 1;
+    const row = ws.getRow(last);
+    cols.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = i === 0 ? totals.label : totals[c.key] ?? '';
+      if (c.money) cell.numFmt = MONEY_FMT;
+      cell.font = { bold: true };
+      cell.alignment = { horizontal: c.num ? 'right' : 'left' };
+      cell.border = { top: { style: 'medium', color: { argb: XL.navy } } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.navySoft } };
+    });
+    row.height = 20;
+  }
+  // As wide as the longest value (dates and money as they will show).
+  cols.forEach((c, i) => {
+    const shown = v => (c.date ? '00 Mmm 0000' : c.money ? Number(v || 0).toLocaleString('en', { minimumFractionDigits: 3 }) : String(v ?? ''));
+    const widest = Math.max(String(c.header).length, ...rows.map(r => shown(r[c.key]).length), totals && i ? shown(totals[c.key]).length : 0);
+    const w = Math.min(Math.max(widest + 3, c.min ?? 8), c.max ?? 46);
+    ws.getColumn(i + 1).width = Math.max(ws.getColumn(i + 1).width ?? 0, w);
+  });
+  if (!freeze) return last;
+  ws.views = [{ state: 'frozen', ySplit: head, showGridLines: false }];
+  if (rows.length) ws.autoFilter = { from: { row: head, column: 1 }, to: { row: head + rows.length, column: n } };
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${head}:${head}`,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } };
+  ws.headerFooter.oddFooter = '&L&8Finland Optical Center — Insurance Sales&R&8Page &P of &N';
+  return last;
+}
+
+export async function insuranceWorkbook(list, { scope, period, by }) {
+  const ExcelJS = await loadExcel();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'FOC Portal'; wb.created = new Date();
+  const cx = c => !!c.canceledAt;
+  const live = list.filter(c => !cx(c));
+  const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+  const count = (c, k) => (c.items ?? []).filter(i => i.kind === k).reduce((s, i) => s + itemQty(i), 0);
+  const total = sum(live, claimTotal);
+  const head = [
+    `${scope} · ${period}`,
+    `Exported ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${by ? ` by ${by}` : ''}`,
+    `${live.length} sale${live.length === 1 ? '' : 's'} · ${money(total)} ${CURRENCY}${list.length > live.length ? ` · ${list.length - live.length} canceled (listed, not counted)` : ''}`,
+  ];
+
+  const ws1 = wb.addWorksheet('Insurance Sales', { properties: { tabColor: { argb: XL.navy } } });
+  xlTable(ws1, {
+    title: 'Finland Optical Center — Insurance Sales', lines: head,
+    cols: [
+      { header: 'Invoice No.', key: 'ref' }, { header: 'Date', key: 'date', date: true, min: 12 },
+      { header: 'Branch', key: 'branch' }, { header: 'Bill Number', key: 'bill' },
+      { header: 'Customer Name', key: 'customer', min: 18 }, { header: 'Member ID', key: 'member' },
+      { header: 'Insurer', key: 'insurer' }, { header: 'Salesperson', key: 'sales', min: 14 },
+      { header: 'Frames', key: 'frames', num: true }, { header: 'Lenses', key: 'lenses', num: true },
+      { header: `Total (${CURRENCY})`, key: 'total', num: true, money: true, min: 12 },
+      { header: 'Status', key: 'status' },
+    ],
+    rows: list.map(c => ({
+      ref: c.ref, date: c.date, branch: locName(c.branch), bill: c.billNo, customer: c.customer, member: c.memberId,
+      insurer: c.insurer, sales: c.employeeName, frames: count(c, 'frame'), lenses: count(c, 'lens'),
+      total: Number(claimTotal(c).toFixed(3)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+    })),
+    canceled: r => r._cx,
+    totals: { label: 'Total (canceled not counted)', frames: sum(live, c => count(c, 'frame')), lenses: sum(live, c => count(c, 'lens')), total: Number(total.toFixed(3)) },
+  });
+
+  const lines = list.flatMap(c => (c.items ?? []).map(i => ({
+    ref: c.ref, date: c.date, branch: locName(c.branch), customer: c.customer,
+    item: ITEM_KINDS[i.kind]?.label ?? '', desc: i.name, qty: itemQty(i),
+    amount: Number(itemAmount(i, c.kind).toFixed(3)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+  })));
+  if (lines.length) {
+    const ws2 = wb.addWorksheet('Products', { properties: { tabColor: { argb: 'FF2E7D6B' } } });
+    const liveLines = lines.filter(l => !l._cx);
+    xlTable(ws2, {
+      title: 'Finland Optical Center — Products sold', lines: head,
+      cols: [
+        { header: 'Invoice No.', key: 'ref' }, { header: 'Date', key: 'date', date: true, min: 12 },
+        { header: 'Branch', key: 'branch' }, { header: 'Customer Name', key: 'customer', min: 18 },
+        { header: 'Item', key: 'item' }, { header: 'Description', key: 'desc', min: 22 },
+        { header: 'Qty', key: 'qty', num: true }, { header: `Amount (${CURRENCY})`, key: 'amount', num: true, money: true, min: 12 },
+        { header: 'Status', key: 'status' },
+      ],
+      rows: lines, canceled: r => r._cx,
+      totals: { label: 'Total (canceled not counted)', qty: sum(liveLines, l => l.qty), amount: Number(sum(liveLines, l => l.amount).toFixed(3)) },
+    });
+  }
+
+  // The sums: by insurer, by branch, by salesperson — sold only.
+  const ws3 = wb.addWorksheet('Summary', { properties: { tabColor: { argb: 'FFB45309' } } });
+  const groups = [['By insurer', c => c.insurer || '—'], ['By branch', c => locName(c.branch)], ['By salesperson', c => c.employeeName || '—']];
+  let at = 0;
+  groups.forEach(([name, key], gi) => {
+    const m = new Map();
+    for (const c of live) { const k = key(c); const g = m.get(k) ?? { name: k, n: 0, amount: 0 }; g.n += 1; g.amount += claimTotal(c); m.set(k, g); }
+    const rows = [...m.values()].sort((a, b) => b.amount - a.amount)
+      .map(g => ({ name: g.name, n: g.n, amount: Number(g.amount.toFixed(3)), share: total ? `${Math.round((g.amount / total) * 100)}%` : '' }));
+    at = xlTable(ws3, {
+      ...(gi ? {} : { title: 'Finland Optical Center — Insurance Sales summary', lines: head }),
+      top: gi ? at + 2 : 1, section: name, freeze: false,
+      cols: [{ header: name.replace('By ', '').replace(/^./, s => s.toUpperCase()), key: 'name', min: 24 }, { header: 'Customers', key: 'n', num: true, min: 11 },
+        { header: `Total (${CURRENCY})`, key: 'amount', num: true, money: true, min: 14 }, { header: 'Share', key: 'share', num: true, min: 8 }],
+      rows,
+      totals: { label: 'Total', n: live.length, amount: Number(total.toFixed(3)), share: live.length ? '100%' : '' },
+    });
+  });
+  ws3.views = [{ showGridLines: false }];
+  ws3.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
 export function receiptHTML(c) {
   const items = (c.items ?? []).length ? c.items : [{ name: '', price: null }];
   const total = claimTotal(c);
@@ -398,6 +583,10 @@ export function claimsView(me, kind = 'claim') {
   let root, layer = null;
 
   const mine = () => store.claimsFor(me.code).filter(c => (c.kind || 'claim') === kind);
+  // Canceled Direct Insurance stays on the list, marked, and in the export —
+  // but it is not a sale, so the dashboard's sums leave it out (schema-47).
+  const isCanceled = c => !!c.canceledAt;
+  const canceledNote = c => `Canceled ${fmtDT(c.canceledAt)}${c.canceledBy ? ` by ${locName(c.canceledBy)}` : ''}`;
 
   function visible() {
     let list = mine();
@@ -424,7 +613,7 @@ export function claimsView(me, kind = 'claim') {
   // beside it, the detail on hover.
   function dashHTML() {
     const { from, to } = periodRange(ui.period);
-    const list = mine().filter(c => c.date >= from && c.date <= to);
+    const list = mine().filter(c => c.date >= from && c.date <= to && !isCanceled(c));
     const total = list.reduce((t, c) => t + claimTotal(c), 0);
     const group = (keyOf, nameOf, seed = []) => {
       const m = new Map(seed.map(k => [k, { name: nameOf(k), amount: 0, n: 0 }]));
@@ -477,8 +666,8 @@ export function claimsView(me, kind = 'claim') {
     return `
       <div class="dl-head"><span>Number</span><span>Bill</span><span>Customer name</span><span>Member ID</span><span>Insurer</span><span>Salesperson</span><span class="num">Amount</span><span></span></div>
       ${list.map(c => `
-      <div class="row dl-row" data-open="${c.id}">
-        <div class="dl-ref"><b>${esc(c.ref)}</b><span>${esc(fmtDay(c.date))}${isAdmin ? ` · ${esc(c.branch)}` : ''}</span></div>
+      <div class="row dl-row ${isCanceled(c) ? 'is-canceled' : ''}" data-open="${c.id}" ${isCanceled(c) ? `title="${esc(canceledNote(c))}"` : ''}>
+        <div class="dl-ref"><b>${esc(c.ref)}</b><span>${esc(fmtDay(c.date))}${isAdmin ? ` · ${esc(c.branch)}` : ''}</span>${isCanceled(c) ? '<em class="cx-pill">Canceled</em>' : ''}</div>
         <div class="dl-mono">${esc(c.billNo || '—')}</div>
         <div class="dl-strong">${esc(c.customer || '—')}</div>
         <div class="dl-mono">${esc(c.memberId || '—')}</div>
@@ -535,6 +724,7 @@ export function claimsView(me, kind = 'claim') {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="dw-body">
+        ${isCanceled(c) ? `<div class="cx-banner">${icons.x} <b>Canceled</b> <span>${esc(canceledNote(c))} — kept on record and in the export, not counted in the totals.</span></div>` : ''}
         <div class="dw-status-row">${c.insurer ? `<span class="ins-chip">${esc(c.insurer)}</span>` : ''}<span class="dw-when">${esc(fmtDay(c.date))}</span></div>
         <div class="kv">
           ${kv('Bill number', esc(c.billNo || '—'))}
@@ -563,10 +753,22 @@ export function claimsView(me, kind = 'claim') {
         <div class="dw-actions">
           <button class="btn btn-primary" data-do-print>${icons.printer} Print invoice</button>
           <button class="btn btn-ghost" data-preview>See the invoice</button>
-          ${viewOnly ? '' : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
-          <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
+          ${viewOnly ? '' : isCanceled(c) ? `<button class="btn btn-ghost" data-restore>${icons.history} Restore</button>`
+            : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
+          <button class="btn btn-ghost btn-danger-text" data-cancel-claim>${icons.x} Cancel</button>`}
         </div>
       </div>`;
+  }
+  // Cancel, or take it back — asked first, both ways.
+  function cancelClaim(id, cancel) {
+    const c = store.claim(id);
+    if (!c) return false;
+    const ask = cancel
+      ? `Cancel ${c.ref} (${c.customer || '—'})?\n\nIt stays on the list marked Canceled and still exports, but no longer counts in the totals.`
+      : `Restore ${c.ref}? It counts as a sale again.`;
+    if (!confirm(ask)) return false;
+    store.cancelClaim(id, cancel, me.code);
+    return true;
   }
 
   function openDetail(id) {
@@ -576,6 +778,8 @@ export function claimsView(me, kind = 'claim') {
       if (e.target.closest('[data-do-print]')) return printClaim(store.claim(id));
       if (e.target.closest('[data-preview]')) return openPreview(id);
       if (e.target.closest('[data-edit]')) { const c = store.claim(id); drawer.close(); return composer(c); }
+      if (e.target.closest('[data-cancel-claim]')) return cancelClaim(id, true);
+      if (e.target.closest('[data-restore]')) return cancelClaim(id, false);
       if (e.target.closest('[data-del]')) {
         const c = store.claim(id);
         if (!c || !confirm(`Delete ${c.ref}? This cannot be undone.`)) return;
@@ -601,7 +805,11 @@ export function claimsView(me, kind = 'claim') {
       <div class="rc-stage"><div class="rc-scale">${receiptHTML(cur)}</div></div>
       <div class="modal-foot rc-actions">
         <button class="btn btn-primary" data-do-print>${icons.printer} Print invoice</button>
-        ${viewOnly ? '' : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
+        ${viewOnly ? '' : direct
+          ? (isCanceled(cur) ? `<button class="btn btn-ghost" data-restore>${icons.history} Restore</button>`
+            : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
+        <button class="btn btn-ghost btn-danger-text" data-cancel-claim>${icons.x} Cancel</button>`)
+          : `<button class="btn btn-ghost" data-edit>${icons.wrench} Edit</button>
         <button class="btn btn-ghost btn-danger-text" data-del>${icons.trash} Delete</button>`}
         <button class="btn btn-ghost" data-close>Close</button>
       </div>`;
@@ -618,6 +826,8 @@ export function claimsView(me, kind = 'claim') {
       if (e.target.closest('[data-close]')) return layer.close();
       if (e.target.closest('[data-do-print]')) return printClaim(store.claim(id));
       if (e.target.closest('[data-edit]')) { layer.close(); return composer(store.claim(id)); }
+      if (e.target.closest('[data-cancel-claim]')) { if (cancelClaim(id, true)) layer.close(); return; }
+      if (e.target.closest('[data-restore]')) { if (cancelClaim(id, false)) layer.close(); return; }
       if (e.target.closest('[data-del]')) {
         const cur = store.claim(id);
         if (!cur || !confirm(`Delete ${cur.ref}? This cannot be undone.`)) return;
@@ -925,32 +1135,21 @@ export function claimsView(me, kind = 'claim') {
       if (!list.length) return;
       go.disabled = true;
       try {
-        const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
-        const rows = list.map(c => ({
-          'Invoice No.': c.ref, Date: c.date, Branch: locName(c.branch), 'Bill Number': c.billNo,
-          'Customer Name': c.customer, 'Member ID': c.memberId, Insurer: c.insurer, Salesperson: c.employeeName,
-          Frames: (c.items ?? []).filter(i => i.kind === 'frame').reduce((s, i) => s + itemQty(i), 0),
-          Lenses: (c.items ?? []).filter(i => i.kind === 'lens').reduce((s, i) => s + itemQty(i), 0),
-          [`Total (${CURRENCY})`]: Number(claimTotal(c).toFixed(3)),
-        }));
-        const lines = list.flatMap(c => (c.items ?? []).map(i => ({
-          'Invoice No.': c.ref, Date: c.date, Branch: locName(c.branch), 'Customer Name': c.customer,
-          Item: ITEM_KINDS[i.kind]?.label ?? '', Description: i.name, Qty: itemQty(i),
-          ...(c.kind === 'direct' ? {} : { [`Price each (${CURRENCY})`]: Number(i.price) || 0 }),
-          [`Amount (${CURRENCY})`]: Number(itemAmount(i, c.kind).toFixed(3)),
-        })));
-        const wb = XLSX.utils.book_new();
-        const s1 = XLSX.utils.json_to_sheet(rows);
-        s1['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length, ...rows.map(r => String(r[k] ?? '').length)) + 2 }));
-        XLSX.utils.book_append_sheet(wb, s1, 'Insurance Sales');
-        if (lines.length) {
-          const s2 = XLSX.utils.json_to_sheet(lines);
-          s2['!cols'] = Object.keys(lines[0]).map(k => ({ wch: Math.max(k.length, ...lines.map(r => String(r[k] ?? '').length)) + 2 }));
-          XLSX.utils.book_append_sheet(wb, s2, 'Products');
-        }
         const [from, to] = range();
+        const fmt = d => asDate(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        const branchName = st.branch === 'all' ? 'All branches' : locName(st.branch);
+        const insurerName = st.insurer === 'all' ? 'All insurers' : st.insurer;
+        const blob = await insuranceWorkbook(list, {
+          scope: `${branchName} · ${insurerName}`,
+          period: from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`,
+          by: me.name ?? me.code,
+        });
         const who = [st.branch === 'all' ? 'All branches' : st.branch, st.insurer === 'all' ? '' : st.insurer].filter(Boolean).join(' - ');
-        XLSX.writeFile(wb, `Insurance Sales - ${who.replace(/[\/:*?"<>|]/g, '')} - ${from === to ? from : `${from} to ${to}`}.xlsx`);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Insurance Sales - ${who.replace(/[\/:*?"<>|]/g, '')} - ${from === to ? from : `${from} to ${to}`}.xlsx`;
+        document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         layer.close();
         toast({ title: `Exported ${list.length} entr${list.length === 1 ? 'y' : 'ies'}`, sub: 'The Excel file is in your downloads.', tone: 'info' });
       } catch (err) {

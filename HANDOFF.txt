@@ -807,6 +807,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              Schedule tab's own again. Applied 2026-10-18.
   schema-46-payment-both.sql claims.payment may be 'both' (cash + card).
                              Applied 2026-10-18.
+  schema-47-direct-cancel.sql claims.canceled_at / canceled_by;
+                             cancel_claim(id, cancel) — branch or office;
+                             Direct Insurance can no longer be deleted (RLS).
+                             Applied 2026-10-18.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1207,6 +1211,25 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Direct Insurance: CANCEL, not delete (user). The record stays —
+             striped row + red "Canceled" pill, a banner in its panel with when
+             and who — and "Restore" takes it back. Not counted in the
+             dashboard's sums; still in the export (Status column). Deleting
+             is refused by the database for Direct Insurance (schema-47:
+             rehearsed — delete refused, cancel/restore by the branch, another
+             branch refused, invoices still deletable; applied). The
+             Reimbursement Invoice keeps Delete.
+             INSURANCE SALES EXCEL redone (user: "much nicer layout with titles
+             and correct column sizing"): ExcelJS 4.4.0 (jsdelivr, loaded on
+             export). Sheet "Insurance Sales": navy title band, the filters,
+             who/when, a summary line; navy header frozen + filter arrows;
+             real dates, money as #,##0.000, zebra rows, columns sized to the
+             content, a total row (canceled not counted); canceled rows grey
+             italic, amount struck, Status in red. "Products": every line,
+             same style. "Summary": by insurer / branch / salesperson with
+             customers, total and share. Landscape, fit to width, header row
+             repeated on print, page numbers. claims.js insuranceWorkbook /
+             xlTable. Practice copy rebuilt + VERSION 5.
  2026-10-18  TRIAL — PRACTICE COPY ONLY: "Message Customer" on WhatsApp (user:
              try it in practice; put it on the real site only when they say).
              New fitting order gains "Customer phone" (8 digits → 968 added;
