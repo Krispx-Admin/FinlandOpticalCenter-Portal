@@ -631,17 +631,21 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
    The list is the grid and every row a subgrid of it, so each column is as
    wide as its widest row and lines up down the whole list — the tags start
    at one edge, the buttons end at another, and a button never wraps. */
-#f-list { display: grid; grid-template-columns: 30px minmax(150px, 1fr) minmax(230px, 1.6fr) max-content max-content; row-gap: 9px; }
+#f-list { display: grid; grid-template-columns: max-content minmax(150px, 1fr) minmax(230px, 1.6fr) max-content max-content; row-gap: 9px; }
 #f-list > * { grid-column: 1 / -1; }
 #f-list > .row { display: grid; grid-template-columns: subgrid; column-gap: 24px; }
 #f-list .row-status { justify-self: start; }
 #f-list .row-act { justify-self: end; }
 #f-list .row-act .btn { white-space: nowrap; }
+/* The row's own padding sits inside the shared first column, so that column
+   sizes to its content (padding + the tick box) rather than a fixed width —
+   a fixed 30px squeezed the box (user, 2026-10-18). */
+#f-list > .row > .cbx { justify-self: start; align-self: center; flex: none; }
 @media (max-width: 1180px) {
-  #f-list { grid-template-columns: 30px minmax(170px, 1fr) max-content max-content; }
+  #f-list { grid-template-columns: max-content minmax(170px, 1fr) max-content max-content; }
 }
 @media (max-width: 900px) {
-  #f-list { grid-template-columns: 26px minmax(0, 1fr) max-content; }
+  #f-list { grid-template-columns: max-content minmax(0, 1fr) max-content; }
   #f-list > .row { column-gap: 12px; }
 }
 .row-status .pill { max-width: 100%; }

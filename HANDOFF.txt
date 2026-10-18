@@ -1218,6 +1218,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Fix (user): the Fitting Log row tick box was squeezed into a thin
+             pill with the tick spilling out. With the rows as subgrids, the
+             row's padding sits inside the shared first column, which was a
+             fixed 30px — it is max-content now (all three widths), and the box
+             keeps its 16x16.
  2026-10-18  WHATSAPP "Message Customer" NOW LIVE (user: put the practice
              things on the real one). The isPractice checks in fitting.js are
              gone: every branch's New fitting order has "Customer phone"; an
