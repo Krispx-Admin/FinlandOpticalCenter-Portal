@@ -1218,6 +1218,17 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  TRIAL — PRACTICE COPY ONLY (user: try it before the real site):
+             the branch that ORDERED outside lenses sees a plain job in its
+             frame tabs — one line, one tag, no "Outside Lens" mark: lenses
+             coming to it → "Waiting for Lenses" (right side "waiting for
+             lenses", not "waiting on AV"); its frame going to a fitter → "Send
+             to Fitting" + "Send Frame to X". It sees them in full (frame + lens
+             lines, both tags) only in its own new tab "Outside Lens Orders"
+             (chip key olmine), steps: All | Being Ordered · Ordered · On the
+             Way | Received. Avenues' view unchanged. Gated by isPractice in
+             fitting.js (plainOutside, the olmine chip's `mine` filter). TO PUT
+             LIVE: drop isPractice from plainOutside and the chip filter.
  2026-10-18  Outside Lens Orders steps: no divider between Waiting from Supplier
              and Send Lenses (user) — All | Order Lens · Waiting from Supplier ·
              Send Lenses · On the Way | Done.
