@@ -891,7 +891,7 @@ export const store = {
     }, { module: 'settings', title: `${name} removed from the employees` });
   },
 
-  // ── Outside cutters: the 3rd parties "Send to fitter" offers ──
+  // ── Outside cutters: the 3rd parties "Send to Fitting" offers ──
   addCutter(name) {
     name = String(name).trim();
     const list = state.settings.outsideCutters ?? (state.settings.outsideCutters = []);

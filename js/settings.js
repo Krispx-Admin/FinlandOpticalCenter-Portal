@@ -215,9 +215,9 @@ export function settingsView(me) {
       return store.saveBranch(code, { role });
     }
     const note = role === 'fitting'
-      ? `${b.name} will be offered in “Send to fitter” from now on.`
+      ? `${b.name} will be offered in “Send to Fitting” from now on.`
       : b.role === 'fitting'
-        ? `${b.name} will no longer be offered in “Send to fitter”.${away ? ` The ${away} frame${away === 1 ? '' : 's'} with it now will finish their journey as normal.` : ''}`
+        ? `${b.name} will no longer be offered in “Send to Fitting”.${away ? ` The ${away} frame${away === 1 ? '' : 's'} with it now will finish their journey as normal.` : ''}`
         : '';
     if (!confirm(`Make ${b.name} a ${what}?\n\n${note}`.trim())) { sel.value = b.role; return; }
     store.saveBranch(code, { role });

@@ -1211,6 +1211,19 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Fitting Log rows: even spacing (user). #f-list is now one grid and
+             every row a SUBGRID of it, so the columns — bill + name, journey,
+             tags, buttons — are shared down the whole list: tags start at one
+             edge, buttons end at another, buttons never wrap (24px between
+             columns). Replaces the old calc() that nudged each pill to the
+             middle of a gap. Narrower: journey hides at <=1180px, tags at
+             <=900px, as before.
+             Action buttons in Title Case and "Fitting", not "fitter" (user):
+             Lens Received, Frame Received, Send to Fitting, Mark Ready, Send to
+             Branch, Start Fitting, Mark as Done, Send Lenses (to X), Send Frame
+             to X, Order Lens, Confirm Order; tabs "Send to Fitting" and "In
+             Transit to Fitting". Timeline sentences unchanged. tour.js taps the
+             new words.
  2026-10-18  Direct Insurance: CANCEL, not delete (user). The record stays —
              striped row + red "Canceled" pill, a banner in its panel with when
              and who — and "Restore" takes it back. Not counted in the

@@ -172,7 +172,7 @@ export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered', 'coll
 export const isOutside = o => !!o.outside;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
-  to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame received', actor: 'origin', done: 'Received back from the outside cutter' },
+  to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame Received', actor: 'origin', done: 'Received back from the outside cutter' },
   delivered: { label: 'Ready for collection', color: 'green', action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',         color: 'done',   action: null,            actor: null,     done: null },
 };
@@ -207,12 +207,12 @@ export const canChangeCollect = (o, code) => o.status !== 'collected' && (onRout
 // then the road, then the bench. On the road the order names the centre it is heading for (see
 // fitStep); the chip keeps the generic word.
 export const FIT_STATUS = {
-  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lens received', actor: 'origin', done: 'Lenses delivered at the branch' },
-  lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to fitter',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
-  to_fitter: { label: 'In transit',           color: 'blue',   action: 'Frame received', actor: 'fitter', done: 'Frame received at fitting centre' },
-  at_fitter: { label: 'In Fitting',           color: 'purple', action: 'Mark ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
-  ready:     { label: 'Ready',                color: 'green',  action: 'Send to branch',  actor: 'here',   done: 'Handed to driver — returning to branch' },
-  returning: { label: 'Returning',            color: 'teal',   action: 'Frame received',  actor: 'to',     done: 'Delivered back at origin branch' },
+  pending:   { label: 'Waiting for Lenses',   color: 'slate',  action: 'Lens Received', actor: 'origin', done: 'Lenses delivered at the branch' },
+  lenses_in: { label: 'Lenses Delivered',     color: 'cyan',   action: 'Send to Fitting',  actor: 'origin', done: 'Handed to driver — in transit to fitter' },
+  to_fitter: { label: 'In transit',           color: 'blue',   action: 'Frame Received', actor: 'fitter', done: 'Frame received at fitting centre' },
+  at_fitter: { label: 'In Fitting',           color: 'purple', action: 'Mark Ready',      actor: 'fitter', done: 'Lenses fitted — job ready' },
+  ready:     { label: 'Ready',                color: 'green',  action: 'Send to Branch',  actor: 'here',   done: 'Handed to driver — returning to branch' },
+  returning: { label: 'Returning',            color: 'teal',   action: 'Frame Received',  actor: 'to',     done: 'Delivered back at origin branch' },
   delivered: { label: 'Ready for collection', color: 'green',  action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',            color: 'done',   action: null,              actor: null,     done: null },
 };
@@ -222,9 +222,9 @@ export const FIT_STATUS = {
 const SELF_STATUS = {
   // Pending with the fitter already set is a job the lens request opened: the
   // bench is waiting on the lenses, not on anyone choosing where to send it.
-  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens received', actor: 'fitter', done: 'Lenses delivered at the branch' },
-  lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
-  at_fitter: { label: 'In Fitting',         color: 'purple', action: 'Mark as done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
+  pending:   { label: 'Waiting for Lenses', color: 'slate',  action: 'Lens Received', actor: 'fitter', done: 'Lenses delivered at the branch' },
+  lenses_in: { label: 'Lenses Delivered',   color: 'cyan',   action: 'Start Fitting', actor: 'fitter', done: 'Lenses in — fitting started' },
+  at_fitter: { label: 'In Fitting',         color: 'purple', action: 'Mark as Done',  actor: 'fitter', done: 'Fitting finished — waiting for the customer' },
   delivered: { label: 'Ready for collection', color: 'green', action: 'Hand to Customer', actor: 'collect', done: 'Handed to the customer — collected' },
   collected: { label: 'Collected',          color: 'done',   action: null,            actor: null,     done: null },
 };
@@ -319,10 +319,10 @@ export function fulfilmentSwitch(r, o, code) {
 
 // A branch that asked to receive lenses reads "Waiting for Lenses" from the
 // moment it orders (user, 2026-10-12). Until the holder sends them the job is
-// the holder's: its Fitting Log shows "Send lenses" (canSendLenses) and the
+// the holder's: its Fitting Log shows "Send Lenses" (canSendLenses) and the
 // branch's row says who it is waiting on; once sent, the branch gets
-// "Lens received". The long form (drawer, hover) says which of the two.
-const LENS_WAIT = { label: 'Waiting for Lenses', color: 'slate', action: 'Send lenses', actor: 'lens' };
+// "Lens Received". The long form (drawer, hover) says which of the two.
+const LENS_WAIT = { label: 'Waiting for Lenses', color: 'slate', action: 'Send Lenses', actor: 'lens' };
 export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
 export const canSendLenses = (o, code) =>
   awaitingLens(o) && (o.lensRequest.holder === code || loc(code)?.role === 'admin');
@@ -355,10 +355,10 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     const ordered = ol.status === 'ordered';
     // The handler (Avenues): order the lens, then send it on.
     if (viewer === H && o.origin !== H && !ol.sentAt) return !ordered
-      ? { ...base, label: 'Order lens', color: 'amber', action: null, actor: 'outside' }
+      ? { ...base, label: 'Order Lens', color: 'amber', action: null, actor: 'outside' }
       : !ol.arrivedAt
-        ? { ...base, label: 'Lenses ordered', color: 'green', action: 'Lens received', actor: 'outside' }
-        : { ...base, label: 'Lenses Delivered', color: 'cyan', action: `Send lenses to ${ol.dest}`, actor: 'outside' };
+        ? { ...base, label: 'Lenses ordered', color: 'green', action: 'Lens Received', actor: 'outside' }
+        : { ...base, label: 'Lenses Delivered', color: 'cyan', action: `Send Lenses to ${ol.dest}`, actor: 'outside' };
     // …and, once sent, watches them on the road until they arrive.
     if (viewer && outsideInTransit(o, viewer))
       return { ...base, label: long ? `Lenses in transit to ${locName(ol.dest)}` : `In transit to ${ol.dest}`, color: 'blue', action: null, actor: null };
@@ -367,7 +367,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
       return { ...base, label: ol.sentAt ? `Lenses on the way from ${H}` : `Waiting for lenses from ${H}`, color: 'amber', action: null };
     // Receiving at the branch.
     if (ol.fulfilment === 'receive_lens' && o.status === 'pending') {
-      if (ol.branch === H) return ordered ? { ...base, label: 'Lenses ordered', color: 'green' } : { ...base, label: 'Order lens', color: 'amber' };
+      if (ol.branch === H) return ordered ? { ...base, label: 'Lenses ordered', color: 'green' } : { ...base, label: 'Order Lens', color: 'amber' };
       if (!ol.sentAt) return { ...base, label: long ? `Waiting for Lenses — ${locName(H)} to ${ordered ? 'send' : 'order'} them` : 'Waiting for Lenses',
         color: 'slate', action: null, actor: 'outside' };
       if (long) return { ...base, label: `Waiting for Lenses — sent by ${locName(H)}` };
@@ -375,7 +375,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     // Sending the frame, before it leaves.
     if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in') {
       if (viewer && viewer === o.fitter) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
-      return { ...base, label: outsideLensState(ol), color: ordered ? 'green' : 'amber', action: `Send frame to ${o.fitter}` };
+      return { ...base, label: outsideLensState(ol), color: ordered ? 'green' : 'amber', action: `Send Frame to ${o.fitter}` };
     }
   }
   if (o.status === 'lenses_in' && o.lensRequest?.fulfilment === 'send_frames' && o.lensRequest.status !== 'declined' && o.fitter) {
@@ -386,7 +386,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
   // The road after the fitter, to wherever the customer collects.
   const C = collectOf(o);
   if (o.status === 'at_fitter' && o.fitter && !isSelfFit(o) && C === o.fitter)
-    return { ...base, action: 'Mark as done', done: 'Fitted — ready for collection here' };
+    return { ...base, action: 'Mark as Done', done: 'Fitted — ready for collection here' };
   if (o.status === 'ready') {
     if (isTransfer(o)) return { ...base, label: `Transfer to ${where(C)}`, color: 'amber', action: `Transfer to ${C}`, done: `Handed to driver — transferred to ${locName(C)}` };
     return { ...base, action: `Send to ${C}`, done: `Handed to driver — on its way to ${locName(C)}` };
@@ -602,7 +602,7 @@ export function canSeeOrder(o, code) {
 export function handlerStage(o, code) {
   const ol = o.outsideLens;
   if (!ol || code !== outsideHandler() || o.origin === code || ol.dest === code || ol.receivedAt || isBack(o)) return null;
-  // Sent: to the fitter with the frame (send_frames) → In Transit to Fitter;
+  // Sent: to the fitter with the frame (send_frames) → In Transit to Fitting;
   // to the branch receiving them (receive_lens) → In Transit to Branch, until
   // that branch marks them received (user, 2026-10-17).
   if (ol.sentAt) return ol.fulfilment === 'receive_lens' ? (o.status === 'pending' ? 'returning' : null) : 'to_fitter';
@@ -629,7 +629,7 @@ export function frameStep(o, { long = false, viewer = null } = {}) {
 export function lensStep(o, { long = false, viewer = null } = {}) {
   const ol = o.outsideLens, H = outsideHandler();
   const where = code => (long ? locName(code) : code);
-  if (ol.status !== 'ordered') return { label: viewer === H ? 'Order lens' : 'Lenses being ordered', color: 'amber' };
+  if (ol.status !== 'ordered') return { label: viewer === H ? 'Order Lens' : 'Lenses being ordered', color: 'amber' };
   if (!ol.arrivedAt) return { label: long ? `Lenses ordered by ${locName(H)}` : 'Lenses ordered', color: 'green' };
   if (!ol.sentAt) return { label: viewer === H ? 'Lenses Delivered' : `Lenses at ${where(H)}`, color: 'cyan' };
   if (!ol.receivedAt) return { label: `In transit to ${where(ol.dest)}`, color: 'blue' };

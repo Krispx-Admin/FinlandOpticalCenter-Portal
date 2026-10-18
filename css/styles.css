@@ -619,31 +619,23 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 #f-list .row-status .pill { font-size: 10px; padding: 2px 7px; gap: 4px; }
 #f-list .row-status .pill .dot { width: 5px; height: 5px; }
 
-/* …and each pill is centred in the gap between the two worst cases either
-   side of it: the end of the widest journey any order can draw, and the start
-   of the widest action button. So whatever a row holds, the pill is never
-   nearer one than the other. Measured with this stylesheet (re-measure if
-   the pins, the buttons or the location codes change):
-     widest journey  QURFEC → MOUJ → QURFEC, segments at their minimum  237px
-     widest action   "Confirm delivery →" 140px + 6px gap + 30px arrow   176px
-   The row grid is 30px | 1.4fr | 1fr | 190px | 180px with 14px gaps and 16px
-   padding inside a 1px border, so with the list as the container the journey
-   column is (100cqw − 490px) / 2.4 wide. A journey fills its column less its
-   18px padding, or overflows it when it cannot fit. Only above 1180px, where
-   the journey column is shown and this grid applies. */
-@media (min-width: 1181px) {
-  #f-list { container-type: inline-size; }
-  #f-list .row-status {
-    --widest-journey: 237px;
-    --widest-action: 176px;
-    --j: calc((100cqw - 490px) / 2.4);
-    --pipe-end: max(calc(var(--j) - 18px), var(--widest-journey));
-    --btn-start: calc(var(--j) + 398px - var(--widest-action));
-    --mid: calc((var(--pipe-end) + var(--btn-start)) / 2 - var(--j) - 14px);
-  }
-  /* `translate`, not `transform`, so the status-change flash still plays */
-  #f-list .row-status .pill { position: relative; left: var(--mid); translate: -50% 0; }
-  #f-list .row-status .ol-tag { position: relative; left: var(--mid); translate: -50% 0; }
+/* The Fitting Log's rows share one set of columns (user, 2026-10-18: even
+   space between the bill and name, the journey, the tags and the buttons).
+   The list is the grid and every row a subgrid of it, so each column is as
+   wide as its widest row and lines up down the whole list — the tags start
+   at one edge, the buttons end at another, and a button never wraps. */
+#f-list { display: grid; grid-template-columns: 30px minmax(150px, 1fr) minmax(230px, 1.6fr) max-content max-content; row-gap: 9px; }
+#f-list > * { grid-column: 1 / -1; }
+#f-list > .row { display: grid; grid-template-columns: subgrid; column-gap: 24px; }
+#f-list .row-status { justify-self: start; }
+#f-list .row-act { justify-self: end; }
+#f-list .row-act .btn { white-space: nowrap; }
+@media (max-width: 1180px) {
+  #f-list { grid-template-columns: 30px minmax(170px, 1fr) max-content max-content; }
+}
+@media (max-width: 900px) {
+  #f-list { grid-template-columns: 26px minmax(0, 1fr) max-content; }
+  #f-list > .row { column-gap: 12px; }
 }
 .row-status .pill { max-width: 100%; }
 /* outside lenses: the frame's tag over the lenses', each level with its line */

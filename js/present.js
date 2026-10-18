@@ -26,7 +26,7 @@
 // recording without a console. It is off-screen in the video unless open.
 //
 // A target is a CSS selector, or text that is visible on screen. "A >> B"
-// means B inside whatever holds A: "DEMO-1231 >> Send to fitter".
+// means B inside whatever holds A: "DEMO-1231 >> Send to Fitting".
 import { TOUR, CHAPTERS } from './tour.js';
 
 const CTX_KEY = 'focp.present.ctx';

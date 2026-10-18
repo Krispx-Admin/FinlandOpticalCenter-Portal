@@ -308,7 +308,7 @@ export function lensView(me) {
       const changed = ui.prevStatus.get(r.id) !== r.status;
       const quick = r.holder === me.code && r.status === 'requested'
         ? `<button class="btn btn-ghost btn-sm" data-decline="${r.id}">Decline</button>
-           <button class="btn btn-primary btn-sm" data-send-lenses="${r.id}">${icons.send} Send lenses</button>` : '';
+           <button class="btn btn-primary btn-sm" data-send-lenses="${r.id}">${icons.send} Send Lenses</button>` : '';
       const first = r.lines.slice(0, 2).map(lensLabel);
       const more = r.lines.length - first.length;
       return `
@@ -387,7 +387,7 @@ export function lensView(me) {
            <button class="btn btn-danger" data-do-decline="${r.id}">Decline request</button>
          </div>`
       : `<button class="btn btn-ghost btn-danger-text" data-decline="${r.id}">Decline</button>
-         <button class="btn btn-primary" data-send-lenses="${r.id}">${icons.send} Send lenses to ${esc(locName(r.branch))}</button>`;
+         <button class="btn btn-primary" data-send-lenses="${r.id}">${icons.send} Send Lenses to ${esc(locName(r.branch))}</button>`;
     return `
       <div class="dw-head">
         <div>

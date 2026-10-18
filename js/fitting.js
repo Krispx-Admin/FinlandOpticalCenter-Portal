@@ -23,12 +23,12 @@ const DAY_FILTERS = [0, 1, 3, 7, 14, 30];
 // Fitter". Where nothing is pressed, the tab says where the frame is
 // (user, 2026-10-15). A chip's key is its status.
 const CHIP_LABELS = {
-  pending: 'Waiting for Lenses', lenses_in: 'Send to Fitter', to_fitter: 'In Transit to Fitter',
+  pending: 'Waiting for Lenses', lenses_in: 'Send to Fitting', to_fitter: 'In Transit to Fitting',
   at_fitter: 'In Fitting', ready: 'Ready', returning: 'In Transit to Branch', delivered: 'Ready for Collection',
 };
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
 for (const s of FIT_FLOW.filter(s => s !== 'collected')) CHIP_DEFS.push({ key: s, label: CHIP_LABELS[s], statuses: [s] });
-// A frame at an outside cutter has its own tab, not "In Transit to Fitter".
+// A frame at an outside cutter has its own tab, not "In Transit to Fitting".
 CHIP_DEFS.find(d => d.key === 'to_fitter').test = o => o.status === 'to_fitter' && !isOutside(o);
 CHIP_DEFS.push({ key: 'outside', label: 'Outside Cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
 // Every order that uses this branch's stock lenses — only a branch holding
@@ -430,19 +430,19 @@ export function fittingView(me) {
       let action;
       // The handler's first job on any outside order: order the lens — the button opens the list.
       if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && !isBack(o) && !viewOnly)
-        action = `<a class="btn btn-primary btn-sm" href="#/outside">Order lens ${icons.arrowRight}</a>`;
-      else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses</button>`;
-      else if (canArriveOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-arrive-outside="${o.outsideLens.id}">Lens received ${icons.arrowRight}</button>`;
-      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(o.outsideLens.dest)}</button>`;
+        action = `<a class="btn btn-primary btn-sm" href="#/outside">Order Lens ${icons.arrowRight}</a>`;
+      else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send Lenses</button>`;
+      else if (canArriveOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-arrive-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
+      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send Lenses to ${esc(o.outsideLens.dest)}</button>`;
       else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} not taking frames</span>`;
-      else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>`;
+      else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
       else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       // The fitter marks the outside lenses received — alongside the frame's own step.
       if (canReceiveOutside(o, me.code) && !viewOnly) {
-        const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens received ${icons.arrowRight}</button>`;
+        const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
         action = action.startsWith('<span') ? lens : `${lens}${action}`;
       }
       if (waOn(o)) action = `${waBtn(o)}${action}`;
@@ -473,7 +473,7 @@ export function fittingView(me) {
   // The button an order would get in a bulk move, or null when this location
   // has nothing to press on it (yet) — e.g. waiting for another branch.
   const bulkLabel = o => (!canAdvanceOrder(o, me.code) ? null
-    : (o.status === 'lenses_in' && !o.fitter) ? 'Send to fitter'
+    : (o.status === 'lenses_in' && !o.fitter) ? 'Send to Fitting'
     : fitStep(o).action) || null;
   function bulkAction() {
     const sel = [...ui.selected].map(id => store.order(id)).filter(Boolean);
@@ -543,11 +543,11 @@ export function fittingView(me) {
         ${stockLensHTML(store.lensRequestForOrder(o.id))}
         ${outsideLensHTML(o)}
         <div class="dw-actions">
-          ${canReceiveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-recv-outside="${o.outsideLens.id}">Lens received ${icons.arrowRight}</button>` : ''}
-          ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send lenses to ${esc(locName(o.origin))}</button>` :
-            canArriveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-arrive-outside="${o.outsideLens.id}">Lens received ${icons.arrowRight}</button>` :
-            canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(locName(o.outsideLens.dest))}</button>` :
-            needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
+          ${canReceiveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-recv-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>` : ''}
+          ${canSendLenses(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-lenses="${o.lensRequest.id}">${icons.send} Send Lenses to ${esc(locName(o.origin))}</button>` :
+            canArriveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-arrive-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>` :
+            canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send Lenses to ${esc(locName(o.outsideLens.dest))}</button>` :
+            needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
           ${waBtn(o, true)}
         </div>
@@ -721,7 +721,7 @@ export function fittingView(me) {
     const cutters = listed.length ? listed : [OUTSIDE_DEFAULT];
     const layer = openLayer('modal', () => `
       <div class="dw-head">
-        <div><div class="dw-kicker">Send to fitter</div><h2>Choose a fitting centre for ${esc(what)}</h2></div>
+        <div><div class="dw-kicker">Send to Fitting</div><h2>Choose a fitting centre for ${esc(what)}</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
@@ -762,7 +762,7 @@ export function fittingView(me) {
     });
   }
 
-  // ── outside cutters (the office) — the 3rd parties Send to fitter offers ──
+  // ── outside cutters (the office) — the 3rd parties Send to Fitting offers ──
   function cuttersModal() {
     const layer = openLayer('modal', () => {
       const list = store.settings.outsideCutters ?? [];
@@ -835,7 +835,7 @@ export function fittingView(me) {
     };
     const lsWayHTML = () => {
       // Your own shelf: the lenses are already here — nothing to send.
-      if (own()) return `<p class="muted sm ls-own">The lenses come off your shelf now — the order starts at “Send to Fitter”, where you keep it here or send it.</p>`;
+      if (own()) return `<p class="muted sm ls-own">The lenses come off your shelf now — the order starts at “Send to Fitting”, where you keep it here or send it.</p>`;
       const shut = isBenchClosed(ls.holder);
       const how = shut ? 'receive_lens' : (layer?.el.querySelector('[name=lsHow]:checked')?.value ?? 'send_frames');
       return Object.entries(FULFILMENT).map(([k, f]) => `
@@ -1061,10 +1061,10 @@ export function fittingView(me) {
       layer.close();
       toast({
         title: `${o.ref} logged`,
-        sub: src === 'stock' ? (own() ? 'Lenses taken off your shelf — use “Send to fitter” to keep it here or send it' : `Lenses requested from ${locName(ls.holder)}`)
+        sub: src === 'stock' ? (own() ? 'Lenses taken off your shelf — use “Send to Fitting” to keep it here or send it' : `Lenses requested from ${locName(ls.holder)}`)
           : me.role === 'fitting'
-            ? 'Use “Send to fitter” when the lenses arrive'
-            : 'Use “Send to fitter” when it leaves your branch',
+            ? 'Use “Send to Fitting” when the lenses arrive'
+            : 'Use “Send to Fitting” when it leaves your branch',
         tone: 'info',
       });
     });
@@ -1213,7 +1213,7 @@ export function fittingView(me) {
         // Frames with no fitter yet are sent through the picker; frames a lens
         // request already gave one simply go.
         const unassigned = ids.filter(id => !store.order(id)?.fitter);
-        if (action === 'Send to fitter' && unassigned.length) {
+        if (action === 'Send to Fitting' && unassigned.length) {
           const assigned = ids.filter(id => !unassigned.includes(id));
           if (assigned.length) store.advanceOrders(assigned, me.code);
           fitterPicker(unassigned); return; // picker clears selection on send

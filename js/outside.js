@@ -100,12 +100,12 @@ export function outsideView(me) {
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
-            ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Confirm order</button>`
+            ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Confirm Order</button>`
             : !x.sentAt && x.branch !== outsideHandler()
               ? (x.arrivedAt
-                ? `<button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send lenses to ${esc(x.dest ?? x.branch)}</button>`
+                ? `<button class="btn btn-primary btn-sm" data-send="${x.id}">${icons.send} Send Lenses to ${esc(x.dest ?? x.branch)}</button>`
                 : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>
-                   <button class="btn btn-primary btn-sm" data-arrive="${x.id}">Lens received ${icons.arrowRight}</button>`)
+                   <button class="btn btn-primary btn-sm" data-arrive="${x.id}">Lens Received ${icons.arrowRight}</button>`)
               : x.sentAt ? '<span class="row-actor">sent</span>'
               : `<button class="btn btn-ghost btn-sm" data-mark="${x.id}" data-to="to_order" title="Put it back to To order">Undo</button>`}
         </div>
