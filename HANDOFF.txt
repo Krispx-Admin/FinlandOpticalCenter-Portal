@@ -811,6 +811,10 @@ Migrations are applied by hand, in order. Each file has a header with
                              cancel_claim(id, cancel) — branch or office;
                              Direct Insurance can no longer be deleted (RLS).
                              Applied 2026-10-18.
+  schema-48-branch-hours.sql branch_hours(code): a branch's open / close /
+                             closed per day from THIS week's saved schedule
+                             (Oman time), else schedule_branches.days. No
+                             staffing numbers. Applied 2026-10-18.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1211,6 +1215,14 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  WhatsApp message (practice trial) rewritten (user): English, then
+             Arabic; no bill number; the branch's opening hours from the
+             SCHEDULE for the current week — so seasonal hours follow the
+             schedule — days with the same hours grouped ("Sat – Wed: 10 AM –
+             10 PM", "Thu – Fri: 10 AM – 12 midnight"; Arabic day names and
+             صباحاً / مساءً / منتصف الليل). schema-48 branch_hours() (rehearsed,
+             applied); store.branchHours; fitting.js waText / hoursLines.
+             Practice copy seeds schedule_branches now + VERSION 6.
  2026-10-18  LENS TABS WITH THEIR OWN STEPS (user). Stock Lens (lens holders)
              holds every other branch's job on this shelf, start to finish;
              Outside Lens Orders (Avenues) every other branch's outside-lens job

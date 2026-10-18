@@ -691,6 +691,27 @@ AS $function$
    order by b.position, b.code
 $function$;
 
+CREATE OR REPLACE FUNCTION public.branch_hours(p_code text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  -- Open / close / closed for each day — nothing about staffing.
+  select (select jsonb_object_agg(d.key, jsonb_build_object('open', d.value -> 'open', 'close', d.value -> 'close',
+                                                            'closed', coalesce(d.value -> 'closed', 'false'::jsonb)))
+            from jsonb_each(coalesce(
+    (select b -> 'days'
+       from public.schedule_weeks w, jsonb_array_elements(case when jsonb_typeof(w.branches) = 'array' then w.branches else '[]'::jsonb end) b
+      where w.week_start <= (now() at time zone 'Asia/Muscat')::date
+        and (now() at time zone 'Asia/Muscat')::date < w.week_start + 7
+        and b ->> 'code' = p_code
+      order by w.week_start desc
+      limit 1),
+    (select days from public.schedule_branches where code = p_code),
+    '{}'::jsonb)) d)
+$function$;
+
 CREATE OR REPLACE FUNCTION public.can_schedule()
  RETURNS boolean
  LANGUAGE sql

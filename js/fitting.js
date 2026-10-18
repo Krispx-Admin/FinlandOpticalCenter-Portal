@@ -218,12 +218,52 @@ export function fittingView(me) {
     if (d.length === 8) d = `968${d}`;
     return d.length >= 10 ? d : null;
   };
-  const waText = o => [
-    'Finland Optical Center',
-    `Hello *${o.customer || 'there'}*`,
-    `Your Frames *${o.ref}* are ready to pick up from *${locName(collectOf(o))}*.`,
-    'Please visit us from 10-10 on weekdays and 10-12 on weekends',
-  ].join('\n');
+  // The message: English, then Arabic (user, 2026-10-18), with the branch's
+  // opening hours as the schedule has them this week — they change with the
+  // season — days with the same hours run together ("Sat – Wed").
+  const WEEK = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const DAY_AR = { Sat: 'السبت', Sun: 'الأحد', Mon: 'الإثنين', Tue: 'الثلاثاء', Wed: 'الأربعاء', Thu: 'الخميس', Fri: 'الجمعة' };
+  const clock = (h, ar) => {
+    const n = Number(h) || 0, mins = Math.round((n % 1) * 60), hr = Math.floor(n) % 24;
+    const mm = mins ? `:${String(mins).padStart(2, '0')}` : '';
+    if (hr === 0 && !mins) return ar ? '12 منتصف الليل' : '12 midnight';
+    if (hr === 12 && !mins) return ar ? '12 ظهراً' : '12 noon';
+    const h12 = hr % 12 || 12;
+    return ar ? `${h12}${mm} ${hr < 12 ? 'صباحاً' : 'مساءً'}` : `${h12}${mm} ${hr < 12 ? 'AM' : 'PM'}`;
+  };
+  function hoursLines(days, ar) {
+    if (!days) return [];
+    const runs = [];
+    for (const d of WEEK) {
+      const x = days[d];
+      if (!x) continue;
+      const key = x.closed ? 'closed' : `${x.open}-${x.close}`;
+      const last = runs.at(-1);
+      if (last && last.key === key && WEEK.indexOf(last.to) === WEEK.indexOf(d) - 1) last.to = d;
+      else runs.push({ key, from: d, to: d, x });
+    }
+    const name = d => (ar ? DAY_AR[d] : d);
+    return runs.map(r => `${name(r.from)}${r.to !== r.from ? ` – ${name(r.to)}` : ''}: ${r.x.closed ? (ar ? 'مغلق' : 'Closed') : `${clock(r.x.open, ar)} – ${clock(r.x.close, ar)}`}`);
+  }
+  const waText = (o, days) => {
+    const name = o.customer || '';
+    const branch = locName(collectOf(o));
+    const en = [
+      `Hello${name ? ` *${name}*` : ''},`,
+      `Your glasses are ready for collection at *Finland Optical Center – ${branch}*.`,
+      ...(days ? ['', '*Opening hours*', ...hoursLines(days, false)] : []),
+      '',
+      'We look forward to seeing you!',
+    ];
+    const ar = [
+      `مرحباً${name ? ` *${name}*` : ''}،`,
+      `نظارتك جاهزة للاستلام من *المركز الفنلندي للبصريات – ${branch}*.`,
+      ...(days ? ['', '*أوقات العمل*', ...hoursLines(days, true)] : []),
+      '',
+      'بانتظار زيارتك!',
+    ];
+    return [...en, '', '—', '', ...ar].join('\n');
+  };
   const waBtn = (o, big = false) => (waOn(o)
     ? `<button class="btn btn-ghost ${big ? '' : 'btn-sm'} wa-btn" data-wa="${o.id}" title="Opens WhatsApp with the message ready — press Send there">${icons.chat} Message Customer</button>` : '');
   async function messageCustomer(id) {
@@ -237,7 +277,8 @@ export function fittingView(me) {
       if (!num) { toast({ title: 'That number does not look right', sub: 'Eight digits for an Omani number, or the full number with its country code.', tone: 'stock' }); return; }
       await store.setOrderPhone(id, num, me.code);
     }
-    location.href = `whatsapp://send?phone=${num}&text=${encodeURIComponent(waText(o))}`;
+    const days = await store.branchHours(collectOf(o));
+    location.href = `whatsapp://send?phone=${num}&text=${encodeURIComponent(waText(store.order(id) ?? o, days))}`;
   }
 
   // ── fixing mistakes: edit, undo the last step, delete (schema-34) ──

@@ -756,6 +756,13 @@ export const store = {
     }, { by, module: 'fitting', title: `${this.order(id)?.ref ?? 'Order'} — customer phone saved`, refs: [id] });
   },
 
+  // A branch's opening hours as the schedule has them this week (schema-48):
+  // { Sat: { open: 10, close: 22, closed: false }, … }, or null.
+  async branchHours(code) {
+    const { data, error } = await supabase.rpc('branch_hours', { p_code: code });
+    return error || !data || !Object.keys(data).length ? null : data;
+  },
+
   // ── fixing mistakes on an order (schema-34) ──
   editOrder(id, { ref, customer }, by) {
     return run(['orders', 'lensRequests'], async () => ok(await supabase.rpc('edit_order', { p_id: id, p_ref: ref, p_customer: customer })), {

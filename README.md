@@ -141,6 +141,7 @@ Applied in order:
 | `supabase/schema-45-employees.sql` | `employees`: the staff by full name, the salesperson list — apart from the schedule's roster |
 | `supabase/schema-46-payment-both.sql` | Reimbursement Invoice payment may be cash, card or both |
 | `supabase/schema-47-direct-cancel.sql` | Direct Insurance is canceled (kept, marked, exported), never deleted |
+| `supabase/schema-48-branch-hours.sql` | `branch_hours(code)`: a branch's opening hours from this week's schedule |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

@@ -99,7 +99,7 @@ def rows_sql(table, where='true', order='1'):
 seed = ["-- ── FOC Portal practice copy: the starting data ──",
         "-- GENERATED from the live database (branches, settings, lens lists, the",
         "-- employee list and the lens shelves) — every order, request and invoice starts empty."]
-for t in ['branches', 'app_settings', 'lens_catalogue', 'employees']:
+for t in ['branches', 'app_settings', 'lens_catalogue', 'employees', 'schedule_branches']:
     s = rows_sql(t)
     if s:
         seed.append(s)
