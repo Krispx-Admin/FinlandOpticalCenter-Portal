@@ -268,9 +268,10 @@ export function settingsView(me) {
     });
   }
 
-  // ── Employees: the schedule's roster ──
-  const STAFF_TYPES = ['Stable', 'High-Stable', 'High', 'Medium', 'Low', 'Non-Stable', 'Part-Time'];
-  const WEEK = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  // ── Employees: the staff by full name (schema-45) ──
+  // Their own list — the Direct Insurance salesperson list reads it. The
+  // schedule's roster (short names, branches, days off) is the Schedule tab's
+  // own and is edited there (user, 2026-10-18).
   let staffCount = null, staffData = null;
 
   async function loadStaff() {
@@ -279,77 +280,39 @@ export function settingsView(me) {
     try { staffData = await store.loadEmployees(); }
     catch (err) { host.innerHTML = `<p class="muted sm">Could not load the employees — ${esc(err.message)}</p>`; return; }
     if (!root.contains(host)) return;
-    staffCount = staffData.employees.length;
-    const bname = c => staffData.branches.find(b => b.code === c)?.name ?? c;
-    host.innerHTML = staffData.employees.length ? staffData.employees.map(e => `
-      <div class="st-row">
-        <div class="st-who"><b>${esc(e.name)}</b>${e.optom ? '<span class="st-tag">Optometrist</span>' : ''}</div>
-        <div class="st-br">${(e.priority ?? []).map((c, i) => `<span class="loc-chip ${i ? 'st-alt' : ''}" title="${esc(bname(c))}${i ? '' : ' — home branch'}">${esc(c)}</span>`).join('') || '<span class="muted sm">No branch</span>'}</div>
-        <div class="st-type muted sm">${esc(e.type)}</div>
-        <div class="st-off muted sm">${(e.weekend_days ?? []).length ? `Off ${esc(e.weekend_days.join(', '))}` : 'No days off set'}</div>
+    staffCount = staffData.length;
+    host.innerHTML = staffData.length ? `<div class="emp-list">${staffData.map(e => `
+      <div class="emp-row">
+        <b>${esc(e.name)}</b>
         <div class="row-act">
-          <button class="icon-btn" data-emp-edit="${esc(e.id)}" title="Edit">${icons.wrench}</button>
+          <button class="icon-btn" data-emp-edit="${esc(e.id)}" title="Rename">${icons.wrench}</button>
           <button class="icon-btn" data-emp-del="${esc(e.id)}" title="Remove">${icons.trash}</button>
         </div>
-      </div>`).join('') : `<div class="empty">${icons.users}<p>No employees yet — add the first one.</p></div>`;
+      </div>`).join('')}</div>` : `<div class="empty">${icons.users}<p>No employees yet — add the first one.</p></div>`;
   }
 
   function employeeModal(id) {
     if (!staffData) return;
-    const old = staffData.employees.find(e => e.id === id);
-    const pri = old?.priority ?? [];
-    const draft = {
-      name: old?.name ?? '', optom: !!old?.optom, type: old?.type ?? 'Stable',
-      home: pri[0] ?? staffData.branches[0]?.code ?? '', also: pri.slice(1), off: old?.weekend_days ?? [],
-    };
+    const old = staffData.find(e => e.id === id);
     const layer = openLayer('modal', () => `
       <div class="dw-head">
-        <div><div class="dw-kicker">${old ? 'Edit employee' : 'New employee'}</div><h2>${old ? esc(old.name) : 'Add an employee'}</h2></div>
+        <div><div class="dw-kicker">${old ? 'Rename employee' : 'New employee'}</div><h2>${old ? esc(old.name) : 'Add an employee'}</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <form class="form" id="emp-form" autocomplete="off">
-        <div class="grid2">
-          <label>Name<input name="name" required value="${esc(draft.name)}" placeholder="e.g. Ahmed"></label>
-          <label>Home branch<select name="home">${staffData.branches.map(b => `<option value="${esc(b.code)}" ${draft.home === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
-        </div>
-        <div class="fieldset">
-          <div class="fs-head"><span>Can also work at</span></div>
-          <div class="emp-checks">${staffData.branches.map(b => `
-            <label class="check sm"><input type="checkbox" name="also" value="${esc(b.code)}" ${draft.also.includes(b.code) ? 'checked' : ''}><i></i>${esc(b.code)}</label>`).join('')}</div>
-        </div>
-        <div class="grid2">
-          <label>Type<select name="type">${STAFF_TYPES.map(s => `<option ${draft.type === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>
-          <label class="check emp-optom"><input type="checkbox" name="optom" ${draft.optom ? 'checked' : ''}><i></i>Optometrist</label>
-        </div>
-        <div class="fieldset">
-          <div class="fs-head"><span>Days off</span></div>
-          <div class="emp-checks">${WEEK.map(d => `
-            <label class="check sm"><input type="checkbox" name="off" value="${d}" ${draft.off.includes(d) ? 'checked' : ''}><i></i>${d}</label>`).join('')}</div>
-        </div>
-        <p class="muted sm">If the Schedule tab is open somewhere, reload it before saving the schedule.</p>
+        <label>Full name<input name="name" required value="${esc(old?.name ?? '')}" placeholder="First and last name — e.g. Ahmad Al Khalili"></label>
         <div class="form-foot">
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-          <button type="submit" class="btn btn-primary">${icons.check} ${old ? 'Save changes' : 'Add employee'}</button>
+          <button type="submit" class="btn btn-primary">${icons.check} ${old ? 'Save' : 'Add employee'}</button>
         </div>
       </form>`);
+    layer.el.querySelector('input[name=name]')?.focus();
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
     layer.el.addEventListener('submit', async e => {
       e.preventDefault();
-      const f = e.target;
-      const d = new FormData(f);
-      const name = String(d.get('name') ?? '').trim();
+      const name = String(new FormData(e.target).get('name') ?? '').trim().replace(/\s+/g, ' ');
       if (!name) return;
-      const home = String(d.get('home') ?? '');
-      // The home branch leads; the rest follow in the schedule's own order.
-      const also = d.getAll('also').map(String).filter(c => c !== home);
-      const id = old?.id ?? `e${Date.now().toString(36)}`;
-      const position = old?.position ?? (Math.max(-1, ...staffData.employees.map(x => x.position ?? 0)) + 1);
-      const ok = await store.saveEmployee({
-        id, name, optom: !!d.get('optom'), type: String(d.get('type')),
-        weekendDays: WEEK.filter(w => d.getAll('off').includes(w)),
-        priority: [home, ...also].filter(Boolean), position,
-      }, !old);
-      if (ok) layer.close();
+      if (await store.saveEmployee({ id: old?.id, name }, !old)) layer.close();
     });
   }
 
@@ -396,7 +359,7 @@ export function settingsView(me) {
       desc: 'Every sign-in — branches and people: add, rename, set what each one is, close or delete, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
     { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'],
-      desc: 'Everyone on the staff schedule and the Direct Insurance salesperson list',
+      desc: 'The staff by full name — the Direct Insurance salesperson list. The schedule keeps its own in the Schedule tab',
       sum: () => (staffCount == null ? '' : count(staffCount, 'employee')) },
     { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'],
       desc: 'Categories — the fields each needs, how it is counted — and the brand groups they offer',
@@ -659,8 +622,8 @@ export function settingsView(me) {
       if (ee) return employeeModal(ee.dataset.empEdit);
       const ed = e.target.closest('[data-emp-del]');
       if (ed) {
-        const emp = staffData?.employees.find(x => x.id === ed.dataset.empDel);
-        if (emp && confirm(`Remove ${emp.name} from the employees?\n\nThey leave the staff schedule and the salesperson list. Sales already recorded keep their name.`)) store.deleteEmployee(emp.id, emp.name);
+        const emp = staffData?.find(x => x.id === ed.dataset.empDel);
+        if (emp && confirm(`Remove ${emp.name} from the employees?\n\nThey leave the salesperson list. Sales already recorded keep their name. The schedule is not changed.`)) store.deleteEmployee(emp.id, emp.name);
         return;
       }
       const go = e.target.closest('[data-page]');

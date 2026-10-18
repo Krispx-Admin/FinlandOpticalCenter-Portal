@@ -801,6 +801,10 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-44-direct-line-total.sql  Direct Insurance: a line's price is the
                              whole line's (total = sum(price)); invoices
                              stay price × qty. Applied 2026-10-17.
+  schema-45-employees.sql    public.employees (full names, admin writes,
+                             unique by name); staff_list() reads it — the
+                             salesperson list. schedule_employees is the
+                             Schedule tab's own again. Applied 2026-10-18.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1201,6 +1205,24 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  EMPLOYEES split from the schedule (user). Settings → Employees is
+             now its own list of the staff by FULL NAME (first + last, no
+             middle names — 30 seeded from the user's list) and is what the
+             Direct Insurance salesperson list offers. The schedule's roster
+             (short names, branches, days off) is the Schedule tab's own, no
+             longer edited from Settings. schema-45 (rehearsed: a branch reads
+             the 30 names through staff_list() but not the table; the office
+             adds; schedule roster untouched at 27; applied).
+             SALESPERSON BY TYPING: people type the name instead of picking
+             from the list, so claims.js matchStaff() finds the person — full
+             name, a start of the words that fits one person ("salman",
+             "ahmad kh", "abdulaziz"), or a near spelling by consonants
+             ("munira" → Muneera Al Alawi, "maitha" → Mithaa, "motaz" →
+             Mootez Al Mersni). Leaving the box writes the full name in; a
+             name fitting two or more ("ahmad") picks nobody and the save
+             message names them. Practice copy rebuilt (employees in its
+             seed) + VERSION 3; fixed: a practice rpc() with no arguments
+             (staff_list, disabled_tabs) failed.
  2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 8 orders, 2
              outside-lens orders, 2 lens / 1 stock request, 2 insurance records,
              1 damaged report deleted; numbering restarted; 2 set-aside lenses

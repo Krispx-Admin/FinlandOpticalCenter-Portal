@@ -138,6 +138,7 @@ Applied in order:
 | `supabase/schema-42-own-lens-stock.sql` | a lens holder uses its own shelf for its own fitting orders |
 | `supabase/schema-43-security.sql` | security: outsiders can only see the sign-in list; everything else closed |
 | `supabase/schema-44-direct-line-total.sql` | Direct Insurance: a line's price is the whole line's; the Reimbursement Invoice stays price × qty |
+| `supabase/schema-45-employees.sql` | `employees`: the staff by full name, the salesperson list — apart from the schedule's roster |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

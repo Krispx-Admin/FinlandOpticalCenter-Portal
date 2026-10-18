@@ -331,6 +331,40 @@ const KINDS = {
 // once; a fresh one is fetched every time the form opens, so an employee
 // added in Settings appears without reloading the page.
 let staffCache = null;
+
+// People type the salesperson's name rather than pick it from the list (user,
+// 2026-10-18), so a typed name finds its person: the full name; a start of
+// its words that fits one person only ("salman", "ahmad kh", "abdulaziz");
+// or a near spelling ("munira" for Muneera, "fatima" for Fatma — the
+// consonants, in order). A name that fits two or more ("ahmad") picks nobody:
+// the form names them instead.
+const normName = s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z؀-ۿ ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const skeleton = w => {
+  const s = w.replace(/(.)\1+/g, '$1');
+  return (s[0] ?? '') + s.slice(1).replace(/[aeiouy]/g, '').replace(/h$/, '');
+};
+export function matchStaff(typed, list) {
+  const t = normName(typed);
+  if (!t) return { hit: null, options: [] };
+  const words = t.split(' ');
+  const named = (list ?? []).map(s => ({ s, w: normName(s.name).split(' ') }));
+  const exact = named.filter(x => x.w.join(' ') === t);
+  if (exact.length === 1) return { hit: exact[0].s, options: [] };
+  const tests = [
+    x => words.every(q => q.length >= 2 && x.w.some(w => w.startsWith(q))),
+    x => t.length >= 3 && x.w.join('').startsWith(t.replace(/ /g, '')),
+    x => words.every(q => skeleton(q).length >= 2 && x.w.some(w => skeleton(w) === skeleton(q))),
+    x => words.every(q => skeleton(q).length >= 2 && x.w.some(w => skeleton(w).startsWith(skeleton(q)))),
+  ];
+  for (const test of tests) {
+    const m = named.filter(test);
+    if (m.length === 1) return { hit: m[0].s, options: [] };
+    if (m.length > 1) return { hit: null, options: m.map(x => x.s.name) };
+  }
+  return { hit: null, options: [] };
+}
+
 async function staffList() {
   const { data, error } = await supabase.rpc('staff_list');
   if (error) throw new Error(error.message);
@@ -758,10 +792,11 @@ export function claimsView(me, kind = 'claim') {
       if (!direct) draft.payment = el.querySelector('#f-pay').value;
       if (direct) {
         draft.insurer = el.querySelector('#f-ins').value;
-        // The name typed has to be one on the roster — or, editing an old
-        // sale, the person it was already recorded against.
+        // The name typed has to find one person on the list (matchStaff) —
+        // or, editing an old sale, the person it was already recorded against.
         const typed = el.querySelector('#f-emp').value.trim();
-        const hit = staff?.find(s => s.name.toLowerCase() === typed.toLowerCase());
+        const { hit, options } = matchStaff(typed, staff);
+        draft.employeeOptions = options;
         if (hit) { draft.employeeId = hit.id; draft.employeeName = hit.name; }
         else if (existing && typed === existing.employeeName) { draft.employeeId = existing.employeeId; draft.employeeName = typed; }
         else { draft.employeeId = ''; draft.employeeName = typed; }
@@ -793,6 +828,10 @@ export function claimsView(me, kind = 'claim') {
       sync();
     });
     el.addEventListener('change', sync);
+    // Leaving the salesperson box: the name found is written out in full.
+    el.addEventListener('change', e => {
+      if (e.target.id === 'f-emp' && draft.employeeId && e.target.value !== draft.employeeName) e.target.value = draft.employeeName;
+    });
     el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
       const add = e.target.closest('[data-add]');
@@ -803,7 +842,7 @@ export function claimsView(me, kind = 'claim') {
         sync();
         const items = draft.items.filter(i => (i.name || '').trim() || Number(i.price));
         if (direct && !draft.insurer) return toast({ title: 'Choose the insurer', tone: 'stock' });
-        if (direct && !draft.employeeId) return toast({ title: 'Choose the salesperson', sub: draft.employeeName ? `“${draft.employeeName}” is not on the staff list — pick a name from the list.` : 'Type a name and pick it from the list.', tone: 'stock' });
+        if (direct && !draft.employeeId) return toast({ title: 'Choose the salesperson', sub: draft.employeeOptions?.length > 1 ? `“${draft.employeeName}” fits ${draft.employeeOptions.join(', ')} — type a little more or pick from the list.` : draft.employeeName ? `“${draft.employeeName}” is not on the staff list — pick a name from the list.` : 'Type a name and pick it from the list.', tone: 'stock' });
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });

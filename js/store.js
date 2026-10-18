@@ -89,6 +89,7 @@ function linkLensRequests() {
 function explain(e) {
   const m = String(e?.message ?? e);
   if (/orders_ref_per_branch|duplicate key.*orders/i.test(m)) return 'That bill number is already logged at your branch.';
+  if (/employees_name_key/i.test(m)) return 'That name is already on the employee list.';
   if (/row-level security|violates row-level/i.test(m)) return 'Your branch is not allowed to do that.';
   if (/only the lens-holding branch/i.test(m)) return 'Only the branch holding those lenses can do that.';
   if (/only the warehouse|only the office/i.test(m)) return 'Only the office can do that.';
@@ -845,33 +846,28 @@ export const store = {
     }, { module: 'settings', title: on ? `${name} now holds lens stock` : `${name} no longer holds lens stock` });
   },
 
-  // ── Employees: the schedule's roster, which is also the salesperson list ──
-  // Read on demand by Settings; the office and Ghiath may write it.
+  // ── Employees: the staff by full name, the salesperson list (schema-45) ──
+  // Read on demand by Settings; the office writes it. The schedule's roster
+  // (schedule_employees) is the Schedule tab's own.
   async loadEmployees() {
-    const [emps, brs] = await Promise.all([
-      supabase.from('schedule_employees').select('id, name, optom, type, weekend_days, priority, position').order('position'),
-      supabase.from('schedule_branches').select('code, name').order('position'),
-    ]);
-    if (emps.error) throw new Error(emps.error.message);
-    if (brs.error) throw new Error(brs.error.message);
-    return { employees: emps.data ?? [], branches: brs.data ?? [] };
+    const { data, error } = await supabase.from('employees').select('id, name');
+    if (error) throw new Error(error.message);
+    return (data ?? []).sort((a, b) => a.name.localeCompare(b.name));
   },
 
   saveEmployee(e, isNew) {
     const name = String(e.name ?? '').trim();
     if (!name) return Promise.resolve(null);
     return run([], async () => {
-      ok(await supabase.from('schedule_employees').upsert({
-        id: e.id, name, optom: !!e.optom, type: e.type, weekend_days: e.weekendDays ?? [],
-        priority: e.priority ?? [], position: e.position ?? 0,
-      }));
+      if (isNew) ok(await supabase.from('employees').insert({ name }));
+      else ok(await supabase.from('employees').update({ name }).eq('id', e.id));
       return true;
-    }, { module: 'settings', title: isNew ? `${name} added to the employees` : `${name} updated` });
+    }, { module: 'settings', title: isNew ? `${name} added to the employees` : `Renamed to ${name}` });
   },
 
   deleteEmployee(id, name) {
     return run([], async () => {
-      ok(await supabase.from('schedule_employees').delete().eq('id', id));
+      ok(await supabase.from('employees').delete().eq('id', id));
       return true;
     }, { module: 'settings', title: `${name} removed from the employees` });
   },

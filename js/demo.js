@@ -16,7 +16,7 @@ import { pgcrypto } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.5.
 
 // Bump when demo/*.sql is regenerated: every practice copy then starts over
 // on the new layout (an old one could not run the new screens).
-const VERSION = 2;
+const VERSION = 3;
 const DB_NAME = `foc-practice-v${VERSION}`;
 const SESSION_KEY = 'focp.practice.as';
 
@@ -229,7 +229,7 @@ async function rpc(name, args = {}) {
     const sql = fn.void ? `select ${call}, null::json as data`
       : fn.set ? `select coalesce(json_agg(x), '[]'::json) as data from ${call} x`
       : `select to_json(${call}) as data`;
-    const res = await asCaller(tx => tx.query(sql, [JSON.stringify(args ?? {})]));
+    const res = await asCaller(tx => tx.query(sql, given.length ? [JSON.stringify(args ?? {})] : []));
     return { data: res.rows[0]?.data ?? null, error: null };
   } catch (e) {
     return failed(e);

@@ -102,6 +102,12 @@ create table public."damaged_reports" (
   "created_at" timestamp with time zone default now() not null
 );
 
+create table public."employees" (
+  "id" uuid default gen_random_uuid() not null,
+  "name" text not null,
+  "created_at" timestamp with time zone default now() not null
+);
+
 create table public."lens_catalogue" (
   "id" integer default 1 not null,
   "types" jsonb default '[]'::jsonb not null,
@@ -328,6 +334,10 @@ alter table public."damaged_reports" add constraint "damaged_reports_pkey" PRIMA
 
 alter table public."damaged_reports" add constraint "damaged_reports_ref_key" UNIQUE (ref);
 
+alter table public."employees" add constraint "employees_name_check" CHECK ((btrim(name) <> ''::text));
+
+alter table public."employees" add constraint "employees_pkey" PRIMARY KEY (id);
+
 alter table public."lens_catalogue" add constraint "lens_catalogue_id_check" CHECK ((id = 1));
 
 alter table public."lens_catalogue" add constraint "lens_catalogue_pkey" PRIMARY KEY (id);
@@ -463,6 +473,8 @@ CREATE INDEX claims_member_idx ON public.claims USING btree (member_id);
 CREATE INDEX damaged_lines_report ON public.damaged_lines USING btree (report_id);
 
 CREATE INDEX damaged_reports_branch_idx ON public.damaged_reports USING btree (branch_code, created_at DESC);
+
+CREATE UNIQUE INDEX employees_name_key ON public.employees USING btree (lower(btrim(name)));
 
 CREATE INDEX lens_request_events_req_idx ON public.lens_request_events USING btree (request_id, at);
 
@@ -1824,9 +1836,7 @@ CREATE OR REPLACE FUNCTION public.staff_list()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$
-  select e.id, e.name, e.priority from public.schedule_employees e order by e.name
-$function$;
+AS $function$ select e.id::text, e.name, '{}'::text[] from public.employees e order by lower(e.name) $function$;
 
 CREATE OR REPLACE FUNCTION public.touch_schedule()
  RETURNS trigger
@@ -2013,15 +2023,19 @@ alter table public."lens_stock" enable row level security;
 
 alter table public."branches" enable row level security;
 
-alter table public."app_settings" enable row level security;
-
 alter table public."stock_request_events" enable row level security;
 
 alter table public."stock_request_lines" enable row level security;
 
 alter table public."stock_requests" enable row level security;
 
+alter table public."employees" enable row level security;
+
+alter table public."app_settings" enable row level security;
+
 alter table public."claim_items" enable row level security;
+
+alter table public."damaged_reports" enable row level security;
 
 alter table public."lens_catalogue" enable row level security;
 
@@ -2030,8 +2044,6 @@ alter table public."schedule_branches" enable row level security;
 alter table public."schedule_employees" enable row level security;
 
 alter table public."schedule_defaults" enable row level security;
-
-alter table public."damaged_reports" enable row level security;
 
 alter table public."schedule_weeks" enable row level security;
 
@@ -2082,6 +2094,8 @@ create policy "damaged_lines_read" on public."damaged_lines" as permissive for s
 create policy "damaged_reports_delete" on public."damaged_reports" as permissive for delete to authenticated using (((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin)));
 
 create policy "damaged_reports_read" on public."damaged_reports" as permissive for select to authenticated using (((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin) OR ( SELECT is_scheduler() AS is_scheduler)));
+
+create policy "employees_admin" on public."employees" as permissive for all to authenticated using (( SELECT is_admin() AS is_admin)) with check (( SELECT is_admin() AS is_admin));
 
 create policy "lens_catalogue_read" on public."lens_catalogue" as permissive for select to authenticated using (true);
 

@@ -97,9 +97,9 @@ def rows_sql(table, where='true', order='1'):
     return (f"insert into public.{table} select * from json_populate_recordset(null::public.{table}, "
             f"$json${json.dumps(data, ensure_ascii=False)}$json$);")
 seed = ["-- ── FOC Portal practice copy: the starting data ──",
-        "-- GENERATED from the live database (branches, settings, lens lists and the",
-        "-- lens shelves) — every order, request and invoice starts empty."]
-for t in ['branches', 'app_settings', 'lens_catalogue']:
+        "-- GENERATED from the live database (branches, settings, lens lists, the",
+        "-- employee list and the lens shelves) — every order, request and invoice starts empty."]
+for t in ['branches', 'app_settings', 'lens_catalogue', 'employees']:
     s = rows_sql(t)
     if s:
         seed.append(s)
