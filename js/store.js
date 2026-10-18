@@ -737,6 +737,15 @@ export const store = {
     });
   },
 
+  // The customer's phone, for the WhatsApp message (PRACTICE COPY trial,
+  // user 2026-10-18 — orders.phone already exists on the live database).
+  setOrderPhone(id, phone, by) {
+    return run(['orders'], async () => {
+      ok(await supabase.from('orders').update({ phone }).eq('id', id));
+      return true;
+    }, { by, module: 'fitting', title: `${this.order(id)?.ref ?? 'Order'} — customer phone saved`, refs: [id] });
+  },
+
   // ── fixing mistakes on an order (schema-34) ──
   editOrder(id, { ref, customer }, by) {
     return run(['orders', 'lensRequests'], async () => ok(await supabase.rpc('edit_order', { p_id: id, p_ref: ref, p_customer: customer })), {

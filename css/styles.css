@@ -299,6 +299,11 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 #pin-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.13); }
 
+/* WhatsApp the customer (practice-copy trial) */
+.wa-btn { color: #128c4b; border-color: #9fdcb8; }
+.wa-btn:hover { background: #e9f8ef; border-color: #25a95b; }
+.row-act .wa-btn { margin-right: 6px; }
+
 /* practice copy (?practice=SCC): a pill along the bottom, on every screen */
 .practice-bar {
   position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 900;

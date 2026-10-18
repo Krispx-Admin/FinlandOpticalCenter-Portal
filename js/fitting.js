@@ -11,6 +11,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
+import { isPractice } from './auth.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -154,6 +155,39 @@ export function fittingView(me) {
       if (to === C) return layer.close();
       if (await store.setCollect(id, to, me.code)) layer.close();
     });
+  }
+
+  // ── WhatsApp the customer (TRIAL — practice copy only, user 2026-10-18) ──
+  // When the frame is ready at the branch the customer collects from, one
+  // click opens WhatsApp on this computer with the customer's number and the
+  // message typed; staff press Send. WhatsApp lets no website send by itself.
+  const waOn = o => isPractice && !viewOnly && o.status === 'delivered' && collectOf(o) === me.code;
+  // 8 digits is an Omani number: 968 goes in front. "+", "00", spaces go.
+  const waNumber = s => {
+    let d = String(s ?? '').replace(/\D/g, '').replace(/^00/, '');
+    if (d.length === 8) d = `968${d}`;
+    return d.length >= 10 ? d : null;
+  };
+  const waText = o => [
+    'Finland Optical Center',
+    `Hello *${o.customer || 'there'}*`,
+    `Your Frames *${o.ref}* are ready to pick up from *${locName(collectOf(o))}*.`,
+    'Please visit us from 10-10 on weekdays and 10-12 on weekends',
+  ].join('\n');
+  const waBtn = (o, big = false) => (waOn(o)
+    ? `<button class="btn btn-ghost ${big ? '' : 'btn-sm'} wa-btn" data-wa="${o.id}" title="Opens WhatsApp with the message ready — press Send there">${icons.chat} Message Customer</button>` : '');
+  async function messageCustomer(id) {
+    const o = store.order(id);
+    if (!o) return;
+    let num = waNumber(o.phone);
+    if (!num) {
+      const typed = prompt(`${o.customer || o.ref} — customer's WhatsApp number:`, o.phone || '');
+      if (typed == null) return;
+      num = waNumber(typed);
+      if (!num) { toast({ title: 'That number does not look right', sub: 'Eight digits for an Omani number, or the full number with its country code.', tone: 'stock' }); return; }
+      await store.setOrderPhone(id, num, me.code);
+    }
+    location.href = `whatsapp://send?phone=${num}&text=${encodeURIComponent(waText(o))}`;
   }
 
   // ── fixing mistakes: edit, undo the last step, delete (schema-34) ──
@@ -411,6 +445,7 @@ export function fittingView(me) {
         const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens received ${icons.arrowRight}</button>`;
         action = action.startsWith('<span') ? lens : `${lens}${action}`;
       }
+      if (waOn(o)) action = `${waBtn(o)}${action}`;
       const title = o.customer || 'No customer name';
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
@@ -514,6 +549,7 @@ export function fittingView(me) {
             canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send lenses to ${esc(locName(o.outsideLens.dest))}</button>` :
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to fitter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
+          ${waBtn(o, true)}
         </div>
         <h3 class="tl-h">${icons.history} Timeline</h3>
         <div class="timeline">
@@ -595,6 +631,8 @@ export function fittingView(me) {
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
       if (adv) return store.advanceOrders([adv.dataset.advance], me.code);
+      const wa = e.target.closest('[data-wa]');
+      if (wa) return messageCustomer(wa.dataset.wa);
       const co = e.target.closest('[data-collect]');
       if (co) return collectModal(co.dataset.collect);
       const ed = e.target.closest('[data-edit-order]');
@@ -818,6 +856,7 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
+        ${isPractice ? '<label>Customer phone <span class="opt">for the WhatsApp message when it is ready</span><input name="phone" inputmode="tel" autocomplete="off" placeholder="e.g. 9123 4567"></label>' : ''}
         <label>Customer collects at <select name="collect">${collectOptions(me.code)}</select></label>
         <div class="lens-src" role="radiogroup" aria-label="Lenses">
           <span class="lens-src-l">Lenses</span>
@@ -973,6 +1012,7 @@ export function fittingView(me) {
       const ref = f.get('ref').trim();
       const customer = f.get('customer').trim();
       const collect = String(f.get('collect') || me.code);
+      const phone = waNumber(f.get('phone'));
       // A name of only spaces passes the browser's own required check, so put
       // the trimmed values back and let it re-check — that way an empty field
       // gets the usual prompt instead of a button that quietly does nothing.
@@ -1017,6 +1057,7 @@ export function fittingView(me) {
         o = await store.createOrder({ ref, origin: me.code, customer, collect }, me.code);
       }
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
+      if (isPractice && phone) await store.setOrderPhone(o.id, phone, me.code);
       layer.close();
       toast({
         title: `${o.ref} logged`,
@@ -1196,6 +1237,8 @@ export function fittingView(me) {
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');
       if (adv) { e.stopPropagation(); store.advanceOrders([adv.dataset.advance], me.code); return; }
+      const wa = e.target.closest('[data-wa]');
+      if (wa) { e.stopPropagation(); messageCustomer(wa.dataset.wa); return; }
       const sel = e.target.closest('[data-sel]');
       if (sel) { toggleSelect(sel.dataset.sel); return; }
       if (e.target.closest('[data-stop]')) return;

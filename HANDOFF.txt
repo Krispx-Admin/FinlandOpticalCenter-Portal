@@ -1207,6 +1207,24 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  TRIAL — PRACTICE COPY ONLY: "Message Customer" on WhatsApp (user:
+             try it in practice; put it on the real site only when they say).
+             New fitting order gains "Customer phone" (8 digits → 968 added;
+             saved in orders.phone, which the live table already has). When an
+             order is Ready for Collection at the branch collecting it, a green
+             "Message Customer" button (row + order panel) opens
+             whatsapp://send with the number and the message:
+               Finland Optical Center / Hello *name* / Your Frames *bill* are
+               ready to pick up from *branch*. / Please visit us from 10-10 on
+               weekdays and 10-12 on weekends
+             Staff press Send — WhatsApp lets no site send by itself (that needs
+             the paid Business API). No number on the order: it asks for one
+             and saves it. Gated by isPractice (fitting.js waOn); store
+             setOrderPhone. Tested in the practice copy end to end. TO PUT LIVE:
+             drop the isPractice checks in fitting.js (waOn + the phone field).
+             Also checked (user report): changing "collect at" while the frame
+             is returning keeps the branch it is heading to and adds the new
+             one as a 4th stop — line, label and database all correct.
  2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 7 orders, 1
              outside-lens order, 3 lens / 1 stock request, 1 invoice, 1 damaged
              report deleted; numbering restarted; 1 set-aside lens back on the
