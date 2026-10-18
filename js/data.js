@@ -516,9 +516,11 @@ export const lensFull = i => `${lensLabel(i)} · ${lensRx(i)}`;
 export const CURRENCY = 'OMR';
 export const money = n => (Number(n) || 0).toFixed(3);
 
+// A customer can split it — cash and card both (user, 2026-10-18; schema-46).
 export const PAYMENT_TYPES = [
   { value: 'cash', label: 'Cash' },
   { value: 'card', label: 'Card' },
+  { value: 'both', label: 'Cash + Card' },
 ];
 
 // Prescription grid: Distance / Near rows, OD and OS each carrying

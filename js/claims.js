@@ -240,7 +240,7 @@ export function receiptHTML(c) {
         ${c.kind === 'direct' ? '' : `<div class="rc-pay-box">
           <h3 class="rc-sec">Payment Method</h3>
           <div class="rc-ticks">
-            ${PAYMENT_TYPES.map(p => `<span class="rc-tick ${c.payment === p.value ? 'on' : ''}"><i></i>${esc(p.label)}</span>`).join('')}
+            ${PAYMENT_TYPES.filter(p => p.value !== 'both').map(p => `<span class="rc-tick ${c.payment === p.value || c.payment === 'both' ? 'on' : ''}"><i></i>${esc(p.label)}</span>`).join('')}
           </div>
         </div>`}
         <div class="rc-total"><span>Total Amount</span><b>${money(total)}<em>${CURRENCY}</em></b></div>
@@ -506,7 +506,7 @@ export function claimsView(me, kind = 'claim') {
           <div class="row-sub"><span class="row-sub-txt">${esc(fmtDay(c.date))}${direct && c.employeeName ? ` · ${esc(c.employeeName)}` : ''} · Bill ${esc(c.billNo || '—')}${c.memberId ? ` · Member ${esc(c.memberId)}` : ''} · ${n} item${n === 1 ? '' : 's'}</span></div>
         </div>
         <div class="row-units"><b>${money(claimTotal(c))}</b> ${CURRENCY}</div>
-        <div class="row-status">${direct ? '' : `<span class="pill ${c.payment === 'card' ? 's-blue' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span>`}</div>
+        <div class="row-status">${direct ? '' : `<span class="pill ${c.payment === 'card' ? 's-blue' : c.payment === 'both' ? 's-purple' : 's-green'}"><i class="dot"></i>${esc(payLabel(c.payment))}</span>`}</div>
         <div class="row-time" title="${fmtDT(c.updatedAt)}">${relTime(c.updatedAt)}</div>
         <div class="row-act" data-stop>
           <button class="btn btn-ghost btn-sm" data-print="${c.id}">${icons.printer} Print</button>

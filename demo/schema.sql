@@ -320,7 +320,7 @@ alter table public."claim_prescriptions" add constraint "claim_prescriptions_pke
 
 alter table public."claims" add constraint "claims_kind_check" CHECK ((kind = ANY (ARRAY['claim'::text, 'direct'::text])));
 
-alter table public."claims" add constraint "claims_payment_check" CHECK ((payment = ANY (ARRAY['cash'::text, 'card'::text])));
+alter table public."claims" add constraint "claims_payment_check" CHECK ((payment = ANY (ARRAY['cash'::text, 'card'::text, 'both'::text])));
 
 alter table public."claims" add constraint "claims_pkey" PRIMARY KEY (id);
 

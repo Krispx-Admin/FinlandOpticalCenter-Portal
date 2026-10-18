@@ -805,6 +805,8 @@ Migrations are applied by hand, in order. Each file has a header with
                              unique by name); staff_list() reads it — the
                              salesperson list. schedule_employees is the
                              Schedule tab's own again. Applied 2026-10-18.
+  schema-46-payment-both.sql claims.payment may be 'both' (cash + card).
+                             Applied 2026-10-18.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1205,6 +1207,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Reimbursement Invoice payment: Cash, Card, or Cash + Card (user).
+             schema-46 (rehearsed, applied). The printed invoice keeps its two
+             boxes and ticks both for Cash + Card; the list shows a purple
+             "Cash + Card" pill. data.js PAYMENT_TYPES, db.js claimRow.
+             Practice copy rebuilt + VERSION 4.
  2026-10-18  EMPLOYEES split from the schedule (user). Settings → Employees is
              now its own list of the staff by FULL NAME (first + last, no
              middle names — 30 seeded from the user's list) and is what the

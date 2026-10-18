@@ -162,7 +162,7 @@ export const claimRow = (f, by) => ({
     kind: 'direct', insurer: f.insurer || null,
     employee_id: f.employeeId || null, employee_name: f.employeeName || null,
   } : {}),
-  customer: f.customer ?? '', payment: f.payment === 'card' ? 'card' : 'cash',
+  customer: f.customer ?? '', payment: ['card', 'both'].includes(f.payment) ? f.payment : 'cash',
   add_od: f.rx?.add?.od ?? '', add_os: f.rx?.add?.os ?? '',
   ...(by ? { created_by: by } : {}),
 });
