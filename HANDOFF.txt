@@ -1207,6 +1207,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 7 orders, 1
+             outside-lens order, 3 lens / 1 stock request, 1 invoice, 1 damaged
+             report deleted; numbering restarted; 1 set-aside lens back on the
+             shelf (10 rows, 150 pcs — 3 were sent during testing).
  2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 8 orders, 4
              outside-lens orders, 1 lens request, 1 invoice deleted; numbering
              restarted; 1 set-aside lens back on the shelf (10 rows, 153 pcs).
