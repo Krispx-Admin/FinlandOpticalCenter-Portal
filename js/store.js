@@ -709,6 +709,14 @@ export const store = {
     }, { module: 'settings', title });
   },
 
+  // The branch's name in Arabic (schema-49) — the WhatsApp message uses it.
+  setBranchNameAr(code, name) {
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_branch_name_ar', { p_code: code, p_name: name }));
+      return true;
+    }, { module: 'settings', title: `${code}: Arabic name ${name ? 'saved' : 'cleared'}` });
+  },
+
   // ── Outside lens orders (TRIAL) ──
   createOutsideOrder({ ref, customer, rx, lensType, fulfilment, dest }, by) {
     return run(['orders', 'outsideOrders'], async () => ok(await supabase.rpc('create_outside_lens_order', {

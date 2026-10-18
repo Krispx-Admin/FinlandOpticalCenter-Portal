@@ -150,6 +150,8 @@ export function settingsView(me) {
           <span>${r.active ? 'Open' : 'Closed'}</span></label>
         <button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${lensLocked ? 'Holds lens stock — stop that first' : 'Delete this account'}" ${lensLocked || r.code === me.code ? 'disabled' : ''}>${icons.trash}</button>
         <div class="br-opts">
+          ${isPerson(r) ? '' : `<label class="br-ar"><span>Arabic name</span>
+            <input dir="rtl" lang="ar" data-br-ar="${esc(r.code)}" value="${esc(LOCATIONS.find(l => l.code === r.code)?.nameAr ?? '')}" placeholder="الاسم بالعربية" aria-label="Arabic name of ${esc(r.code)}"></label>`}
           <label class="br-lens br-bench ${fitting ? '' : 'is-off'}" title="${fitting ? 'In-house only: it cuts its own jobs, other branches can’t send any. Off: nothing.' : 'Only an open fitting centre has a lab'}">
             <span>Lab</span>
             <select class="sel sel-sm" data-br-lab="${esc(r.code)}" ${off(fitting, 'Only an open fitting centre has a lab')}>${LAB_MODES.map(([k, l]) => `<option value="${k}" ${fitting && labMode(r.code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -583,6 +585,7 @@ export function settingsView(me) {
         if (!v) { e.target.value = LOCATIONS.find(l => l.code === d.brName)?.name ?? ''; return; }
         return store.saveBranch(d.brName, { name: v });
       }
+      if (d.brAr != null) return store.setBranchNameAr(d.brAr, e.target.value.trim());
       if (d.brRole) return saveRole(e.target);
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);

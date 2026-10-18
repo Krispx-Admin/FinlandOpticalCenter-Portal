@@ -197,7 +197,7 @@ const SELECTS = {
   lensStock:    ['lens_stock', '*', { column: 'updated_at', asc: false }, toLensItem],
   lensRequests: ['lens_requests', '*, lens_request_lines(*), lens_request_events(*)', { column: 'created_at', asc: false }, toLensRequest],
   claims:       ['claims', '*, claim_items(*), claim_prescriptions(*)', { column: 'created_at', asc: false }, toClaim],
-  branches:     ['branches', 'code, name, role, active, position, holds_lens_stock, bench_closed, bench_closed_until, bench_own_only, can_export_insurance', { column: 'position', asc: true }, r => r],
+  branches:     ['branches', 'code, name, name_ar, role, active, position, holds_lens_stock, bench_closed, bench_closed_until, bench_own_only, can_export_insurance', { column: 'position', asc: true }, r => r],
   damaged: ['damaged_reports', '*, damaged_lines(*)', { column: 'created_at', asc: false }, r => ({
     id: r.id, ref: r.ref, branch: r.branch_code, note: r.note ?? '', createdAt: ts(r.created_at),
     lines: (r.damaged_lines ?? []).slice().sort((a, b) => a.position - b.position)

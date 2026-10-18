@@ -35,7 +35,8 @@ create table public."branches" (
   "bench_closed" boolean default false not null,
   "bench_closed_until" date,
   "bench_own_only" boolean default false not null,
-  "can_export_insurance" boolean default false not null
+  "can_export_insurance" boolean default false not null,
+  "name_ar" text
 );
 
 create table public."claim_items" (
@@ -1709,6 +1710,18 @@ begin
   end if;
 end $function$;
 
+CREATE OR REPLACE FUNCTION public.set_branch_name_ar(p_code text, p_name text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not public.is_admin() then raise exception 'Only the office can rename a branch'; end if;
+  update public.branches set name_ar = nullif(btrim(p_name), '') where code = p_code;
+  if not found then raise exception 'No such branch'; end if;
+end $function$;
+
 CREATE OR REPLACE FUNCTION public.set_collect(p_id uuid, p_code text)
  RETURNS orders
  LANGUAGE plpgsql
@@ -2057,6 +2070,8 @@ alter table public."claims" enable row level security;
 
 alter table public."claim_prescriptions" enable row level security;
 
+alter table public."branches" enable row level security;
+
 alter table public."order_events" enable row level security;
 
 alter table public."lens_request_events" enable row level security;
@@ -2068,8 +2083,6 @@ alter table public."lens_requests" enable row level security;
 alter table public."orders" enable row level security;
 
 alter table public."lens_stock" enable row level security;
-
-alter table public."branches" enable row level security;
 
 alter table public."employees" enable row level security;
 

@@ -16,7 +16,7 @@ import { pgcrypto } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.5.
 
 // Bump when demo/*.sql is regenerated: every practice copy then starts over
 // on the new layout (an old one could not run the new screens).
-const VERSION = 6;
+const VERSION = 7;
 const DB_NAME = `foc-practice-v${VERSION}`;
 const SESSION_KEY = 'focp.practice.as';
 

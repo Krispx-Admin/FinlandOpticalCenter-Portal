@@ -248,16 +248,20 @@ export function fittingView(me) {
   const waText = (o, days) => {
     const name = o.customer || '';
     const branch = locName(collectOf(o));
+    // The Arabic half names the branch in Arabic (Settings → Accounts).
+    const branchAr = LOCATIONS.find(l => l.code === collectOf(o))?.nameAr || branch;
     const en = [
       `Hello${name ? ` *${name}*` : ''},`,
-      `Your glasses are ready for collection at *Finland Optical Center – ${branch}*.`,
+      'Your glasses are ready for collection at:',
+      `*Finland Optical Center – ${branch}*`,
       ...(days ? ['', '*Opening hours*', ...hoursLines(days, false)] : []),
       '',
       'We look forward to seeing you!',
     ];
     const ar = [
       `مرحباً${name ? ` *${name}*` : ''}،`,
-      `نظارتك جاهزة للاستلام من *المركز الفنلندي للبصريات – ${branch}*.`,
+      'نظارتك جاهزة للاستلام من:',
+      `*المركز الفنلندي للبصريات – ${branchAr}*`,
       ...(days ? ['', '*أوقات العمل*', ...hoursLines(days, true)] : []),
       '',
       'بانتظار زيارتك!',

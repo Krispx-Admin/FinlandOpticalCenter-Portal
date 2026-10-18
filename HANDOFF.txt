@@ -815,6 +815,9 @@ Migrations are applied by hand, in order. Each file has a header with
                              closed per day from THIS week's saved schedule
                              (Oman time), else schedule_branches.days. No
                              staffing numbers. Applied 2026-10-18.
+  schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
+                             السيب, FEC clinics عيادة <city>); office-only
+                             set_branch_name_ar(). Applied 2026-10-18.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1215,6 +1218,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  WhatsApp message (practice trial): "Finland Optical Center –
+             <branch>" on its own line in both halves; the Arabic half names
+             the branch in ARABIC. Arabic names: branches.name_ar (schema-49,
+             rehearsed: a branch is refused, the office can rename; applied),
+             edited in Settings → Accounts ("Arabic name", branches only).
+             The FEC clinics were given عيادة <city> — the user may correct.
+             Practice copy rebuilt + VERSION 7.
  2026-10-18  WhatsApp message (practice trial) rewritten (user): English, then
              Arabic; no bill number; the branch's opening hours from the
              SCHEDULE for the current week — so seasonal hours follow the

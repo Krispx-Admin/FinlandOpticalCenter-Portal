@@ -76,7 +76,7 @@ export const benchNote = code => {
 export function setLocations(rows) {
   if (!rows?.length) return;
   const next = rows.map(r => Object.assign(LOCATIONS.find(l => l.code === r.code) ?? {}, {
-    code: r.code, name: r.name, role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
+    code: r.code, name: r.name, nameAr: r.name_ar ?? '', role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
     benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null, benchOwnOnly: !!r.bench_own_only,
     canExport: !!r.can_export_insurance,
   }));
