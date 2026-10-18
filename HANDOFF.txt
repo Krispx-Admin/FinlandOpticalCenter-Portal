@@ -1218,6 +1218,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Both outside-lens TRIALS REMOVED (user: "I don't like it, don't use
+             this in the real and remove it from practice"): the ordering
+             branch's plain view + its own "Outside Lens Orders" tab (olmine),
+             and Avenues' lenses-only view (lensView) — code deleted, practice
+             back to the two-line view (frame + lens) for everyone. The two
+             TRIAL entries below are history only. Kept: summary tiles removed,
+             the received-lenses refresh fix, the WhatsApp icon button.
  2026-10-18  Fitting Log: the three summary tiles (Active orders / Need your
              action / Completed · 7d) removed (user) — live; the tabs carry the
              counts. fitting.js statsHTML gone.

@@ -11,7 +11,6 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
-import { isPractice } from './auth.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -37,9 +36,6 @@ CHIP_DEFS.push({ key: 'stock', label: 'Stock Lens', statuses: [], holders: true,
 // Every other branch's order with outside lenses — only the branch that orders
 // them (Avenues) has this tab (user, 2026-10-16). Matched in the view.
 CHIP_DEFS.push({ key: 'olorders', label: 'Outside Lens Orders', statuses: [], handler: true, test: () => false });
-// TRIAL (practice copy, user 2026-10-18): a branch's own outside-lens orders,
-// in full, with the lenses' steps — the only place it sees them as such.
-CHIP_DEFS.push({ key: 'olmine', label: 'Outside Lens Orders', statuses: [], mine: true, test: () => false });
 CHIP_DEFS.push({ key: 'collected', label: 'Completed', statuses: ['collected'] });
 const onChip = (d, o) => (d.test ? d.test(o) : d.statuses.includes(o.status));
 
@@ -125,36 +121,11 @@ export function fittingView(me) {
     { key: 'way',      label: 'On the Way',            rank: 4, test: o => outsideInTransit(o, me.code) },
     { key: 'done',     label: 'Done',                  bar: true, rank: 9, test: () => true },
   ];
-  // The branch that ordered outside lenses, in its own tab (TRIAL).
-  const MINE_STEPS = [
-    { key: 'all',     label: 'All' },
-    { key: 'ordering', label: 'Being Ordered', bar: true, rank: 1, test: o => o.outsideLens?.status !== 'ordered' && !isBack(o) },
-    { key: 'ordered',  label: 'Ordered',       rank: 2, test: o => o.outsideLens?.status === 'ordered' && !o.outsideLens.sentAt && !o.outsideLens.receivedAt && !isBack(o) },
-    { key: 'way',      label: 'On the Way',    rank: 3, test: o => !!o.outsideLens?.sentAt && !o.outsideLens.receivedAt && !isBack(o) && !(o.outsideLens.fulfilment === 'receive_lens' && o.status !== 'pending') },
-    { key: 'done',     label: 'Received',      bar: true, rank: 9, test: () => true },
-  ];
-  const stepsOf = key => (key === 'stock' ? STOCK_STEPS : key === 'olorders' ? OUTSIDE_STEPS : key === 'olmine' ? MINE_STEPS : null);
-  // TRIAL (practice copy): outside the "Outside Lens Orders" tab, the branch
-  // that ordered outside lenses sees a plain job — one line, one tag:
-  // "Waiting for Lenses" when the lenses come to it, "Send to Fitting" when
-  // its frame goes to them (user, 2026-10-18).
-  const plainOutside = o => isPractice && !!o.outsideLens && o.outsideLens.branch !== outsideHandler()
-    && o.origin === me.code && me.code !== outsideHandler() && ui.chip !== 'olmine';
-  // …and Avenues, ordering another branch's outside lenses, sees only the
-  // lenses: their line from it to where they go, and their tag — where the
-  // frame is is the other branch's business (user, 2026-10-18; TRIAL).
-  const lensView = o => isPractice && me.code === outsideHandler() && onMyOutside(o, me.code) && o.outsideLens.branch !== me.code;
-  function plainStep(o, st) {
-    const ol = o.outsideLens;
-    if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in') return { ...st, label: 'Send to Fitting', color: 'cyan' };
-    if (ol.fulfilment === 'receive_lens' && o.status === 'pending') return { ...st, label: 'Waiting for Lenses', color: 'slate' };
-    return frameStep(o, { viewer: me.code });
-  }
+  const stepsOf = key => (key === 'stock' ? STOCK_STEPS : key === 'olorders' ? OUTSIDE_STEPS : null);
   const stepOf = (steps, o) => steps.filter(s => s.test).sort((a, b) => a.rank - b.rank).find(s => s.test(o))?.key;
   const chipHas = (d, o) => {
     if (d.key === 'stock') return inStockTab(o);
     if (d.key === 'olorders') return inOutsideTab(o);
-    if (d.key === 'olmine') return !!o.outsideLens && o.origin === me.code && o.outsideLens.branch !== outsideHandler();
     if (inStockTab(o) || (inOutsideTab(o) && o.origin !== me.code)) return false;
     return onChip(d, o);
   };
@@ -400,8 +371,6 @@ export function fittingView(me) {
     return `<div class="tag-stack">${stepPill(f, { flash: changed, title: `Frame: ${fl}` })}${stepPill(l, { title: `Lenses: ${ll}` })}</div>`;
   }
   function statusHTML(o, st, changed) {
-    if (plainOutside(o)) return stepPill(plainStep(o, st), { flash: changed });
-    if (lensView(o)) return stepPill(lensStep(o, { viewer: me.code }), { flash: changed, title: lensStep(o, { viewer: me.code, long: true }).label });
     if (twoRoads(o)) return tagsHTML(o, changed);
     return stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label });
   }
@@ -413,18 +382,11 @@ export function fittingView(me) {
   // stays once they arrive — its end pin simply turns navy (user, 2026-10-13).
   function journey(o, big = false, tail = '') {
     const ol = o.outsideLens, H = outsideHandler();
-    if (plainOutside(o)) return frameJourney(o, big, tail);
     if (!ol || ol.branch === H) return frameJourney(o, big, tail);
     const dest = ol.dest ?? o.origin;
     const seg = ol.receivedAt ? 'done' : ol.sentAt ? 'moving' : '';
     const pin = (code, cls) => `<div class="j-node ${cls}"><span class="j-pin">${esc(code)}</span>${big ? `<span class="j-lbl">${esc(locName(code))}</span>` : ''}</div>`;
     const name = t => `<span class="j-line-lbl">${t}</span>`;
-    if (lensView(o)) return `
-      <div class="journey ${big ? 'journey-big' : ''}" title="Lenses: ${esc(locName(H))} → ${esc(locName(dest))} · ${esc(outsideLensState(ol))}">
-        ${pin(H, ol.status === 'ordered' ? 'done' : '')}
-        <i class="j-seg ${seg}"></i>
-        ${pin(dest, `${ol.receivedAt ? 'done' : ''} j-mid`)}
-      </div>`;
     return `
       <div class="journey-2 ${big ? 'journey-2-big' : ''}">
         <div class="j-line">${name('Frame')}${frameJourney(o, big, '')}</div>
@@ -558,8 +520,7 @@ export function fittingView(me) {
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
-      else if (lensView(o)) action = `<span class="row-actor">${o.outsideLens.receivedAt || isBack(o) ? `${icons.check} lenses delivered` : `waiting on ${esc(o.outsideLens.dest ?? o.origin)}`}</span>`;
-      else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : plainOutside(o) && fitActor(o) === outsideHandler() ? 'waiting for lenses' : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
+      else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       // The fitter marks the outside lenses received — alongside the frame's own step.
       if (canReceiveOutside(o, me.code) && !viewOnly) {
         const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
@@ -576,9 +537,9 @@ export function fittingView(me) {
             <b>${esc(o.ref)}</b>
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens && !plainOutside(o) && !lensView(o) ? outsideLensTag('stock-tag-sub') : ''}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens ? outsideLensTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens && !plainOutside(o) && !lensView(o) ? outsideLensTag() : '')}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens ? outsideLensTag() : '')}</div>
         <div class="row-status">${statusHTML(o, st, changed)}</div>
         <div class="row-act" data-stop>
           ${action}
@@ -626,8 +587,7 @@ export function fittingView(me) {
     // How many in each chip are waiting on this location.
     const mine = viewOnly ? [] : store.ordersFor(me.code).filter(o => o.status !== 'collected' && (needsAction(o, me.code) || toOrder(o)));
     const act = d => (d.key === 'active' ? mine.length : mine.filter(o => chipHas(d, o)).length);
-    return CHIP_DEFS.filter(d => (!d.holders || isLensOwner(me.code)) && (!d.handler || me.code === outsideHandler())
-      && (!d.mine || (isPractice && !isAdmin && me.code !== outsideHandler()))).map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
+    return CHIP_DEFS.filter(d => (!d.holders || isLensOwner(me.code)) && (!d.handler || me.code === outsideHandler())).map(d => `${d.key === 'collected' ? '<span class="chip-sep"></span>' : ''}
       <button class="chip ${ui.chip === d.key ? 'on' : ''}" data-chip="${d.key}">
         ${esc(d.label)}${chipCount(c[d.key] ?? 0, act(d))}
       </button>`).join('');
@@ -651,7 +611,7 @@ export function fittingView(me) {
       </div>
       <div class="dw-body">
         ${viewOnly ? '' : toolsHTML(o)}
-        <div class="dw-status-row">${plainOutside(o) ? stepPill(plainStep(o, st)) : lensView(o) ? stepPill(lensStep(o, { viewer: me.code, long: true })) : twoRoads(o) ? `${tagsHTML(o, false, true)}` : stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
+        <div class="dw-status-row">${twoRoads(o) ? `${tagsHTML(o, false, true)}` : stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
         ${journey(o, true)}
         <div class="kv">
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
