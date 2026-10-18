@@ -117,7 +117,7 @@ export function fittingView(me) {
     { key: 'all',      label: 'All' },
     { key: 'order',    label: 'Order Lens',            bar: true, rank: 1, test: o => toOrder(o) },
     { key: 'supplier', label: 'Waiting from Supplier', rank: 2, test: o => o.outsideLens?.status === 'ordered' && !o.outsideLens.arrivedAt && !isBack(o) },
-    { key: 'send',     label: 'Send Lenses',           bar: true, rank: 3, test: o => !!o.outsideLens?.arrivedAt && !o.outsideLens.sentAt && !isBack(o) },
+    { key: 'send',     label: 'Send Lenses',           rank: 3, test: o => !!o.outsideLens?.arrivedAt && !o.outsideLens.sentAt && !isBack(o) },
     { key: 'way',      label: 'On the Way',            rank: 4, test: o => outsideInTransit(o, me.code) },
     { key: 'done',     label: 'Done',                  bar: true, rank: 9, test: () => true },
   ];
