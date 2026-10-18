@@ -1201,6 +1201,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 8 orders, 2
+             outside-lens orders, 2 lens / 1 stock request, 2 insurance records,
+             1 damaged report deleted; numbering restarted; 2 set-aside lenses
+             back on the shelf (10 rows, 153 pcs).
  2026-10-17  Direct Insurance: the price typed on a product line is the TOTAL
              for that line, not per piece (user) — 2 lenses at 40.000 count
              40.000. schema-44 (rehearsed rolled back: direct 40+25 = 65,
