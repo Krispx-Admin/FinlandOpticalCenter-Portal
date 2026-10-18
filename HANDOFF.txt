@@ -1218,6 +1218,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  WHATSAPP "Message Customer" NOW LIVE (user: put the practice
+             things on the real one). The isPractice checks in fitting.js are
+             gone: every branch's New fitting order has "Customer phone"; an
+             order Ready for Collection at the branch collecting it shows
+             "Message Customer" (English then Arabic, the branch's Arabic name,
+             this week's opening hours from the schedule). Live orders.phone
+             existed already; orders_update lets the collecting branch save a
+             number it is asked for. Everything else tried in practice was
+             already live (it is one codebase; only these two were gated).
  2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 6 orders, 2
              outside-lens orders, 3 lens requests deleted; numbering restarted;
              2 set-aside lenses back on the shelf (10 rows, 149 pcs).

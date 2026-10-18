@@ -11,7 +11,6 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
-import { isPractice } from './auth.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -204,11 +203,11 @@ export function fittingView(me) {
     });
   }
 
-  // ── WhatsApp the customer (TRIAL — practice copy only, user 2026-10-18) ──
+  // ── WhatsApp the customer (user 2026-10-18; tried in the practice copy, then live) ──
   // When the frame is ready at the branch the customer collects from, one
   // click opens WhatsApp on this computer with the customer's number and the
   // message typed; staff press Send. WhatsApp lets no website send by itself.
-  const waOn = o => isPractice && !viewOnly && o.status === 'delivered' && collectOf(o) === me.code;
+  const waOn = o => !viewOnly && o.status === 'delivered' && collectOf(o) === me.code;
   // 8 digits is an Omani number: 968 goes in front. "+", "00", spaces go.
   const waNumber = s => {
     let d = String(s ?? '').replace(/\D/g, '').replace(/^00/, '');
@@ -948,7 +947,7 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
-        ${isPractice ? '<label>Customer phone <span class="opt">for the WhatsApp message when it is ready</span><input name="phone" inputmode="tel" autocomplete="off" placeholder="e.g. 9123 4567"></label>' : ''}
+        <label>Customer phone <span class="opt">for the WhatsApp message when it is ready</span><input name="phone" inputmode="tel" autocomplete="off" placeholder="e.g. 9123 4567"></label>
         <label>Customer collects at <select name="collect">${collectOptions(me.code)}</select></label>
         <div class="lens-src" role="radiogroup" aria-label="Lenses">
           <span class="lens-src-l">Lenses</span>
@@ -1149,7 +1148,7 @@ export function fittingView(me) {
         o = await store.createOrder({ ref, origin: me.code, customer, collect }, me.code);
       }
       if (!o) { go.disabled = false; go.innerHTML = was; return; }
-      if (isPractice && phone) await store.setOrderPhone(o.id, phone, me.code);
+      if (phone) await store.setOrderPhone(o.id, phone, me.code);
       layer.close();
       toast({
         title: `${o.ref} logged`,
