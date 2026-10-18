@@ -326,7 +326,11 @@ export const store = {
   // time — in parallel, and each guarded on the status it was read at, so an
   // order someone else just moved is left alone instead of skipping a step.
   advanceOrders(ids, by) {
-    return run(['orders'], async () => {
+    // Moving an outside-lens job on can mark its lenses received in the same
+    // step (the database does it), so that list comes back too — else the lens
+    // line would still read "on the way" until something else refreshed it.
+    const keys = ids.some(id => this.order(id)?.outsideLens) ? ['orders', 'outsideOrders'] : ['orders'];
+    return run(keys, async () => {
       const plan = ids.map(id => this.order(id))
         .filter(o => o && canAdvanceOrder(o, by) && !(o.status === 'lenses_in' && !o.fitter))
         .map(o => ({ o, from: o.status, to: nextFitStatus(o) }))

@@ -290,7 +290,7 @@ export function fittingView(me) {
     return [...en, '', '—', '', ...ar].join('\n');
   };
   const waBtn = (o, big = false) => (waOn(o)
-    ? `<button class="btn btn-ghost ${big ? '' : 'btn-sm'} wa-btn" data-wa="${o.id}" title="Opens WhatsApp with the message ready — press Send there">${icons.chat} Message Customer</button>` : '');
+    ? `<button class="btn btn-ghost ${big ? '' : 'btn-sm'} wa-btn" data-wa="${o.id}" title="Message the customer on WhatsApp — it opens with the message ready; press Send there" aria-label="Message the customer on WhatsApp">${icons.whatsapp}</button>` : '');
   async function messageCustomer(id) {
     const o = store.order(id);
     if (!o) return;

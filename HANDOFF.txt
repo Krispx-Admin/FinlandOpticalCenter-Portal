@@ -1218,6 +1218,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  FIX (user): outside lenses received at the branch still showed "In
+             transit to <branch>" with the moving lens line. Pressing Lens
+             Received makes the database stamp the lenses received
+             (outside_lens_gate), but advanceOrders refreshed only the orders —
+             the outside-lens list stayed stale until realtime caught up (never,
+             in the practice copy). It now refreshes outsideOrders too whenever
+             an outside-lens job moves. Checked: Al Mouj's own receive-here job
+             reads "Lenses at MOUJ", line done, right after Lens Received.
+             Message Customer is now just the WhatsApp mark (user): a green
+             square icon button, the words on hover / for screen readers.
  2026-10-18  TRIAL — PRACTICE COPY ONLY (user: try it before the real site):
              the branch that ORDERED outside lenses sees a plain job in its
              frame tabs — one line, one tag, no "Outside Lens" mark: lenses

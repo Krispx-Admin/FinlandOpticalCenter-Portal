@@ -310,8 +310,11 @@ svg { width: 18px; height: 18px; flex: none; }
 .cx-banner span { color: #9b3a3a; }
 
 /* WhatsApp the customer (practice-copy trial) */
-.wa-btn { color: #128c4b; border-color: #9fdcb8; }
-.wa-btn:hover { background: #e9f8ef; border-color: #25a95b; }
+/* just the WhatsApp mark (user, 2026-10-18) — square, the brand's green */
+.wa-btn { color: #25d366; border-color: #9fdcb8; padding: 0; width: 34px; height: 34px; justify-content: center; flex: none; }
+.wa-btn.btn-sm { width: 32px; height: 32px; }
+.wa-btn svg { width: 19px; height: 19px; }
+.wa-btn:hover { background: #e9f8ef; border-color: #25a95b; color: #1da851; }
 .row-act .wa-btn { margin-right: 6px; }
 
 /* practice copy (?practice=SCC): a pill along the bottom, on every screen */
