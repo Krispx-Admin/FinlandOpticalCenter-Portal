@@ -511,7 +511,8 @@ export const store = {
       sub: r.fulfilment === 'receive_lens'
         ? `${r.pcs} pcs to ${locName(by)} · fitting here`
         : `${r.pcs} pcs · frame going to ${locName(r.holder_code ?? holder)}`,
-      refs: [r.id],
+      // The request and the fitting order it opened: both refresh at once.
+      refs: [r.id, r.order_id].filter(Boolean),
     })).then(r => (r ? this.lensRequest(r.id) : null));
   },
 

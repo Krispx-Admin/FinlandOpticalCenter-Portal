@@ -102,24 +102,28 @@ export function fittingView(me) {
   const inStockTab = o => onMyStock(o, me.code);
   const inOutsideTab = o => onMyOutside(o, me.code) || (toOrder(o) && o.origin === me.code);
   const fitHere = o => o.fitter === me.code;
+  // Shown in this order (user, 2026-10-18): All | the frame's steps | the
+  // lenses' steps | Done — `bar` starts a new group. `rank` is the order the
+  // tests are tried in: an order sits in the first step that fits it.
   const STOCK_STEPS = [
-    { key: 'send',    label: 'Lenses to Send', test: o => o.lensRequest?.status === 'requested' },
-    { key: 'coming',  label: 'Frame Coming',   test: o => fitHere(o) && ['pending', 'lenses_in', 'to_fitter'].includes(o.status) },
-    { key: 'fitting', label: 'In Fitting',     test: o => fitHere(o) && o.status === 'at_fitter' },
-    { key: 'ready',   label: 'Ready',          test: o => o.status === 'ready' && frameLoc(o) === me.code },
-    { key: 'sent',    label: 'Lenses Sent',    test: o => o.lensRequest?.status === 'sent' && o.status === 'pending' },
-    { key: 'done',    label: 'Done',           test: () => true },
+    { key: 'all',     label: 'All' },
+    { key: 'coming',  label: 'Frame Coming',   bar: true, rank: 2, test: o => fitHere(o) && ['pending', 'lenses_in', 'to_fitter'].includes(o.status) },
+    { key: 'fitting', label: 'In Fitting',     rank: 3, test: o => fitHere(o) && o.status === 'at_fitter' },
+    { key: 'ready',   label: 'Ready',          rank: 4, test: o => o.status === 'ready' && frameLoc(o) === me.code },
+    { key: 'send',    label: 'Send Lenses',    bar: true, rank: 1, test: o => o.lensRequest?.status === 'requested' },
+    { key: 'sent',    label: 'Lenses Sent',    rank: 5, test: o => o.lensRequest?.status === 'sent' && o.status === 'pending' },
+    { key: 'done',    label: 'Done',           bar: true, rank: 9, test: () => true },
   ];
   const OUTSIDE_STEPS = [
-    { key: 'order',    label: 'Order Lens',            test: o => toOrder(o) },
-    { key: 'supplier', label: 'Waiting from Supplier', test: o => o.outsideLens?.status === 'ordered' && !o.outsideLens.arrivedAt && !isBack(o) },
-    { key: 'send',     label: 'Send Lenses',           test: o => !!o.outsideLens?.arrivedAt && !o.outsideLens.sentAt && !isBack(o) },
-    { key: 'way',      label: 'On the Way',            test: o => outsideInTransit(o, me.code) },
-    { key: 'done',     label: 'Done',                  test: () => true },
+    { key: 'all',      label: 'All' },
+    { key: 'order',    label: 'Order Lens',            bar: true, rank: 1, test: o => toOrder(o) },
+    { key: 'supplier', label: 'Waiting from Supplier', rank: 2, test: o => o.outsideLens?.status === 'ordered' && !o.outsideLens.arrivedAt && !isBack(o) },
+    { key: 'send',     label: 'Send Lenses',           bar: true, rank: 3, test: o => !!o.outsideLens?.arrivedAt && !o.outsideLens.sentAt && !isBack(o) },
+    { key: 'way',      label: 'On the Way',            rank: 4, test: o => outsideInTransit(o, me.code) },
+    { key: 'done',     label: 'Done',                  bar: true, rank: 9, test: () => true },
   ];
   const stepsOf = key => (key === 'stock' ? STOCK_STEPS : key === 'olorders' ? OUTSIDE_STEPS : null);
-  // An order sits in the first step that fits it.
-  const stepOf = (steps, o) => steps.find(s => s.test(o))?.key;
+  const stepOf = (steps, o) => steps.filter(s => s.test).sort((a, b) => a.rank - b.rank).find(s => s.test(o))?.key;
   const chipHas = (d, o) => {
     if (d.key === 'stock') return inStockTab(o);
     if (d.key === 'olorders') return inOutsideTab(o);
@@ -133,7 +137,7 @@ export function fittingView(me) {
       const chip = CHIP_DEFS.find(d => d.key === ui.chip);
       list = list.filter(o => chip && chipHas(chip, o));
       const steps = stepsOf(ui.chip);
-      if (steps && ui.step) list = list.filter(o => stepOf(steps, o) === ui.step);
+      if (steps && ui.step && ui.step !== 'all') list = list.filter(o => stepOf(steps, o) === ui.step);
     }
     return list.sort((a, b) => b.updatedAt - a.updatedAt);
   }
@@ -143,24 +147,17 @@ export function fittingView(me) {
     : toOrder(o) ? 'Confirm Order'
     : canArriveOutside(o, me.code) ? 'Lens Received'
     : canSendOutside(o, me.code) ? `Send Lenses to ${o.outsideLens.dest}` : null);
-  // On opening a lens tab: the first step with something to press, else the
-  // first with anything in it.
-  function pickStep() {
-    const steps = stepsOf(ui.chip);
-    if (!steps) { ui.step = null; return; }
-    const list = filtered().filter(o => chipHas(CHIP_DEFS.find(d => d.key === ui.chip), o));
-    const has = k => list.filter(o => stepOf(steps, o) === k);
-    ui.step = (steps.find(s => has(s.key).some(o => actionOf(o))) ?? steps.find(s => has(s.key).length) ?? steps[0]).key;
-  }
+  // Opening a lens tab starts on All.
+  function pickStep() { ui.step = stepsOf(ui.chip) ? 'all' : null; }
   function stepsHTML() {
     const steps = stepsOf(ui.chip);
     if (!steps) return '';
     const chip = CHIP_DEFS.find(d => d.key === ui.chip);
     const list = filtered().filter(o => chipHas(chip, o));
     return `<div class="chips step-chips" role="tablist" aria-label="${esc(chip.label)} steps">${steps.map(s => {
-      const inIt = list.filter(o => stepOf(steps, o) === s.key);
+      const inIt = s.key === 'all' ? list.filter(o => o.status !== 'collected') : list.filter(o => stepOf(steps, o) === s.key);
       const act = s.key === 'done' ? 0 : inIt.filter(o => actionOf(o)).length;
-      return `<button class="chip ${ui.step === s.key ? 'on' : ''}" data-step="${s.key}" role="tab">${esc(s.label)}${chipCount(inIt.length, act)}</button>`;
+      return `${s.bar ? '<span class="chip-sep"></span>' : ''}<button class="chip ${ui.step === s.key ? 'on' : ''}" data-step="${s.key}" role="tab">${esc(s.label)}${chipCount(inIt.length, act)}</button>`;
     }).join('')}</div>`;
   }
   // The other branches this one shares orders with, for its branch filter.
@@ -570,16 +567,16 @@ export function fittingView(me) {
   const bulkLabel = o => (!canAdvanceOrder(o, me.code) ? null
     : (o.status === 'lenses_in' && !o.fitter) ? 'Send to Fitting'
     : fitStep(o).action) || null;
+  // The step, without where to: "Send to AV" and "Send to MOUJ" are both
+  // "Send to Branch". Mixed steps still go — each order does its own.
+  const stepWord = a => String(a ?? '')
+    .replace(/^Send Lenses to .+/, 'Send Lenses').replace(/^Send Frame to .+/, 'Send Frame')
+    .replace(/^Transfer to .+/, 'Transfer').replace(/^Send to (?!Fitting$).+/, 'Send to Branch');
   function bulkAction() {
     const sel = [...ui.selected].map(id => store.order(id)).filter(Boolean);
-    let action = null, ok = sel.length > 0;
-    for (const o of sel) {
-      const label = actionOf(o);
-      if (!label) { ok = false; continue; }
-      if (action === null) action = label;
-      else if (action !== label) ok = false;
-    }
-    return { count: sel.length, action, ok: ok && !!action };
+    const words = [...new Set(sel.map(o => stepWord(actionOf(o))))];
+    const ok = sel.length > 0 && sel.every(o => actionOf(o));
+    return { count: sel.length, action: words.length === 1 ? words[0] : 'Next Step', ok };
   }
 
   function bulkHTML() {
@@ -591,7 +588,7 @@ export function fittingView(me) {
         <button class="btn btn-primary btn-sm" data-bulk-act ${ok ? '' : 'disabled'}>
           ${icons.checks} ${esc(action ?? 'Advance')}${count > 1 ? ` · ${count} orders` : ''}
         </button>
-        ${!ok ? `<span class="bulk-hint">selected orders need different actions</span>` : ''}
+        ${!ok ? `<span class="bulk-hint">some selected orders have no step for you</span>` : action === 'Next Step' ? `<span class="bulk-hint">each order does its own next step</span>` : ''}
         <button class="btn btn-ghost btn-sm" data-bulk-clear>Clear</button>
       </div>`;
   }
@@ -1249,23 +1246,18 @@ export function fittingView(me) {
   const actionOf = o => lensAct(o) ?? (lensOnly(o) || handlerStage(o, me.code) ? null : bulkLabel(o));
   const canSelect = o => o.status !== 'collected' && !!actionOf(o);
   const selectable = () => visible().filter(canSelect);
-  function selectAllGroup() {
-    const list = selectable();
-    const by = new Map();
-    for (const o of list) { const a = actionOf(o); by.set(a, [...(by.get(a) ?? []), o]); }
-    const [action, group] = [...by.entries()].sort((a, b) => b[1].length - a[1].length)[0] ?? [null, []];
-    return { action, group, others: list.length - group.length };
-  }
+  // Select all (user, 2026-10-18): always shown — greyed when nothing here
+  // has a step to press — and it takes every order that has one, whatever
+  // the step; the bulk button then does each order's own step.
   function selectAllHTML() {
     const steps = stepsHTML();
-    if (viewOnly || ui.chip === 'active') return steps ? `<div class="sel-row">${steps}</div>` : '';
-    const { action, group, others } = selectAllGroup();
-    if (!group.length) return steps ? `<div class="sel-row">${steps}</div>` : '';
-    const all = group.every(o => ui.selected.has(o.id));
+    if (viewOnly) return steps ? `<div class="sel-row">${steps}</div>` : '';
+    const list = selectable();
+    const all = list.length > 0 && list.every(o => ui.selected.has(o.id));
     return `<div class="sel-row">
-      <label class="sel-all">
-        <span class="cbx"><input type="checkbox" data-sel-all ${all ? 'checked' : ''}><i></i></span>
-        <span>${all ? 'Clear selection' : `Select all ${group.length} — ${esc(action)}`}${others ? ` <span class="muted">· ${others} need${others === 1 ? 's' : ''} another step</span>` : ''}</span>
+      <label class="sel-all ${list.length ? '' : 'is-off'}" ${list.length ? '' : 'title="Nothing here has a step for you to press"'}>
+        <span class="cbx"><input type="checkbox" data-sel-all ${all ? 'checked' : ''} ${list.length ? '' : 'disabled'}><i></i></span>
+        <span>Select all${list.length ? ` <span class="muted">· ${list.length}</span>` : ''}</span>
       </label>${steps}</div>`;
   }
 
@@ -1300,8 +1292,8 @@ export function fittingView(me) {
       if (dd) { ui.days = +dd.dataset.days; ui.selected.clear(); refreshLists(); return; }
       const sa = e.target.closest('[data-sel-all]');
       if (sa) {
-        const { group } = selectAllGroup();
-        if (sa.checked) { ui.selected.clear(); group.forEach(o => ui.selected.add(o.id)); } else group.forEach(o => ui.selected.delete(o.id));
+        const list = selectable();
+        if (sa.checked) { ui.selected.clear(); list.forEach(o => ui.selected.add(o.id)); } else ui.selected.clear();
         refreshLists(); return;
       }
       if (e.target.closest('[data-bulk-clear]')) { ui.selected.clear(); refreshLists(); return; }
@@ -1311,8 +1303,7 @@ export function fittingView(me) {
         const ids = [...ui.selected];
         // A lens step: each order's own lens action, one after another.
         const lensOrders = ids.map(id => store.order(id)).filter(o => o && lensAct(o));
-        if (lensOrders.length === ids.length) {
-          ui.selected.clear();
+        if (lensOrders.length) {
           (async () => {
             const confirmIds = lensOrders.filter(toOrder).map(o => o.outsideLens.id);
             if (confirmIds.length) await store.setOutsideStatus(confirmIds, 'ordered', me.code);
@@ -1322,13 +1313,13 @@ export function fittingView(me) {
               else if (canSendOutside(o, me.code)) await store.sendOutsideLenses(o.outsideLens.id, me.code);
             }
           })();
-          refreshLists();
-          return;
+          ids.splice(0, ids.length, ...ids.filter(id => !lensOrders.some(o => o.id === id)));
+          if (!ids.length) { ui.selected.clear(); refreshLists(); return; }
         }
         // Frames with no fitter yet are sent through the picker; frames a lens
         // request already gave one simply go.
         const unassigned = ids.filter(id => !store.order(id)?.fitter);
-        if (action === 'Send to Fitting' && unassigned.length) {
+        if (unassigned.some(id => actionOf(store.order(id)) === 'Send to Fitting')) {
           const assigned = ids.filter(id => !unassigned.includes(id));
           if (assigned.length) store.advanceOrders(assigned, me.code);
           fitterPicker(unassigned); return; // picker clears selection on send

@@ -504,6 +504,8 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .sel-row .sel-all { padding: 2px 17px 0; }
 .step-chips { margin: 0; gap: 6px; }
 .step-chips .chip { font-size: 12.5px; padding: 5px 11px; }
+.step-chips .chip-sep { align-self: stretch; width: 1px; background: var(--border-strong); margin: 4px 4px; }
+.sel-all.is-off { opacity: .5; cursor: not-allowed; }
 /* ── Outside Lens Orders ── */
 .ol-switch, .form .ol-switch { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
 .ol-switch b { font-weight: 650; }
