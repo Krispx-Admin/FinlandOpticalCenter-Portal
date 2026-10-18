@@ -57,6 +57,7 @@ export function fittingView(me) {
     branch: 'all',                          // a branch: the branch it shares orders with
     origin: 'all', fitter: 'all',           // admin-only filters
     selected: new Set(),
+    step: null,                             // the lens step open inside Stock Lens / Outside Lens Orders
     seen: new Set(store.state.orders.map(o => o.id)),
     prevStatus: new Map(store.state.orders.map(o => [o.id, o.status])),
   };
@@ -91,17 +92,38 @@ export function fittingView(me) {
   // they live under Stock Lens / Outside Lens Orders for the whole job (and
   // Completed, once collected), not in the frame tabs.
   const lensOnly = o => (onMyStock(o, me.code) || onMyOutside(o, me.code)) && o.fitter !== me.code && collectOf(o) !== me.code;
-  // For the handler (Avenues), a lens still to order sits under Outside Lens
-  // Orders; once ordered it moves to Waiting for Lenses — waiting on the
-  // supplier — and on from there (user, 2026-10-17).
+  // A lens still to order, for the handler (Avenues) — its own orders too.
   const toOrder = o => !!o.outsideLens && me.code === outsideHandler() && o.outsideLens.status !== 'ordered' && !isBack(o);
+  // The two lens tabs hold every job of theirs, start to finish (user,
+  // 2026-10-18): Stock Lens — another branch's job on this branch's shelf;
+  // Outside Lens Orders — another branch's outside lenses (and Avenues' own
+  // still to order). Those jobs leave the frame tabs; inside, smaller tabs
+  // follow the lens's road, next to Select all.
+  const inStockTab = o => onMyStock(o, me.code);
+  const inOutsideTab = o => onMyOutside(o, me.code) || (toOrder(o) && o.origin === me.code);
+  const fitHere = o => o.fitter === me.code;
+  const STOCK_STEPS = [
+    { key: 'send',    label: 'Lenses to Send', test: o => o.lensRequest?.status === 'requested' },
+    { key: 'coming',  label: 'Frame Coming',   test: o => fitHere(o) && ['pending', 'lenses_in', 'to_fitter'].includes(o.status) },
+    { key: 'fitting', label: 'In Fitting',     test: o => fitHere(o) && o.status === 'at_fitter' },
+    { key: 'ready',   label: 'Ready',          test: o => o.status === 'ready' && frameLoc(o) === me.code },
+    { key: 'sent',    label: 'Lenses Sent',    test: o => o.lensRequest?.status === 'sent' && o.status === 'pending' },
+    { key: 'done',    label: 'Done',           test: () => true },
+  ];
+  const OUTSIDE_STEPS = [
+    { key: 'order',    label: 'Order Lens',            test: o => toOrder(o) },
+    { key: 'supplier', label: 'Waiting from Supplier', test: o => o.outsideLens?.status === 'ordered' && !o.outsideLens.arrivedAt && !isBack(o) },
+    { key: 'send',     label: 'Send Lenses',           test: o => !!o.outsideLens?.arrivedAt && !o.outsideLens.sentAt && !isBack(o) },
+    { key: 'way',      label: 'On the Way',            test: o => outsideInTransit(o, me.code) },
+    { key: 'done',     label: 'Done',                  test: () => true },
+  ];
+  const stepsOf = key => (key === 'stock' ? STOCK_STEPS : key === 'olorders' ? OUTSIDE_STEPS : null);
+  // An order sits in the first step that fits it.
+  const stepOf = (steps, o) => steps.find(s => s.test(o))?.key;
   const chipHas = (d, o) => {
-    if (d.key === 'stock') return onMyStock(o, me.code);
-    if (d.key === 'olorders') return toOrder(o);
-    if (toOrder(o)) return false;
-    const hs = handlerStage(o, me.code);
-    if (hs) return d.key === hs;
-    if (lensOnly(o)) return d.key === 'collected' && o.status === 'collected';
+    if (d.key === 'stock') return inStockTab(o);
+    if (d.key === 'olorders') return inOutsideTab(o);
+    if (inStockTab(o) || (inOutsideTab(o) && o.origin !== me.code)) return false;
     return onChip(d, o);
   };
   function visible() {
@@ -110,8 +132,36 @@ export function fittingView(me) {
     else {
       const chip = CHIP_DEFS.find(d => d.key === ui.chip);
       list = list.filter(o => chip && chipHas(chip, o));
+      const steps = stepsOf(ui.chip);
+      if (steps && ui.step) list = list.filter(o => stepOf(steps, o) === ui.step);
     }
     return list.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  // The lens's own step for this location, ahead of any frame step.
+  const lensAct = o => (viewOnly ? null
+    : canSendLenses(o, me.code) ? 'Send Lenses'
+    : toOrder(o) ? 'Confirm Order'
+    : canArriveOutside(o, me.code) ? 'Lens Received'
+    : canSendOutside(o, me.code) ? `Send Lenses to ${o.outsideLens.dest}` : null);
+  // On opening a lens tab: the first step with something to press, else the
+  // first with anything in it.
+  function pickStep() {
+    const steps = stepsOf(ui.chip);
+    if (!steps) { ui.step = null; return; }
+    const list = filtered().filter(o => chipHas(CHIP_DEFS.find(d => d.key === ui.chip), o));
+    const has = k => list.filter(o => stepOf(steps, o) === k);
+    ui.step = (steps.find(s => has(s.key).some(o => actionOf(o))) ?? steps.find(s => has(s.key).length) ?? steps[0]).key;
+  }
+  function stepsHTML() {
+    const steps = stepsOf(ui.chip);
+    if (!steps) return '';
+    const chip = CHIP_DEFS.find(d => d.key === ui.chip);
+    const list = filtered().filter(o => chipHas(chip, o));
+    return `<div class="chips step-chips" role="tablist" aria-label="${esc(chip.label)} steps">${steps.map(s => {
+      const inIt = list.filter(o => stepOf(steps, o) === s.key);
+      const act = s.key === 'done' ? 0 : inIt.filter(o => actionOf(o)).length;
+      return `<button class="chip ${ui.step === s.key ? 'on' : ''}" data-step="${s.key}" role="tab">${esc(s.label)}${chipCount(inIt.length, act)}</button>`;
+    }).join('')}</div>`;
   }
   // The other branches this one shares orders with, for its branch filter.
   const partnerBranches = () => [...new Set(store.ordersFor(me.code)
@@ -479,7 +529,7 @@ export function fittingView(me) {
     const sel = [...ui.selected].map(id => store.order(id)).filter(Boolean);
     let action = null, ok = sel.length > 0;
     for (const o of sel) {
-      const label = bulkLabel(o);
+      const label = actionOf(o);
       if (!label) { ok = false; continue; }
       if (action === null) action = label;
       else if (action !== label) ok = false;
@@ -1151,25 +1201,27 @@ export function fittingView(me) {
   // Only orders with a step for this location to press can be selected; Select
   // all takes the ones sharing the most common step (user, 2026-10-15), so the
   // bulk button always works.
-  const canSelect = o => o.status !== 'collected' && !handlerStage(o, me.code) && !lensOnly(o) && !!bulkLabel(o);
+  const actionOf = o => lensAct(o) ?? (lensOnly(o) || handlerStage(o, me.code) ? null : bulkLabel(o));
+  const canSelect = o => o.status !== 'collected' && !!actionOf(o);
   const selectable = () => visible().filter(canSelect);
   function selectAllGroup() {
     const list = selectable();
     const by = new Map();
-    for (const o of list) { const a = bulkLabel(o); by.set(a, [...(by.get(a) ?? []), o]); }
+    for (const o of list) { const a = actionOf(o); by.set(a, [...(by.get(a) ?? []), o]); }
     const [action, group] = [...by.entries()].sort((a, b) => b[1].length - a[1].length)[0] ?? [null, []];
     return { action, group, others: list.length - group.length };
   }
   function selectAllHTML() {
-    if (viewOnly || ui.chip === 'active') return '';
+    const steps = stepsHTML();
+    if (viewOnly || ui.chip === 'active') return steps ? `<div class="sel-row">${steps}</div>` : '';
     const { action, group, others } = selectAllGroup();
-    if (!group.length) return '';
+    if (!group.length) return steps ? `<div class="sel-row">${steps}</div>` : '';
     const all = group.every(o => ui.selected.has(o.id));
-    return `
+    return `<div class="sel-row">
       <label class="sel-all">
         <span class="cbx"><input type="checkbox" data-sel-all ${all ? 'checked' : ''}><i></i></span>
         <span>${all ? 'Clear selection' : `Select all ${group.length} — ${esc(action)}`}${others ? ` <span class="muted">· ${others} need${others === 1 ? 's' : ''} another step</span>` : ''}</span>
-      </label>`;
+      </label>${steps}</div>`;
   }
 
   function markSeen() {
@@ -1195,7 +1247,9 @@ export function fittingView(me) {
 
     root.addEventListener('click', e => {
       const chip = e.target.closest('[data-chip]');
-      if (chip) { ui.chip = chip.dataset.chip; ui.selected.clear(); refreshLists(); return; }
+      if (chip) { ui.chip = chip.dataset.chip; ui.selected.clear(); pickStep(); refreshLists(); return; }
+      const stp = e.target.closest('[data-step]');
+      if (stp) { ui.step = stp.dataset.step; ui.selected.clear(); refreshLists(); return; }
       if (e.target.closest('[data-older]')) { e.target.closest('[data-older]').disabled = true; store.loadOlder('orders'); return; }
       const dd = e.target.closest('[data-days]');
       if (dd) { ui.days = +dd.dataset.days; ui.selected.clear(); refreshLists(); return; }
@@ -1210,6 +1264,22 @@ export function fittingView(me) {
         const { action, ok } = bulkAction();
         if (!ok) return;
         const ids = [...ui.selected];
+        // A lens step: each order's own lens action, one after another.
+        const lensOrders = ids.map(id => store.order(id)).filter(o => o && lensAct(o));
+        if (lensOrders.length === ids.length) {
+          ui.selected.clear();
+          (async () => {
+            const confirmIds = lensOrders.filter(toOrder).map(o => o.outsideLens.id);
+            if (confirmIds.length) await store.setOutsideStatus(confirmIds, 'ordered', me.code);
+            for (const o of lensOrders) {
+              if (canSendLenses(o, me.code)) await store.sendLenses(o.lensRequest.id, me.code);
+              else if (canArriveOutside(o, me.code)) await store.arriveOutsideLenses(o.outsideLens.id, me.code);
+              else if (canSendOutside(o, me.code)) await store.sendOutsideLenses(o.outsideLens.id, me.code);
+            }
+          })();
+          refreshLists();
+          return;
+        }
         // Frames with no fitter yet are sent through the picker; frames a lens
         // request already gave one simply go.
         const unassigned = ids.filter(id => !store.order(id)?.fitter);

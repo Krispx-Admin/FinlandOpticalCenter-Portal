@@ -1211,6 +1211,24 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  LENS TABS WITH THEIR OWN STEPS (user). Stock Lens (lens holders)
+             holds every other branch's job on this shelf, start to finish;
+             Outside Lens Orders (Avenues) every other branch's outside-lens job
+             (+ Avenues' own still to order). Those jobs left the frame tabs —
+             this replaces the 2026-10-17 rule that moved Avenues' ordered
+             lenses to Waiting for Lenses. Beside Select all, step tabs (counts,
+             orange = something to press; opening the tab lands on the first
+             step with something to do):
+               Stock Lens: Lenses to Send · Frame Coming · In Fitting · Ready ·
+                           Lenses Sent · Done
+               Outside:    Order Lens · Waiting from Supplier · Send Lenses ·
+                           On the Way · Done
+             Select all + the bulk button run the lens step for every selected
+             job: Send Lenses (stock), Confirm Order, Lens Received, Send Lenses
+             to X (outside); frame steps as before. fitting.js STOCK_STEPS /
+             OUTSIDE_STEPS / stepOf / lensAct / actionOf / pickStep. Tested in
+             the practice copy: Avenues confirmed, received and sent two orders
+             in three clicks.
  2026-10-18  Fitting Log rows: even spacing (user). #f-list is now one grid and
              every row a SUBGRID of it, so the columns — bill + name, journey,
              tags, buttons — are shared down the whole list: tags start at one

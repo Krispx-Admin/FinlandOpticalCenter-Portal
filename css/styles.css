@@ -499,6 +499,11 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .sel-all { display: inline-flex; align-items: center; gap: 10px; padding: 2px 17px 10px; cursor: pointer;
   font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .sel-all .cbx { display: inline-flex; }
+/* Stock Lens / Outside Lens Orders: Select all, and the lens's steps beside it */
+.sel-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 0 0 10px; }
+.sel-row .sel-all { padding: 2px 17px 0; }
+.step-chips { margin: 0; gap: 6px; }
+.step-chips .chip { font-size: 12.5px; padding: 5px 11px; }
 /* ── Outside Lens Orders ── */
 .ol-switch, .form .ol-switch { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
 .ol-switch b { font-weight: 650; }
