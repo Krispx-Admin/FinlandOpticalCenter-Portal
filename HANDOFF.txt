@@ -1218,6 +1218,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  LIVE DATABASE CLEARED again (user), MGM's shelf kept: 6 orders, 2
+             outside-lens orders, 3 lens requests deleted; numbering restarted;
+             2 set-aside lenses back on the shelf (10 rows, 149 pcs).
  2026-10-18  Select all (user): always shown (greyed when nothing here has a
              step for you), says just "Select all · N", and takes EVERY order
              with a step — "Send to AV" and "Send to MOUJ" together. The bulk
