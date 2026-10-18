@@ -140,6 +140,10 @@ export function fittingView(me) {
   // its frame goes to them (user, 2026-10-18).
   const plainOutside = o => isPractice && !!o.outsideLens && o.outsideLens.branch !== outsideHandler()
     && o.origin === me.code && me.code !== outsideHandler() && ui.chip !== 'olmine';
+  // …and Avenues, ordering another branch's outside lenses, sees only the
+  // lenses: their line from it to where they go, and their tag — where the
+  // frame is is the other branch's business (user, 2026-10-18; TRIAL).
+  const lensView = o => isPractice && me.code === outsideHandler() && onMyOutside(o, me.code) && o.outsideLens.branch !== me.code;
   function plainStep(o, st) {
     const ol = o.outsideLens;
     if (ol.fulfilment === 'send_frames' && o.status === 'lenses_in') return { ...st, label: 'Send to Fitting', color: 'cyan' };
@@ -397,6 +401,7 @@ export function fittingView(me) {
   }
   function statusHTML(o, st, changed) {
     if (plainOutside(o)) return stepPill(plainStep(o, st), { flash: changed });
+    if (lensView(o)) return stepPill(lensStep(o, { viewer: me.code }), { flash: changed, title: lensStep(o, { viewer: me.code, long: true }).label });
     if (twoRoads(o)) return tagsHTML(o, changed);
     return stepPill(st, { flash: changed, title: fitStep(o, { long: true, viewer: me.code }).label });
   }
@@ -414,6 +419,12 @@ export function fittingView(me) {
     const seg = ol.receivedAt ? 'done' : ol.sentAt ? 'moving' : '';
     const pin = (code, cls) => `<div class="j-node ${cls}"><span class="j-pin">${esc(code)}</span>${big ? `<span class="j-lbl">${esc(locName(code))}</span>` : ''}</div>`;
     const name = t => `<span class="j-line-lbl">${t}</span>`;
+    if (lensView(o)) return `
+      <div class="journey ${big ? 'journey-big' : ''}" title="Lenses: ${esc(locName(H))} → ${esc(locName(dest))} · ${esc(outsideLensState(ol))}">
+        ${pin(H, ol.status === 'ordered' ? 'done' : '')}
+        <i class="j-seg ${seg}"></i>
+        ${pin(dest, `${ol.receivedAt ? 'done' : ''} j-mid`)}
+      </div>`;
     return `
       <div class="journey-2 ${big ? 'journey-2-big' : ''}">
         <div class="j-line">${name('Frame')}${frameJourney(o, big, '')}</div>
@@ -520,18 +531,8 @@ export function fittingView(me) {
     return null;
   }
 
-  // ── stats tiles ──
-  function statsHTML() {
-    const all = store.ordersFor(me.code);
-    const active = all.filter(o => o.status !== 'collected');
-    const mine = active.filter(o => needsAction(o, me.code));
-    const week = all.filter(o => o.status === 'collected' && Date.now() - o.updatedAt < 7 * 864e5);
-    const t = (n, lbl, cls = '') => `
-      <div class="stat ${cls}"><div class="stat-n">${n}</div><div class="stat-l">${lbl}</div></div>`;
-    return t(active.length, 'Active orders')
-      + t(mine.length, isAdmin ? 'Awaiting action' : 'Need your action', mine.length ? 'stat-amber' : 'stat-brand')
-      + t(week.length, 'Completed · 7d');
-  }
+  // (The three summary tiles — active / need your action / completed — were
+  // taken off the Fitting Log, user 2026-10-18: the tabs carry the counts.)
 
   // ── list ──
   function rowsHTML() {
@@ -557,6 +558,7 @@ export function fittingView(me) {
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
+      else if (lensView(o)) action = `<span class="row-actor">${o.outsideLens.receivedAt || isBack(o) ? `${icons.check} lenses delivered` : `waiting on ${esc(o.outsideLens.dest ?? o.origin)}`}</span>`;
       else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : plainOutside(o) && fitActor(o) === outsideHandler() ? 'waiting for lenses' : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
       // The fitter marks the outside lenses received — alongside the frame's own step.
       if (canReceiveOutside(o, me.code) && !viewOnly) {
@@ -574,9 +576,9 @@ export function fittingView(me) {
             <b>${esc(o.ref)}</b>
             <span class="row-cust">${esc(title)}</span>
           </div>
-          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens && !plainOutside(o) ? outsideLensTag('stock-tag-sub') : ''}</div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span>${fromStock ? stockTag('stock-tag-sub') : o.outsideLens && !plainOutside(o) && !lensView(o) ? outsideLensTag('stock-tag-sub') : ''}</div>
         </div>
-        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens && !plainOutside(o) ? outsideLensTag() : '')}</div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens && !plainOutside(o) && !lensView(o) ? outsideLensTag() : '')}</div>
         <div class="row-status">${statusHTML(o, st, changed)}</div>
         <div class="row-act" data-stop>
           ${action}
@@ -649,7 +651,7 @@ export function fittingView(me) {
       </div>
       <div class="dw-body">
         ${viewOnly ? '' : toolsHTML(o)}
-        <div class="dw-status-row">${plainOutside(o) ? stepPill(plainStep(o, st)) : twoRoads(o) ? `${tagsHTML(o, false, true)}` : stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
+        <div class="dw-status-row">${plainOutside(o) ? stepPill(plainStep(o, st)) : lensView(o) ? stepPill(lensStep(o, { viewer: me.code, long: true })) : twoRoads(o) ? `${tagsHTML(o, false, true)}` : stepPill(st)}<span class="dw-when">updated ${relTime(o.updatedAt)}</span></div>
         ${journey(o, true)}
         <div class="kv">
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
@@ -1204,7 +1206,6 @@ export function fittingView(me) {
           : me.role === 'admin' ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
         </div>
       </header>
-      <section class="stats" id="f-stats">${statsHTML()}</section>
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="f-q" placeholder="Search ref, customer, frame, location…" value="${esc(ui.q)}"></div>
         ${!isAdmin ? `<select class="sel" id="f-branch" aria-label="Branch"><option value="all">All branches</option>${branchOptions()}</select>` : ''}
@@ -1223,7 +1224,6 @@ export function fittingView(me) {
   }
 
   function refreshLists() {
-    root.querySelector('#f-stats').innerHTML = statsHTML();
     root.querySelector('#f-chips').innerHTML = chipsHTML();
     root.querySelector('#f-days').innerHTML = daysHTML();
     root.querySelector('#f-bulk').innerHTML = bulkHTML();

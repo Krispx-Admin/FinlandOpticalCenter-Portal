@@ -1218,6 +1218,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-18  Fitting Log: the three summary tiles (Active orders / Need your
+             action / Completed · 7d) removed (user) — live; the tabs carry the
+             counts. fitting.js statsHTML gone.
+             TRIAL — PRACTICE COPY ONLY, with the 'plain outside' trial below:
+             Avenues sees another branch's outside-lens job as the LENSES only
+             (user: "they don't need to see the movement of the frame"): one
+             line AV → where the lenses go, the lens tag, right side "waiting on
+             <dest>" / "lenses delivered"; no frame line, frame tag or "Outside
+             Lens" mark. fitting.js lensView (gated by isPractice). TO PUT LIVE
+             with the other trial: drop isPractice from lensView too.
  2026-10-18  FIX (user): outside lenses received at the branch still showed "In
              transit to <branch>" with the moving lens line. Pressing Lens
              Received makes the database stamp the lenses received
