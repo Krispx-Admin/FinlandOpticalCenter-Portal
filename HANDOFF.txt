@@ -1218,6 +1218,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Before launch: EVERY BRANCH SIGNED OUT on every device (user) — the
+             14 branch sign-ins left from the open test period were ended
+             (auth.sessions deleted, refresh tokens revoked; 0 left). A page
+             already open keeps working until its token runs out (up to an
+             hour), then returns to the sign-in screen; every branch signs in
+             again with its real code. People's sign-ins kept. Also: the old
+             ?practice link is dropped from the address bar — it only ever
+             opened the normal site after the Admin Demo rename (the user saw
+             a real Al Mouj sign-in under that address and took it for the
+             practice copy).
  2026-10-19  Practice copy renamed ADMIN DEMO (user): https://foc-portal.org/?AdminDemo
              (?AdminDemo=SCC opens a branch). Where the office tries features
              before launch; listed nowhere. ?practice no longer opens it — it
