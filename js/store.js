@@ -851,6 +851,14 @@ export const store = {
     return saveSettings({ module: 'outside', title: `${code} now orders outside lenses` });
   },
 
+  // The outside-lens supplier's name and WhatsApp number (schema-51).
+  setOutsideSupplier(name, phone, by) {
+    return run(['settings'], async () => {
+      ok(await supabase.rpc('set_outside_supplier', { p_name: name, p_phone: phone }));
+      return true;
+    }, { by, module: 'outside', title: phone ? `Supplier's WhatsApp saved` : `Supplier's WhatsApp removed` });
+  },
+
   setOutsideStatus(ids, status, by) {
     return run(['outsideOrders', 'orders'], async () => ok(await supabase.rpc('set_outside_lens_status', { p_ids: ids, p_status: status })),
       n => ({ by, module: 'outside', title: status === 'ordered' ? `${n} outside order${n === 1 ? '' : 's'} marked ordered` : `${n} outside order${n === 1 ? '' : 's'} put back to order` }));

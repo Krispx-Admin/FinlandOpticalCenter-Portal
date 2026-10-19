@@ -117,6 +117,8 @@ function toSettings(r) {
     disabledTabs: r?.disabled_tabs ?? [], hasDisabledTabs: !!r && 'disabled_tabs' in r,
     outsideCutters: r?.outside_cutters ?? [], hasOutsideCutters: !!r && 'outside_cutters' in r,
     outsideLensHandler: r?.outside_lens_handler || 'AV', hasOutsideHandler: !!r && 'outside_lens_handler' in r,
+    // The outside-lens supplier's WhatsApp (schema-51); written by set_outside_supplier.
+    supplierName: r?.outside_supplier_name ?? '', supplierPhone: r?.outside_supplier_phone ?? '',
   };
 }
 

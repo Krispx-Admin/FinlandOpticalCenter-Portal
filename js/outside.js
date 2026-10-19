@@ -3,10 +3,13 @@
 // the lens type, typed out. Here MGM copies them as WhatsApp text — one, a
 // selection, or everything shown (e.g. one branch's day) — sends them to the
 // supplier, and confirms them ordered so they move out of the way. The frame's
-// own journey stays in the Fitting Log.
+// own journey stays in the Fitting Log. With the supplier's number saved here
+// (schema-51), the WhatsApp button opens the supplier's chat with the picked
+// orders typed — no copy and paste; Copy for WhatsApp stays beside it.
 import { outsideHandler, outsideCopyText, outsideRxLine, locName, readOnly, BRANCHES, can } from './data.js';
 import { store } from './store.js';
-import { esc, relTime, fmtDT, icons, locChip, toast, chipCount } from './ui.js';
+import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
+import { esc, relTime, fmtDT, icons, locChip, toast, chipCount, openLayer } from './ui.js';
 
 const TABS = [
   { key: 'to_order', label: 'To order' },
@@ -45,6 +48,66 @@ export function outsideView(me) {
       // No clipboard (an old browser, or the page not allowed): show the text to copy by hand.
       window.prompt('Copy this text:', text);
     }
+  }
+
+  // ── WhatsApp the supplier (user 2026-10-19) ──
+  const supplier = () => ({ name: store.settings.supplierName ?? '', phone: store.settings.supplierPhone ?? '' });
+  const canSetSupplier = canMark && !viewOnly;
+  async function sendToSupplier(list) {
+    const text = list.map(x => outsideCopyText(x, orderOf(x))).join('\n\n');
+    if (!text) return;
+    if (!supplier().phone) {
+      if (!canSetSupplier) return toast({ title: 'No supplier number yet', sub: `${outsideHandler()} or the office adds it on this page.`, tone: 'stock' });
+      if (!(await supplierModal())) return;
+    }
+    location.href = `whatsapp://send?phone=${supplier().phone}&text=${encodeURIComponent(text)}`;
+  }
+  // The supplier's name and number; resolves true once saved.
+  function supplierModal() {
+    const s = supplier();
+    const { iso, local } = splitPhone(s.phone);
+    return new Promise(done => {
+      let answered = false;
+      const finish = v => { if (!answered) { answered = true; done(v); } };
+      const layer = openLayer('modal', () => `
+        <div class="dw-head">
+          <div><div class="dw-kicker">Outside Lens Orders</div><h2>Supplier's WhatsApp</h2></div>
+          <button class="icon-btn" data-close>${icons.x}</button>
+        </div>
+        <form class="form" id="sup-form" autocomplete="off">
+          <p class="muted sm">The WhatsApp button opens this number's chat with the orders typed — press Send there.</p>
+          <label>Name <span class="opt">optional</span><input name="name" value="${esc(s.name)}" placeholder="e.g. the lab or the person"></label>
+          <div class="ph-label"><span>WhatsApp number</span>${phoneFieldHTML({ iso, value: local })}</div>
+          <div class="form-foot">
+            ${s.phone ? '<button type="button" class="btn btn-ghost" data-sup-clear>Remove</button>' : ''}
+            <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">${icons.check} Save</button>
+          </div>
+        </form>`, { onClose: () => finish(false) });
+      wirePhoneFields(layer.el);
+      layer.el.querySelector('input[inputmode=tel]')?.focus();
+      layer.el.addEventListener('click', async e => {
+        if (e.target.closest('[data-close]')) return layer.close();
+        if (e.target.closest('[data-sup-clear]') && confirm('Remove the supplier\'s number?')) {
+          if (await store.setOutsideSupplier('', null, me.code)) layer.close();
+        }
+      });
+      layer.el.addEventListener('submit', async e => {
+        e.preventDefault();
+        const phone = phoneValue(layer.el.querySelector('[data-ph]'));
+        if (!phone) return toast({ title: 'That number does not look right', sub: 'Type the number — the country is picked on its left.', tone: 'stock' });
+        const name = new FormData(e.target).get('name')?.toString().trim() ?? '';
+        if (await store.setOutsideSupplier(name, phone, me.code)) { finish(true); layer.close(); }
+      });
+    });
+  }
+  function supplierHTML() {
+    const s = supplier();
+    if (!s.phone && !canSetSupplier) return '';
+    const label = s.phone ? `${s.name ? `${esc(s.name)} · ` : ''}+${esc(s.phone)}` : 'Add the supplier’s WhatsApp';
+    return canSetSupplier
+      ? `<button class="btn btn-ghost btn-sm ol-sup" data-sup title="The supplier's WhatsApp — change it">${icons.whatsapp}<span>Supplier</span><b>${label}</b></button>`
+      : `<span class="ol-sup ol-sup-ro">${icons.whatsapp}<span>Supplier</span><b>${label}</b></span>`;
   }
 
   function mark(list, status) {
@@ -99,6 +162,7 @@ export function outsideView(me) {
           ${x.status === 'ordered' ? `<span class="muted sm">ordered ${relTime(x.orderedAt)}${x.arrivedAt && !x.sentAt ? ' · received here' : ''}${x.sentAt ? ` · sent ${relTime(x.sentAt)}` : ''}${x.receivedAt ? ` · received` : ''}</span>` : ''}</div>
         <div class="row-act" data-stop>
           <button class="icon-btn" data-copy="${x.id}" title="Copy for WhatsApp">${icons.copy}</button>
+          <button class="icon-btn ol-wa" data-wa="${x.id}" title="Send to the supplier on WhatsApp">${icons.whatsapp}</button>
           ${!canMark || viewOnly ? '' : x.status === 'to_order'
             ? `<button class="btn btn-primary btn-sm" data-mark="${x.id}" data-to="ordered">${icons.check} Confirm Order</button>`
             : !x.sentAt && x.branch !== outsideHandler()
@@ -123,6 +187,7 @@ export function outsideView(me) {
       <div class="bulkbar ol-bulk">
         <span><b>${what}</b></span>
         <button class="btn btn-ghost btn-sm" data-copy-set>${icons.copy} Copy for WhatsApp</button>
+        <button class="btn btn-ghost btn-sm ol-wa-set" data-wa-set title="Opens the supplier's WhatsApp with these orders typed — press Send there">${icons.whatsapp} WhatsApp ${esc(supplier().name || 'supplier')}</button>
         ${canMark && !viewOnly ? (ui.tab === 'to_order'
           ? `<button class="btn btn-primary btn-sm" data-mark-set="ordered">${icons.check} Confirm ${set.length > 1 ? `${set.length} orders` : 'order'}</button>`
           : `<button class="btn btn-ghost btn-sm" data-mark-set="to_order">Put back to To order</button>`) : ''}
@@ -157,8 +222,11 @@ export function outsideView(me) {
           <h1>Outside Lens Orders</h1>
           <p class="mod-sub">Lenses from outside brands the branches need — copy them for the supplier, then confirm the order</p>
         </div>
+        <div class="ol-head-r">
+        <span id="ol-sup">${supplierHTML()}</span>
         ${can(me, 'lists') ? `<label class="set-ctl ol-handler"><span>Ordered by</span>
           <select id="ol-handler">${BRANCHES.map(b => `<option value="${b.code}" ${b.code === outsideHandler() ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
+        </div>
       </header>
       <section class="stats" id="ol-stats">${statsHTML()}</section>
       <section class="toolbar">
@@ -182,6 +250,7 @@ export function outsideView(me) {
     const s = root.querySelector('#ol-stats');
     if (!s) return;
     s.innerHTML = statsHTML();
+    root.querySelector('#ol-sup').innerHTML = supplierHTML();
     root.querySelector('#ol-chips').innerHTML = chipsHTML();
     root.querySelector('#ol-bulk').innerHTML = bulkHTML();
     root.querySelector('#ol-selall').innerHTML = selectAllHTML();
@@ -197,6 +266,10 @@ export function outsideView(me) {
       const c = e.target.closest('[data-copy]');
       if (c) { const x = all().find(y => y.id === c.dataset.copy); return x && copy([x]); }
       if (e.target.closest('[data-copy-set]')) return copy(setOf());
+      const w = e.target.closest('[data-wa]');
+      if (w) { const x = all().find(y => y.id === w.dataset.wa); return x && sendToSupplier([x]); }
+      if (e.target.closest('[data-wa-set]')) return sendToSupplier(setOf());
+      if (e.target.closest('[data-sup]')) return supplierModal();
       const ar = e.target.closest('[data-arrive]');
       if (ar) return store.arriveOutsideLenses(ar.dataset.arrive, me.code);
       const sd = e.target.closest('[data-send]');

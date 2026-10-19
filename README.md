@@ -145,6 +145,7 @@ Applied in order:
 | `supabase/schema-48-branch-hours.sql` | `branch_hours(code)`: a branch's opening hours from this week's schedule |
 | `supabase/schema-49-branch-name-ar.sql` | `branches.name_ar`: each branch's name in Arabic, set by the office |
 | `supabase/schema-50-permissions.sql` | access permissions per account (tick boxes + View only); people are one kind |
+| `supabase/schema-51-outside-supplier.sql` | the outside-lens supplier's name and WhatsApp number (`set_outside_supplier`) |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

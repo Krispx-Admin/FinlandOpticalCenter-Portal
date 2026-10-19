@@ -21,7 +21,9 @@ create table public."app_settings" (
   "insurers" jsonb default '[]'::jsonb not null,
   "disabled_tabs" jsonb default '[]'::jsonb not null,
   "outside_cutters" jsonb default '[]'::jsonb not null,
-  "outside_lens_handler" text default 'AV'::text not null
+  "outside_lens_handler" text default 'AV'::text not null,
+  "outside_supplier_name" text,
+  "outside_supplier_phone" text
 );
 
 create table public."branches" (
@@ -1920,6 +1922,27 @@ begin
   return n;
 end $function$;
 
+CREATE OR REPLACE FUNCTION public.set_outside_supplier(p_name text, p_phone text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  ph text := nullif(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), '');
+begin
+  if not (public.jwt_branch() = public.outside_lens_handler() or public.has_perm('lists')) then
+    raise exception 'Only % (or the office) can set the supplier', public.outside_lens_handler();
+  end if;
+  if ph is not null and length(ph) not between 8 and 15 then
+    raise exception 'That phone number does not look right';
+  end if;
+  update public.app_settings
+     set outside_supplier_name = nullif(btrim(coalesce(p_name, '')), ''),
+         outside_supplier_phone = ph
+   where id = 1;
+end $function$;
+
 CREATE OR REPLACE FUNCTION public.set_permissions(p_code text, p_perms text[])
  RETURNS void
  LANGUAGE plpgsql
@@ -2134,9 +2157,9 @@ alter table public."orders" enable row level security;
 
 alter table public."lens_stock" enable row level security;
 
-alter table public."employees" enable row level security;
-
 alter table public."app_settings" enable row level security;
+
+alter table public."employees" enable row level security;
 
 alter table public."stock_request_events" enable row level security;
 

@@ -565,9 +565,16 @@ GATES in the DB (outside_lens_gate trigger + functions): no finishing the cut
 Outside Lens Orders tab (js/outside.js): stats, search, branch filter, chips
 To order / Ordered (orange counts), rows with Rx, lens type, "Lenses go to X",
 Copy, Ordered / Undo + "Send lenses to X"; bulk Copy for WhatsApp / Mark
-ordered. Copy text = the user's WhatsApp format:
+ordered. The supplier's WhatsApp (schema-51, app_settings.outside_supplier_
+name/_phone, set_outside_supplier — the handler or 'lists'): shown top right
+("Supplier · name · +number", click to change); the green WhatsApp button
+(per row, and on the bulk bar for the picked / shown orders) opens
+whatsapp://send to that number with the same text typed — no paste. Copy for
+WhatsApp stays. No number yet → the handler is asked for it first.
+Copy text = the user's WhatsApp format:
     *<branch name>*
     *<bill number>*
+    +<customer phone>          (only when the order has one; user 2026-10-19)
     R/ -2.00(-0.75) x 180 | Add: +2.00
     L/ ...
     *<lens type>*
@@ -818,6 +825,10 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-51-outside-supplier.sql  app_settings.outside_supplier_name /
+                             outside_supplier_phone; set_outside_supplier()
+                             (outside-lens handler or 'lists'; 8–15 digits or
+                             empty). Applied 2026-10-19.
   schema-50-permissions.sql  ACCESS PERMISSIONS per account: branches.perms
                              (see_all, act_all, office_queue, accounts, lists,
                              insurance_dash, export_insurance, schedule_edit,
@@ -1236,6 +1247,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Outside Lens Orders (user): the WhatsApp text has the customer's
+             phone under the bill number (when the order has one). The
+             supplier's WhatsApp number is kept on the page (schema-51) — a
+             green WhatsApp button per row and on the bulk bar opens the
+             supplier's chat with the picked orders typed; Copy for WhatsApp
+             stays. Admin Demo rebuilt (VERSION 9). Tested in the Admin Demo:
+             SCC logs two, AV sets "Zeiss Lab" and sends both.
  2026-10-19  Pick sheet: two Brand · Barcode · Qty tables instead of three, 20
              rows each (40 in all, user), rows up to 9 mm; the space left under
              them on a small order is a Notes box. Tested 6 / 30 / 70 lines —

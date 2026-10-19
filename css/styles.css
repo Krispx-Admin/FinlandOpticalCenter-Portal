@@ -795,6 +795,19 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .journey-2-big .j-line-lbl { font-size: 12px; width: 40px; padding-top: 5px; }
 .fulfil-opt .ol-dest { margin-top: 6px; width: 100%; }
 .ol-handler { margin-left: auto; }
+/* The supplier's WhatsApp (schema-51) */
+.ol-head-r { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.ol-head-r .ol-handler { margin-left: 0; }
+.ol-sup { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3); }
+.ol-sup svg { width: 16px; height: 16px; color: #25d366; flex: none; }
+.ol-sup b { color: var(--ink); font-weight: 600; }
+.ol-sup-ro { padding: 4px 2px; }
+.ol-wa { color: #25d366; }
+.ol-wa:hover { color: #1da851; background: #e9f8ef; }
+.ol-wa svg, .ol-wa-set svg { width: 16px; height: 16px; }
+.ol-wa-set { color: #1a7f45; border-color: #9fdcb8; }
+.ol-wa-set svg { color: #25d366; }
+.ol-wa-set:hover { background: #e9f8ef; border-color: #25a95b; }
 /* a closed bench: greyed in the picker, amber on its own header button */
 .picker-card.is-closed { opacity: .5; cursor: not-allowed; background: var(--page); }
 .picker-card.is-closed:hover { border-color: var(--border); box-shadow: none; transform: none; }

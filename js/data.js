@@ -333,10 +333,13 @@ export function outsideRxLine(eye, e = {}) {
   const sph = rxNum(e?.sph), cyl = rxNum(e?.cyl), axis = String(e?.axis ?? '').trim(), add = rxNum(e?.add);
   return `${eye}/ ${sph || '—'}${cyl ? `(${cyl})` : ''}${axis ? ` x ${axis}` : ''} | Add:${add ? ` ${add}` : ''}`;
 }
+// With the customer's number under the order (user 2026-10-19), when it has one.
 export function outsideCopyText(x, order) {
+  const ph = String(order?.phone ?? '').replace(/\D/g, '');
   return [
     `*${locName(x.branch)}*`,
     `*${order?.ref ?? ''}*`,
+    ...(ph ? [`+${ph.length === 8 ? `968${ph}` : ph}`] : []),
     outsideRxLine('R', x.rx?.r),
     outsideRxLine('L', x.rx?.l),
     `*${x.lensType}*`,
