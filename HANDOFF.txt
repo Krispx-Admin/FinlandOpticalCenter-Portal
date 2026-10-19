@@ -1162,8 +1162,14 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  9. PRINT OUTPUTS
 ================================================================================
-  - Stock pick sheet (stock.js printRequest): plain window, inline style, no
-    logo, table with an empty "Picked" column, auto print after 300ms.
+  - Stock pick sheet (stock.js printRequest + fitSheet): always ONE A4 page
+    (@page 9mm). Compact header, the order on top (# · Category · Brand · For
+    · Qty · tick box), then "Picked — Brand · Barcode · Qty": three empty
+    tables side by side for the office to write what it picked (requests name
+    groups like Essential/Signature/Elite, not brands). fitSheet runs from the
+    portal (the print window has no script): it squeezes a big order (smaller
+    type, then two columns, then smaller still) until ~40% of the page is left,
+    then fills the rest with rows stretched to the footer. Auto print 300ms.
   - Claim receipt (claims.js): A4, @page margins 12/14/13mm, logo header,
     meta row (Date, Branch, Bill Number, Receipt No., Customer Name), Products
     table with navy total footer, Prescription grid, Payment ticks + navy
@@ -1229,6 +1235,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Office Queue print (pick sheet) redesigned (user): one A4 page even
+             for a big order; the order compact on top; below it three empty
+             Brand · Barcode · Qty tables side by side filling the rest of the
+             page, to write the brands picked for a group request. Tested: 6
+             lines → 28 rows per table; 70 lines → two columns, 15 rows; both
+             one page.
  2026-10-19  Edit fitting order: the customer phone is editable too (user), with
              the country picker — the saved number opens split back into its
              country and the rest (phone.js splitPhone: longest calling code,

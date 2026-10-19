@@ -222,45 +222,109 @@ export function stockView(me) {
   }
 
   // ── print pick sheet (browser print → PDF) ──
+  // One A4 page (user 2026-10-19): the order, compact, on top; under it three
+  // empty Brand · Barcode · Qty tables side by side to write what was picked
+  // (a request often names a group — Essential, Signature, Elite — not the
+  // brands in it). A big order goes into two columns and smaller type so the
+  // page never runs over; the empty rows fill whatever is left.
   function printRequest(r) {
     if (!r) return;
-    const rows = r.lines.map(l => `
+    const lines = r.lines.map((l, i) => `
       <tr>
-        <td>${esc(l.category)}${l.note ? `<div class="n">${esc(l.note)}</div>` : ''}</td>
+        <td class="i">${i + 1}</td>
+        <td>${esc(l.category)}${l.note ? `<span class="n"> · ${esc(l.note)}</span>` : ''}</td>
         <td>${esc(l.brand ?? '—')}</td>
-        <td>${esc(l.audience ?? '—')}</td>
+        <td>${esc(l.audience ?? '')}</td>
         <td class="num">${l.qty != null ? `${l.qty} ${unitLbl(l)}` : '—'}</td>
-        <td class="pick">${l.done ? 'sent' : ''}</td>
+        <td class="pick">${l.done ? '✓' : ''}</td>
       </tr>`).join('');
+    const units = unitsBreakdown(r.lines);
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.ref)} — Pick Sheet</title>
       <style>
-        body{font:13px system-ui,Segoe UI,Roboto,sans-serif;color:#17202b;padding:32px;}
-        h1{font-size:22px;margin:0 0 2px;}
-        .meta{color:#4c5a6b;margin-bottom:18px;}
-        .meta b{color:#17202b;}
-        table{width:100%;border-collapse:collapse;margin-top:10px;}
-        th,td{text-align:left;padding:9px 10px;border-bottom:1px solid #e3e8f0;vertical-align:top;}
-        th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8593a5;}
-        .num{text-align:right;}
-        .pick{width:80px;border:1px solid #cfd8e5;}
-        .n{color:#8593a5;font-size:11px;margin-top:2px;}
-        .foot{margin-top:26px;color:#8593a5;font-size:11px;border-top:1px solid #e3e8f0;padding-top:10px;}
-        @media print{body{padding:0;}}
-      </style></head><body>
-      <h1>Stock Request — ${esc(r.ref)}</h1>
-      <div class="meta"><b>${esc(locName(r.branch))}</b> (${esc(r.branch)}) → Office · Placed ${esc(fmtDT(r.createdAt))}${r.note ? ` · Note: ${esc(r.note)}` : ''}</div>
-      <table>
-        <thead><tr><th>Category</th><th>Brand</th><th>Audience</th><th class="num">Qty</th><th>Picked</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="foot">${r.lines.length} line${r.lines.length === 1 ? '' : 's'}${unitsBreakdown(r.lines) ? ` · ${unitsBreakdown(r.lines)}` : ''} · Generated ${esc(fmtDT(Date.now()))}</div>
-      </body></html>`;
+        @page{size:A4 portrait;margin:9mm;}
+        *{box-sizing:border-box;}
+        html,body{margin:0;background:#fff;}
+        body{font:11px/1.3 system-ui,Segoe UI,Roboto,sans-serif;color:#17202b;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+        .sheet{width:192mm;height:277mm;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;}
+        .hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:2px solid #17202b;padding-bottom:4px;}
+        .hd h1{font-size:15px;margin:0;}
+        .hd .meta{color:#4c5a6b;font-size:10.5px;text-align:right;}
+        .hd .meta b{color:#17202b;}
+        .note{margin-top:4px;font-size:10.5px;}
+        .order{margin-top:6px;}
+        .order.two{column-count:2;column-gap:5mm;}
+        .order table{width:100%;border-collapse:collapse;}
+        .order.two table{break-inside:auto;}
+        .order tr{break-inside:avoid;}
+        .order th{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:#6b7a8c;text-align:left;padding:2px 4px;border-bottom:1px solid #9aa6b5;}
+        .order td{padding:2.5px 4px;border-bottom:1px solid #e3e8f0;vertical-align:top;}
+        .order tbody tr:nth-child(even) td{background:#f6f8fb;}
+        .order .i{color:#8593a5;width:1%;white-space:nowrap;}
+        .order .num{text-align:right;white-space:nowrap;font-weight:600;}
+        .order .pick{width:7mm;border:1px solid #9aa6b5;text-align:center;}
+        .order .n{color:#6b7a8c;}
+        .order.tight td{padding:1.5px 3px;font-size:9.5px;}
+        .order.tighter td{padding:1px 3px;font-size:8.5px;}
+        .sum{margin-top:3px;font-size:9.5px;color:#6b7a8c;}
+        .fill{margin-top:7px;flex:1;display:flex;flex-direction:column;min-height:0;}
+        .fill h2{font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;}
+        .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;flex:1;min-height:0;}
+        .cols table{width:100%;border-collapse:collapse;table-layout:fixed;align-self:start;}
+        .cols th{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:3px 4px;background:#e9eef5;border:1px solid #9aa6b5;}
+        .cols td{height:7.2mm;border:1px solid #b9c3cf;}
+        .cols .b{width:36%;} .cols .c{width:48%;} .cols .q{width:16%;}
+        .ft{margin-top:3px;font-size:8.5px;color:#8593a5;display:flex;justify-content:space-between;}
+        @media screen{body{background:#e9eef5;padding:16px 0;} .sheet{background:#fff;padding:10mm 9mm;width:210mm;height:297mm;box-shadow:0 2px 12px rgba(0,0,0,.15);}}
+      </style></head><body><div class="sheet">
+      <div class="hd">
+        <h1>Stock Request — ${esc(r.ref)}</h1>
+        <div class="meta"><b>${esc(locName(r.branch))}</b> (${esc(r.branch)}) → Office · Placed ${esc(fmtDT(r.createdAt))}</div>
+      </div>
+      ${r.note ? `<div class="note"><b>Note:</b> ${esc(r.note)}</div>` : ''}
+      <div class="order"><table>
+        <thead><tr><th>#</th><th>Category</th><th>Brand</th><th>For</th><th class="num">Qty</th><th>✓</th></tr></thead>
+        <tbody>${lines}</tbody>
+      </table></div>
+      <div class="sum">${r.lines.length} line${r.lines.length === 1 ? '' : 's'}${units ? ` · ${units}` : ''}</div>
+      <div class="fill">
+        <h2>Picked — Brand · Barcode · Qty</h2>
+        <div class="cols"></div>
+      </div>
+      <div class="ft"><span>${esc(r.ref)} · ${esc(r.branch)}</span><span>Printed ${esc(fmtDT(Date.now()))}</span></div>
+      </div></body></html>`;
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(html);
     w.document.close();
+    fitSheet(w.document);
     w.focus();
     setTimeout(() => w.print(), 300);
+  }
+
+  // Lays the sheet out from here (the print window runs no script of its own):
+  // squeeze the order until it leaves room to write, then fill the rest with rows.
+  function fitSheet(doc) {
+    const sheet = doc.querySelector('.sheet'), order = doc.querySelector('.order');
+    const fill = doc.querySelector('.fill'), cols = doc.querySelector('.cols');
+    const room = () => fill.getBoundingClientRect().bottom - cols.getBoundingClientRect().top;
+    // Keep at least ~40% of the page for writing.
+    const want = sheet.getBoundingClientRect().height * 0.4;
+    for (const step of [[], ['tight'], ['two'], ['two', 'tight'], ['two', 'tighter']]) {
+      order.className = ['order', ...step].join(' ');
+      if (room() >= want) break;
+    }
+    const table = () => `<table><thead><tr><th class="b">Brand</th><th class="c">Barcode</th><th class="q">Qty</th></tr></thead><tbody></tbody></table>`;
+    cols.innerHTML = table() + table() + table();
+    const body = cols.querySelector('tbody'), head = cols.querySelector('thead').getBoundingClientRect().height;
+    body.innerHTML = '<tr><td></td><td></td><td></td></tr>';
+    const rowH = body.firstElementChild.getBoundingClientRect().height;
+    const free = room() - head - 2;
+    const n = Math.max(4, Math.floor(free / rowH));
+    const rows = '<tr><td></td><td></td><td></td></tr>'.repeat(n);
+    cols.querySelectorAll('tbody').forEach(tb => { tb.innerHTML = rows; });
+    // Stretch the rows to reach the footer exactly.
+    const extra = Math.floor((free / n - rowH) * 10) / 10;
+    if (extra > 0) cols.querySelectorAll('td').forEach(td => { td.style.height = `calc(7.2mm + ${extra}px)`; });
   }
 
   // ── composer: new stock request ──
