@@ -223,10 +223,11 @@ export function stockView(me) {
 
   // ── print pick sheet (browser print → PDF) ──
   // One A4 page (user 2026-10-19): the order, compact, on top; under it three
-  // empty Brand · Barcode · Qty tables side by side to write what was picked
+  // empty Brand · Barcode · Qty tables side by side (two, up to 20 rows each —
+  // user 2026-10-19: 40 is plenty) to write what was picked
   // (a request often names a group — Essential, Signature, Elite — not the
   // brands in it). A big order goes into two columns and smaller type so the
-  // page never runs over; the empty rows fill whatever is left.
+  // page never runs over; what the rows leave becomes a Notes box.
   function printRequest(r) {
     if (!r) return;
     const lines = r.lines.map((l, i) => `
@@ -268,11 +269,12 @@ export function stockView(me) {
         .sum{margin-top:3px;font-size:9.5px;color:#6b7a8c;}
         .fill{margin-top:7px;flex:1;display:flex;flex-direction:column;min-height:0;}
         .fill h2{font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px;}
-        .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;flex:1;min-height:0;}
+        .cols{display:grid;grid-template-columns:repeat(2,1fr);gap:5mm;}
         .cols table{width:100%;border-collapse:collapse;table-layout:fixed;align-self:start;}
         .cols th{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:3px 4px;background:#e9eef5;border:1px solid #9aa6b5;}
         .cols td{height:7.2mm;border:1px solid #b9c3cf;}
-        .cols .b{width:36%;} .cols .c{width:48%;} .cols .q{width:16%;}
+        .cols .b{width:38%;} .cols .c{width:47%;} .cols .q{width:15%;}
+        .notes{flex:1;margin-top:4mm;border:1px solid #b9c3cf;padding:3px 5px;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
         .ft{margin-top:3px;font-size:8.5px;color:#8593a5;display:flex;justify-content:space-between;}
         @media screen{body{background:#e9eef5;padding:16px 0;} .sheet{background:#fff;padding:10mm 9mm;width:210mm;height:297mm;box-shadow:0 2px 12px rgba(0,0,0,.15);}}
       </style></head><body><div class="sheet">
@@ -289,6 +291,7 @@ export function stockView(me) {
       <div class="fill">
         <h2>Picked — Brand · Barcode · Qty</h2>
         <div class="cols"></div>
+        <div class="notes" hidden>Notes</div>
       </div>
       <div class="ft"><span>${esc(r.ref)} · ${esc(r.branch)}</span><span>Printed ${esc(fmtDT(Date.now()))}</span></div>
       </div></body></html>`;
@@ -302,29 +305,32 @@ export function stockView(me) {
   }
 
   // Lays the sheet out from here (the print window runs no script of its own):
-  // squeeze the order until it leaves room to write, then fill the rest with rows.
+  // squeeze the order until 2 × 20 rows fit under it, then size the rows to the
+  // space; anything left over is a Notes box.
   function fitSheet(doc) {
-    const sheet = doc.querySelector('.sheet'), order = doc.querySelector('.order');
-    const fill = doc.querySelector('.fill'), cols = doc.querySelector('.cols');
+    const MAX = 20, MM = 96 / 25.4;
+    const order = doc.querySelector('.order'), fill = doc.querySelector('.fill');
+    const cols = doc.querySelector('.cols'), notes = doc.querySelector('.notes');
     const room = () => fill.getBoundingClientRect().bottom - cols.getBoundingClientRect().top;
-    // Keep at least ~40% of the page for writing.
-    const want = sheet.getBoundingClientRect().height * 0.4;
+    const table = () => `<table><thead><tr><th class="b">Brand</th><th class="c">Barcode</th><th class="q">Qty</th></tr></thead><tbody></tbody></table>`;
+    const row = '<tr><td></td><td></td><td></td></tr>';
+    cols.innerHTML = table() + table();
+    const body = cols.querySelector('tbody');
+    body.innerHTML = row;
+    const head = cols.querySelector('thead').getBoundingClientRect().height;
+    const rowH = body.firstElementChild.getBoundingClientRect().height;
+    const want = head + MAX * rowH + 2;
     for (const step of [[], ['tight'], ['two'], ['two', 'tight'], ['two', 'tighter']]) {
       order.className = ['order', ...step].join(' ');
       if (room() >= want) break;
     }
-    const table = () => `<table><thead><tr><th class="b">Brand</th><th class="c">Barcode</th><th class="q">Qty</th></tr></thead><tbody></tbody></table>`;
-    cols.innerHTML = table() + table() + table();
-    const body = cols.querySelector('tbody'), head = cols.querySelector('thead').getBoundingClientRect().height;
-    body.innerHTML = '<tr><td></td><td></td><td></td></tr>';
-    const rowH = body.firstElementChild.getBoundingClientRect().height;
     const free = room() - head - 2;
-    const n = Math.max(4, Math.floor(free / rowH));
-    const rows = '<tr><td></td><td></td><td></td></tr>'.repeat(n);
-    cols.querySelectorAll('tbody').forEach(tb => { tb.innerHTML = rows; });
-    // Stretch the rows to reach the footer exactly.
-    const extra = Math.floor((free / n - rowH) * 10) / 10;
+    const n = Math.min(MAX, Math.max(4, Math.floor(free / rowH)));
+    cols.querySelectorAll('tbody').forEach(tb => { tb.innerHTML = row.repeat(n); });
+    // Rows grow to fill the space, up to 9 mm; past that the rest is Notes.
+    const extra = Math.floor(Math.min(free / n - rowH, 9 * MM - rowH) * 10) / 10;
     if (extra > 0) cols.querySelectorAll('td').forEach(td => { td.style.height = `calc(7.2mm + ${extra}px)`; });
+    notes.hidden = free - n * (rowH + Math.max(extra, 0)) < 16 * MM;
   }
 
   // ── composer: new stock request ──
