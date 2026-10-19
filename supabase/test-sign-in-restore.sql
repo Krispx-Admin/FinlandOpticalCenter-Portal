@@ -1,4 +1,6 @@
 -- ── TEST SIGN-IN: put the real branch codes back ──
+-- DONE 2026-10-19 (by Claude): all 12 branches restored and checked, the copy
+-- and the foc_private schema dropped. Kept as the record of how it was done.
 -- 2026-10-17 the user asked for the codes out while testing: every branch was
 -- set to the one code js/app.js fills in (TEST_SIGN_IN), after a sealed copy
 -- of each branch's code (the stored hash only) went into
