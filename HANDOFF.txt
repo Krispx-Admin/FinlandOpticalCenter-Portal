@@ -1218,6 +1218,8 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Sign-in: the Office section is four across (two rows of four), not
+             two narrow columns that kept stacking (user). CSS .lp-wh .lp-grid.
  2026-10-19  Before launch: EVERY BRANCH SIGNED OUT on every device (user) — the
              14 branch sign-ins left from the open test period were ended
              (auth.sessions deleted, refresh tokens revoked; 0 left). A page

@@ -226,8 +226,11 @@ svg { width: 18px; height: 18px; flex: none; }
 /* the office and Ghiath share the top panel, with the larger cards */
 .lp-wh { margin-bottom: 14px; }
 .lp-wh h3 { text-align: center; color: var(--brand); }
-.lp-wh .lp-grid { grid-template-columns: repeat(2, minmax(0, 300px)); justify-content: center; }
-@media (max-width: 680px) { .lp-wh .lp-grid { grid-template-columns: minmax(0, 340px); } }
+/* Office: four across (user, 2026-10-19) — the main Office account and its
+   people fill two rows of four before a third starts. */
+.lp-wh .lp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); justify-content: center; }
+@media (max-width: 1000px) { .lp-wh .lp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .lp-wh .lp-grid { grid-template-columns: minmax(0, 1fr); } }
 .lp-wh .loc-card {
   flex-direction: row; align-items: center; justify-content: center;
   gap: 11px; padding: 11px 18px;
