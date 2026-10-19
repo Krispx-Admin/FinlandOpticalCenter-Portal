@@ -516,6 +516,15 @@ async function switchBranch(code, pin) {
 // ── boot ──
 // Restoring a session asks Supabase and loading the data asks Postgres, so
 // this is asynchronous now.
+// The old practice link (?practice, renamed Admin Demo 2026-10-19) opens
+// nothing special any more — drop it from the address so it does not look
+// like it still leads somewhere.
+if (new URLSearchParams(location.search).has('practice')) {
+  const u = new URL(location.href);
+  u.searchParams.delete('practice');
+  history.replaceState(null, '', u.pathname + (u.search === '?' ? '' : u.search) + u.hash);
+}
+
 (async () => {
   if (presenterWanted()) {
     import('./present.js')
