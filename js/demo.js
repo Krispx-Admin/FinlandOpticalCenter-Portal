@@ -37,11 +37,11 @@ function splash(text) {
 
 // ── start ──
 export async function practiceClient() {
-  splash('Preparing your practice copy…');
+  splash('Preparing the Admin Demo…');
   db = await PGlite.create(`idb://${DB_NAME}`, { extensions: { pgcrypto } });
   const ready = (await db.query(`select to_regclass('public.orders') is not null as ok`)).rows[0].ok;
   if (!ready) {
-    splash('Setting up your practice copy — the first time takes a few seconds…');
+    splash('Setting up the Admin Demo — the first time takes a few seconds…');
     const files = await Promise.all(['prelude', 'schema', 'seed'].map(f =>
       fetch(`demo/${f}.sql`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(`demo/${f}.sql: ${r.status}`); return r.text(); })));
     await db.transaction(async tx => { for (const sql of files) await tx.exec(sql); });

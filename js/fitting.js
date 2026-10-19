@@ -11,6 +11,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
+import { phoneFieldHTML, wirePhoneFields, phoneValue } from './phone.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -212,7 +213,7 @@ export function fittingView(me) {
   const waNumber = s => {
     let d = String(s ?? '').replace(/\D/g, '').replace(/^00/, '');
     if (d.length === 8) d = `968${d}`;
-    return d.length >= 10 ? d : null;
+    return d.length >= 9 ? d : null;
   };
   // The message: English, then Arabic (user, 2026-10-18), with the branch's
   // opening hours as the schedule has them this week — they change with the
@@ -271,14 +272,43 @@ export function fittingView(me) {
     if (!o) return;
     let num = waNumber(o.phone);
     if (!num) {
-      const typed = prompt(`${o.customer || o.ref} — customer's WhatsApp number:`, o.phone || '');
-      if (typed == null) return;
-      num = waNumber(typed);
-      if (!num) { toast({ title: 'That number does not look right', sub: 'Eight digits for an Omani number, or the full number with its country code.', tone: 'stock' }); return; }
+      num = await askPhone(o);
+      if (!num) return;
       await store.setOrderPhone(id, num, me.code);
     }
     const days = await store.branchHours(collectOf(o));
     location.href = `whatsapp://send?phone=${num}&text=${encodeURIComponent(waText(store.order(id) ?? o, days))}`;
+  }
+
+  // The customer's number, when the order has none: country (Oman unless
+  // changed) and number, then WhatsApp opens.
+  function askPhone(o) {
+    return new Promise(done => {
+      let answered = false;
+      const finish = v => { if (!answered) { answered = true; done(v); } };
+      const layer = openLayer('modal', () => `
+        <div class="dw-head">
+          <div><div class="dw-kicker">${esc(o.ref)} · ${esc(o.customer || '')}</div><h2>Customer's WhatsApp number</h2></div>
+          <button class="icon-btn" data-close>${icons.x}</button>
+        </div>
+        <form class="form" id="ph-ask" autocomplete="off">
+          <div class="ph-label"><span>Phone</span>${phoneFieldHTML()}</div>
+          <div class="form-foot">
+            <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+            <button type="submit" class="btn btn-primary wa-go">${icons.whatsapp} Save and open WhatsApp</button>
+          </div>
+        </form>`, { onClose: () => finish(null) });
+      wirePhoneFields(layer.el);
+      layer.el.querySelector('input[inputmode=tel]')?.focus();
+      layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+      layer.el.addEventListener('submit', e => {
+        e.preventDefault();
+        const v = phoneValue(layer.el.querySelector('[data-ph]'));
+        if (!v) { toast({ title: 'That number does not look right', sub: 'Type the number — the country is picked on its left.', tone: 'stock' }); return; }
+        finish(v);
+        layer.close();
+      });
+    });
   }
 
   // ── fixing mistakes: edit, undo the last step, delete (schema-34) ──
@@ -937,7 +967,7 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
-        <label>Customer phone <span class="opt">for the WhatsApp message when it is ready</span><input name="phone" inputmode="tel" autocomplete="off" placeholder="e.g. 9123 4567"></label>
+        <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message when it is ready</span></span>${phoneFieldHTML()}</div>
         <label>Customer collects at <select name="collect">${collectOptions(me.code)}</select></label>
         <div class="lens-src" role="radiogroup" aria-label="Lenses">
           <span class="lens-src-l">Lenses</span>
@@ -1087,13 +1117,14 @@ export function fittingView(me) {
       if (d) { ls.lines.splice(+d.dataset.lsDel, 1); lsBox().innerHTML = lsLinesHTML(); }
     });
     wireWay(layer.el);
+    wirePhoneFields(layer.el);
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
       const ref = f.get('ref').trim();
       const customer = f.get('customer').trim();
       const collect = String(f.get('collect') || me.code);
-      const phone = waNumber(f.get('phone'));
+      const phone = phoneValue(e.target.querySelector('[data-ph]'));
       // A name of only spaces passes the browser's own required check, so put
       // the trimmed values back and let it re-check — that way an empty field
       // gets the usual prompt instead of a button that quietly does nothing.

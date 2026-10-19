@@ -309,6 +309,27 @@ svg { width: 18px; height: 18px; flex: none; }
 .cx-banner svg { width: 15px; height: 15px; }
 .cx-banner span { color: #9b3a3a; }
 
+/* A phone number with its country (js/phone.js) */
+.ph-label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.ph-field { position: relative; display: flex; gap: 6px; }
+.ph-cc { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border-strong);
+  border-radius: 9px; background: var(--surface); font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.ph-cc:hover, .ph-cc[aria-expanded=true] { border-color: var(--brand); }
+.ph-flag { font-size: 17px; line-height: 1; }
+.ph-caret { font-size: 10px; color: var(--ink-3); }
+.ph-field > input[inputmode=tel] { flex: 1; min-width: 0; }
+.ph-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 40; width: min(360px, 100%); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 14px 34px rgba(19,48,86,.16); padding: 6px; }
+.form .ph-menu .ph-search { margin-bottom: 6px; }
+.ph-list { max-height: 260px; overflow-y: auto; }
+.ph-opt { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: none;
+  border-radius: 8px; background: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--ink); text-align: left; cursor: pointer; }
+.ph-opt:hover, .ph-opt.on { background: var(--brand-soft); }
+.ph-dial { color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ph-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+.ph-none { margin: 0; padding: 10px; font-size: 13px; color: var(--ink-3); }
+.wa-go svg { width: 16px; height: 16px; }
+
 /* WhatsApp the customer (practice-copy trial) */
 /* just the WhatsApp mark (user, 2026-10-18) — square, the brand's green */
 .wa-btn { color: #25d366; border-color: #9fdcb8; padding: 0; width: 34px; height: 34px; justify-content: center; flex: none; }

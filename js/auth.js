@@ -7,10 +7,12 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY, emailFor } from './supabase-config.js';
 import { loc } from './data.js';
 
-// Practice copy (?practice=SCC — js/demo.js): the portal on a database inside
+// Admin Demo (?AdminDemo, or ?AdminDemo=SCC to open a branch — js/demo.js; was
+// ?practice until 2026-10-19): where the office tries features before they
+// launch, unlisted anywhere. The portal on a database inside
 // this browser. The live connection is never even created then, so nothing
 // done in practice can reach the real data.
-export const PRACTICE = new URLSearchParams(location.search).get('practice');
+export const PRACTICE = new URLSearchParams(location.search).get('AdminDemo');
 export const isPractice = PRACTICE !== null;
 export const supabase = isPractice
   ? await (await import('./demo.js')).practiceClient()

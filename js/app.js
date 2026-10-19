@@ -68,7 +68,7 @@ function renderLogin(preselect = null) {
         <section class="lp-step" id="step-pick">
           <header class="lp-head">
             <h2>Sign in</h2>
-            <p class="lp-sub">${auth.isPractice ? 'Practice copy — pick your branch, no code needed.' : 'Choose your location.'}</p>
+            <p class="lp-sub">${auth.isPractice ? 'Admin Demo — pick a branch, no code needed.' : 'Choose your location.'}</p>
           </header>
           ${auth.isPractice ? '' : groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
           <div class="lp-cols">
@@ -91,7 +91,7 @@ function renderLogin(preselect = null) {
   if (preselect) showCodeStep(preselect);
 }
 
-// ── practice copy (?practice=SCC, js/demo.js) ──
+// ── Admin Demo, the practice copy (?AdminDemo=SCC, js/demo.js) ──
 // No codes: the database is this browser's own. Picking a location opens it,
 // so one person can play every side of a job — send from Seeb, receive at MGM.
 async function practiceSignIn(code) {
@@ -105,10 +105,10 @@ function practiceBar() {
   if (!auth.isPractice || document.querySelector('.practice-bar')) return;
   const bar = document.createElement('div');
   bar.className = 'practice-bar';
-  bar.innerHTML = `<b>Practice copy</b><span>Saved in this browser only — nothing here is real</span>
+  bar.innerHTML = `<b>Admin Demo</b><span>Saved in this browser only — nothing here is real</span>
     <button type="button" data-practice-reset>Start over</button>`;
   bar.querySelector('[data-practice-reset]').addEventListener('click', async () => {
-    if (!confirm('Start over?\n\nEverything entered in this practice copy is deleted.')) return;
+    if (!confirm('Start over?\n\nEverything entered in this Admin Demo is deleted.')) return;
     store.stop();
     await (await import('./demo.js')).resetPractice();
     location.reload();
@@ -365,7 +365,7 @@ function renderShell() {
         </div>
         <div class="side-nav" id="nav"></div>
         <div class="side-foot">
-          <div class="live-ind${auth.isPractice ? ' is-practice' : ''}"><i></i>${auth.isPractice ? 'Practice copy' : 'Live · synced'}</div>
+          <div class="live-ind${auth.isPractice ? ' is-practice' : ''}"><i></i>${auth.isPractice ? 'Admin Demo' : 'Live · synced'}</div>
           <div class="me-card">
             <span class="me-code role-${me.role}">${me.code}</span>
             <div class="me-meta">

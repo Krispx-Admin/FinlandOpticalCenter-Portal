@@ -1218,6 +1218,29 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Practice copy renamed ADMIN DEMO (user): https://foc-portal.org/?AdminDemo
+             (?AdminDemo=SCC opens a branch). Where the office tries features
+             before launch; listed nowhere. ?practice no longer opens it — it
+             shows the normal sign-in. Wording: "Admin Demo" pill / sidebar /
+             splash. Still branches only, still this browser's own database.
+             NOTE: unlisted is not secret — the name is in the site's code; it
+             is harmless either way, it never touches live data.
+             CUSTOMER PHONE WITH A COUNTRY (user: customers from outside Oman):
+             js/phone.js — a country button (Oman +968 default) left of the
+             number; its list narrows as you type a name or code ("india",
+             "+44", "971"), Oman + Gulf + common ones first, exact name and each
+             code's main country ranked first. Saved as WhatsApp wants it:
+             country code + number without its leading 0 (a number typed with
+             + or 00 keeps its own code). js/countries.js: 242 countries,
+             generated from libphonenumber + ISO 3166. Used in New fitting order
+             and in the "Customer's WhatsApp number" box Message Customer opens
+             when an order has none (replaces the browser prompt). Windows shows
+             the country letters where phones show flags. Live.
+ 2026-10-19  LIVE DATABASE CLEARED INCLUDING THE LENS SHELVES (user: "start
+             fresh, tomorrow is when we are starting"): every order, outside-
+             lens order, lens / stock request, insurance record, damaged report
+             AND all lens stock (11 rows, 155 pcs) deleted; numbering restarted.
+             Kept: accounts (17), employees (30), settings, lens lists.
  2026-10-19  TEST SIGN-IN ENDED — real codes back (user). The one-click branch
              sign-in is gone from js/app.js (published first), then every
              branch's original code was restored from foc_private.code_backup in
