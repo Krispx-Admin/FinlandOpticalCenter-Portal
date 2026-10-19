@@ -9,9 +9,9 @@ create sequence public."req_seq" start 1001;
 
 create sequence public."lens_seq" start 1001;
 
-create sequence public."damage_seq" start 1001;
-
 create sequence public."claim_seq" start 3001;
+
+create sequence public."damage_seq" start 1001;
 
 create table public."app_settings" (
   "id" integer default 1 not null,
@@ -36,7 +36,8 @@ create table public."branches" (
   "bench_closed_until" date,
   "bench_own_only" boolean default false not null,
   "can_export_insurance" boolean default false not null,
-  "name_ar" text
+  "name_ar" text,
+  "perms" text[] default '{}'::text[] not null
 );
 
 create table public."claim_items" (
@@ -305,7 +306,9 @@ alter table public."app_settings" add constraint "app_settings_id_check" CHECK (
 
 alter table public."app_settings" add constraint "app_settings_pkey" PRIMARY KEY (id);
 
-alter table public."branches" add constraint "branches_role_check" CHECK ((role = ANY (ARRAY['retail'::text, 'fitting'::text, 'clinic'::text, 'admin'::text, 'scheduler'::text, 'manager'::text])));
+alter table public."branches" add constraint "branches_perms_check" CHECK ((perms <@ ARRAY['see_all'::text, 'act_all'::text, 'office_queue'::text, 'accounts'::text, 'lists'::text, 'insurance_dash'::text, 'export_insurance'::text, 'schedule_edit'::text, 'view_only'::text]));
+
+alter table public."branches" add constraint "branches_role_check" CHECK ((role = ANY (ARRAY['retail'::text, 'fitting'::text, 'clinic'::text, 'person'::text, 'admin'::text, 'scheduler'::text, 'manager'::text])));
 
 alter table public."branches" add constraint "branches_pkey" PRIMARY KEY (code);
 
@@ -538,7 +541,7 @@ declare
   uid   uuid := gen_random_uuid();
   src   auth.users;
 begin
-  if not public.is_admin() then
+  if not public.has_perm('accounts') then
     raise exception 'Only the office may add branches';
   end if;
   if v_code !~ '^[A-Z][A-Z0-9]{1,9}$' then
@@ -547,7 +550,9 @@ begin
   if nm = '' then
     raise exception 'Give it a name';
   end if;
-  if p_role not in ('retail', 'fitting', 'clinic', 'manager', 'scheduler', 'admin') then
+  -- A person is one kind now: what it may do is its permissions (schema-50).
+  if p_role in ('manager', 'scheduler', 'admin') then p_role := 'person'; end if;
+  if p_role not in ('retail', 'fitting', 'clinic', 'person') then
     raise exception 'Unknown kind of account %', p_role;
   end if;
   if exists (select 1 from public.branches b where b.code = v_code) then
@@ -560,9 +565,11 @@ begin
     raise exception 'A sign-in account % already exists', v_email;
   end if;
 
-  insert into public.branches (code, name, role, holds_lens_stock, active, position)
+  -- A new person starts able to look, not to change: the office ticks more.
+  insert into public.branches (code, name, role, holds_lens_stock, active, position, perms)
   values (v_code, nm, p_role, false, true,
-          coalesce((select max(position) from public.branches), 0) + 1);
+          coalesce((select max(position) from public.branches), 0) + 1,
+          case when p_role = 'person' then array['see_all', 'view_only'] else '{}'::text[] end);
 
   -- Shaped exactly like the accounts the branches already sign in with.
   select * into src from auth.users where raw_app_meta_data ? 'branch_code' limit 1;
@@ -688,7 +695,7 @@ AS $function$
          u.last_sign_in_at
     from public.branches b
     left join auth.users u on (u.raw_app_meta_data ->> 'branch_code') = b.code
-   where public.is_admin()
+   where public.has_perm('accounts')
    order by b.position, b.code
 $function$;
 
@@ -718,7 +725,7 @@ CREATE OR REPLACE FUNCTION public.can_schedule()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ select exists (select 1 from public.branches b where b.code = public.jwt_branch() and b.role in ('admin', 'scheduler')) $function$;
+AS $function$ select public.has_perm('schedule_edit') $function$;
 
 CREATE OR REPLACE FUNCTION public.cancel_claim(p_id uuid, p_cancel boolean)
  RETURNS claims
@@ -875,7 +882,7 @@ declare
   names text;
   left_ int;
 begin
-  if not public.is_admin() then raise exception 'Only the office may complete a request'; end if;
+  if not public.has_perm('office_queue') then raise exception 'Only the office may complete a request'; end if;
   select * into r from public.stock_requests where id = p_request for update;
   if not found then raise exception 'Request not found'; end if;
   if r.status <> 'placed' then raise exception 'Request is already %', r.status; end if;
@@ -909,7 +916,7 @@ CREATE OR REPLACE FUNCTION public.complete_stock_request(p_request uuid)
 AS $function$
 declare r public.stock_requests;
 begin
-  if not public.is_admin() then raise exception 'Only the office may complete a request'; end if;
+  if not public.has_perm('office_queue') then raise exception 'Only the office may complete a request'; end if;
   select * into r from public.stock_requests where id = p_request for update;
   if not found then raise exception 'Request not found'; end if;
   if r.status <> 'placed' then raise exception 'Request is already %', r.status; end if;
@@ -1143,7 +1150,7 @@ declare
   used text[] := '{}';
   n    int;
 begin
-  if not public.is_admin() then
+  if not public.has_perm('accounts') then
     raise exception 'Only the office may delete branches';
   end if;
   select * into b from public.branches where code = p_code;
@@ -1153,8 +1160,9 @@ begin
   if p_code = public.jwt_branch() then
     raise exception 'You cannot delete the account you are signed in with';
   end if;
-  if b.role = 'admin' and not exists (select 1 from public.branches where role = 'admin' and active and code <> p_code) then
-    raise exception '% is the last office admin', b.name;
+  if public.manages_accounts(b) and not exists (
+       select 1 from public.branches o where o.code <> p_code and o.active and public.manages_accounts(o)) then
+    raise exception '% is the last account that can manage accounts', b.name;
   end if;
   if b.holds_lens_stock then
     raise exception '% holds lens stock - stop that first', b.name;
@@ -1279,12 +1287,23 @@ begin
   return x;
 end $function$;
 
+CREATE OR REPLACE FUNCTION public.has_perm(p text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select exists (select 1 from public.branches b
+                  where b.code = public.jwt_branch() and b.active and p = any(b.perms)
+                    and not (p in ('act_all', 'office_queue', 'accounts', 'lists', 'schedule_edit') and 'view_only' = any(b.perms)))
+$function$;
+
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ select exists (select 1 from public.branches b where b.code = public.jwt_branch() and b.role = 'admin') $function$;
+AS $function$ select public.has_perm('act_all') $function$;
 
 CREATE OR REPLACE FUNCTION public.is_lens_owner()
  RETURNS boolean
@@ -1298,7 +1317,8 @@ CREATE OR REPLACE FUNCTION public.is_scheduler()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ select exists (select 1 from public.branches b where b.code = public.jwt_branch() and b.role in ('scheduler', 'manager')) $function$;
+AS $function$ select exists (select 1 from public.branches b where b.code = public.jwt_branch() and b.active
+                        and b.perms && array['see_all', 'act_all', 'office_queue']) $function$;
 
 CREATE OR REPLACE FUNCTION public.jwt_branch()
  RETURNS text
@@ -1313,6 +1333,12 @@ CREATE OR REPLACE FUNCTION public.lens_owner_code()
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$ select code from public.branches where holds_lens_stock and active order by position limit 1 $function$;
+
+CREATE OR REPLACE FUNCTION public.manages_accounts(b branches)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$ select 'accounts' = any(b.perms) and not ('view_only' = any(b.perms)) $function$;
 
 CREATE OR REPLACE FUNCTION public.open_fitter(p_code text)
  RETURNS boolean
@@ -1518,7 +1544,7 @@ declare
   b  public.branches;
   nm text := trim(coalesce(p_name, ''));
 begin
-  if not public.is_admin() then
+  if not public.has_perm('accounts') then
     raise exception 'Only the office may change branches';
   end if;
   select * into b from public.branches where code = p_code;
@@ -1531,12 +1557,14 @@ begin
   -- Every account is a branch (retail / fitting / clinic) or a person (view-
   -- only admin, schedule editor, office admin), and can be switched - as long
   -- as one open office admin is left (schema-41).
-  if p_role not in ('retail', 'fitting', 'clinic', 'manager', 'scheduler', 'admin') then
+  if p_role in ('manager', 'scheduler', 'admin') then p_role := 'person'; end if;
+  if p_role not in ('retail', 'fitting', 'clinic', 'person') then
     raise exception 'Unknown kind of account %', p_role;
   end if;
-  if b.role = 'admin' and (p_role <> 'admin' or not p_active)
-     and not exists (select 1 from public.branches where role = 'admin' and active and code <> p_code) then
-    raise exception '% is the last office admin - make another account office admin first', b.name;
+  -- Never close the last account that can manage the accounts (schema-50).
+  if not p_active and public.manages_accounts(b) and not exists (
+       select 1 from public.branches o where o.code <> p_code and o.active and public.manages_accounts(o)) then
+    raise exception '% is the last account that can manage accounts - give that to another first', b.name;
   end if;
   if b.holds_lens_stock and (p_role <> 'fitting' or not p_active) then
     raise exception '% holds the lens stock, so it has to stay an open fitting centre', b.name;
@@ -1604,7 +1632,7 @@ AS $function$
     from public.schedule_weeks w
    where w.published is not null
      and w.week_start > (now() at time zone 'Asia/Muscat')::date - 7
-     and (public.is_admin() or not (public.disabled_tabs() ? 'schedule'))
+     and (public.has_perm('lists') or not (public.disabled_tabs() ? 'schedule'))
 $function$;
 
 CREATE OR REPLACE FUNCTION public.send_lens_request(p_request uuid)
@@ -1674,7 +1702,7 @@ begin
   select * into b from public.branches where code = p_code;
   if not found then raise exception 'No branch %', p_code; end if;
   if b.role <> 'fitting' then raise exception '% has no lab', b.name; end if;
-  if not (public.jwt_branch() = p_code or public.is_admin()) then
+  if not (public.jwt_branch() = p_code or public.has_perm('accounts')) then
     raise exception 'Only % itself (or the office) can change its lab', b.name;
   end if;
   if p_closed and p_until is not null and p_until < (now() at time zone 'Asia/Muscat')::date then
@@ -1694,7 +1722,7 @@ AS $function$
 declare
   n int;
 begin
-  if not public.is_admin() then
+  if not public.has_perm('accounts') then
     raise exception 'Only the office may change branch codes';
   end if;
   perform public.assert_good_pin(p_code);
@@ -1717,7 +1745,7 @@ CREATE OR REPLACE FUNCTION public.set_branch_name_ar(p_code text, p_name text)
  SET search_path TO 'public'
 AS $function$
 begin
-  if not public.is_admin() then raise exception 'Only the office can rename a branch'; end if;
+  if not public.has_perm('accounts') then raise exception 'Only the office can rename a branch'; end if;
   update public.branches set name_ar = nullif(btrim(p_name), '') where code = p_code;
   if not found then raise exception 'No such branch'; end if;
 end $function$;
@@ -1786,7 +1814,7 @@ CREATE OR REPLACE FUNCTION public.set_insurance_export(p_code text, p_on boolean
  SET search_path TO 'public'
 AS $function$
 begin
-  if not public.is_admin() then raise exception 'Only the office may change this'; end if;
+  if not public.has_perm('accounts') then raise exception 'Only the office may change this'; end if;
   update public.branches set can_export_insurance = coalesce(p_on, false) where code = p_code;
   if not found then raise exception 'No profile %', p_code; end if;
 end $function$;
@@ -1804,7 +1832,7 @@ begin
   select * into b from public.branches where code = p_code;
   if not found then raise exception 'No branch %', p_code; end if;
   if b.role <> 'fitting' then raise exception '% has no lab', b.name; end if;
-  if not (public.jwt_branch() = p_code or public.is_admin()) then
+  if not (public.jwt_branch() = p_code or public.has_perm('accounts')) then
     raise exception 'Only % itself (or the office) can change its lab', b.name;
   end if;
   update public.branches
@@ -1822,7 +1850,7 @@ declare
   b public.branches;
   n int;
 begin
-  if not public.is_admin() then
+  if not public.has_perm('accounts') then
     raise exception 'Only the office may change who holds lens stock';
   end if;
   select * into b from public.branches where code = p_code;
@@ -1890,6 +1918,28 @@ begin
   update public.orders o set updated_at = now() from ev where o.id = ev.order_id;
   get diagnostics n = row_count;
   return n;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.set_permissions(p_code text, p_perms text[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare b public.branches; nxt text[];
+begin
+  if not public.has_perm('accounts') then raise exception 'Only an account that manages accounts can change permissions'; end if;
+  select * into b from public.branches where code = p_code for update;
+  if not found then raise exception 'No account %', p_code; end if;
+  nxt := array(select distinct unnest(coalesce(p_perms, '{}')) order by 1);
+  if not (nxt <@ array['see_all', 'act_all', 'office_queue', 'accounts', 'lists', 'insurance_dash', 'export_insurance', 'schedule_edit', 'view_only']::text[]) then
+    raise exception 'Unknown permission in %', p_perms;
+  end if;
+  if public.manages_accounts(b) and not ('accounts' = any(nxt) and not 'view_only' = any(nxt))
+     and not exists (select 1 from public.branches o where o.code <> p_code and o.active and public.manages_accounts(o)) then
+    raise exception '% is the last account that can manage accounts - give that to another first', b.name;
+  end if;
+  update public.branches set perms = nxt where code = p_code;
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.staff_list()
@@ -2066,9 +2116,9 @@ CREATE TRIGGER schedule_weeks_touch BEFORE INSERT OR UPDATE ON public.schedule_w
 
 CREATE TRIGGER stock_requests_touch BEFORE UPDATE ON public.stock_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
-alter table public."claims" enable row level security;
-
 alter table public."claim_prescriptions" enable row level security;
+
+alter table public."claims" enable row level security;
 
 alter table public."branches" enable row level security;
 
@@ -2096,9 +2146,9 @@ alter table public."stock_requests" enable row level security;
 
 alter table public."claim_items" enable row level security;
 
-alter table public."damaged_reports" enable row level security;
-
 alter table public."lens_catalogue" enable row level security;
+
+alter table public."damaged_reports" enable row level security;
 
 alter table public."schedule_branches" enable row level security;
 
@@ -2116,7 +2166,7 @@ alter table public."damaged_lines" enable row level security;
 
 create policy "app_settings_read" on public."app_settings" as permissive for select to authenticated using (true);
 
-create policy "app_settings_write" on public."app_settings" as permissive for all to authenticated using (( SELECT is_admin() AS is_admin)) with check (( SELECT is_admin() AS is_admin));
+create policy "app_settings_write" on public."app_settings" as permissive for all to authenticated using (( SELECT has_perm('lists'::text) AS has_perm)) with check (( SELECT has_perm('lists'::text) AS has_perm));
 
 create policy "branches_read" on public."branches" as permissive for select to authenticated using (true);
 
@@ -2156,11 +2206,11 @@ create policy "damaged_reports_delete" on public."damaged_reports" as permissive
 
 create policy "damaged_reports_read" on public."damaged_reports" as permissive for select to authenticated using (((branch_code = ( SELECT jwt_branch() AS jwt_branch)) OR ( SELECT is_admin() AS is_admin) OR ( SELECT is_scheduler() AS is_scheduler)));
 
-create policy "employees_admin" on public."employees" as permissive for all to authenticated using (( SELECT is_admin() AS is_admin)) with check (( SELECT is_admin() AS is_admin));
+create policy "employees_admin" on public."employees" as permissive for all to authenticated using (( SELECT has_perm('accounts'::text) AS has_perm)) with check (( SELECT has_perm('accounts'::text) AS has_perm));
 
 create policy "lens_catalogue_read" on public."lens_catalogue" as permissive for select to authenticated using (true);
 
-create policy "lens_catalogue_write" on public."lens_catalogue" as permissive for all to authenticated using ((( SELECT is_lens_owner() AS is_lens_owner) OR ( SELECT is_admin() AS is_admin))) with check ((( SELECT is_lens_owner() AS is_lens_owner) OR ( SELECT is_admin() AS is_admin)));
+create policy "lens_catalogue_write" on public."lens_catalogue" as permissive for all to authenticated using ((( SELECT is_lens_owner() AS is_lens_owner) OR ( SELECT has_perm('lists'::text) AS has_perm))) with check ((( SELECT is_lens_owner() AS is_lens_owner) OR ( SELECT has_perm('lists'::text) AS has_perm)));
 
 create policy "lens_events_all" on public."lens_request_events" as permissive for all to public using ((EXISTS ( SELECT 1
    FROM lens_requests r
@@ -2256,7 +2306,7 @@ create policy "stock_requests_read" on public."stock_requests" as permissive for
 
 create policy "stock_requests_scheduler_read" on public."stock_requests" as permissive for select to authenticated using (( SELECT is_scheduler() AS is_scheduler));
 
-create policy "stock_requests_update" on public."stock_requests" as permissive for update to authenticated using (( SELECT is_admin() AS is_admin)) with check (( SELECT is_admin() AS is_admin));
+create policy "stock_requests_update" on public."stock_requests" as permissive for update to authenticated using (( SELECT has_perm('office_queue'::text) AS has_perm)) with check (( SELECT has_perm('office_queue'::text) AS has_perm));
 
 -- What the website's signed-in key may touch; the row rules above decide which rows.
 grant usage on schema public to anon, authenticated;

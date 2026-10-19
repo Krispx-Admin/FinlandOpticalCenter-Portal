@@ -818,6 +818,17 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-50-permissions.sql  ACCESS PERMISSIONS per account: branches.perms
+                             (see_all, act_all, office_queue, accounts, lists,
+                             insurance_dash, export_insurance, schedule_edit,
+                             view_only). People are one kind, role 'person'.
+                             has_perm(); is_admin() = act_all, is_scheduler()
+                             = sees all, can_schedule() = schedule_edit;
+                             accounts / lists / office-queue functions and
+                             rules check their own tick; set_permissions()
+                             with a last-account-manager guard; anon cannot
+                             read perms. OFC renamed Office; person OMAR added
+                             (random code). Applied 2026-10-19.
   schema-42-own-lens-stock.sql  use_own_lens_stock(); delete_order returns
                              own-shelf lenses. Applied 2026-10-17.
   schema-41-accounts.sql     save_branch / add_branch / delete_branch: any
@@ -1218,6 +1229,29 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  ACCESS PERMISSIONS (user: instead of admin / schedule editor /
+             view-only admin, each account gets "Access Permissions" — tick
+             boxes, and View only). Settings → Accounts: every account (branch
+             or person) has an "Access Permissions" button with a summary
+             ("Full access", "3 of 8 · view only", "Own branch only"); the
+             window ticks: See every branch · Change any branch's records ·
+             Office Queue · Settings: accounts & codes · Settings: lists & tabs
+             · Direct Insurance dashboard · Export Insurance Sales · Schedule:
+             edit · View only (takes back every tick that changes things). The
+             old "Can export Insurance Sales" switch is now a tick. Settings
+             pages show by tick (accounts pages / list pages).
+             Office accounts: OFC is "Office" (main, full access); new person
+             "Omar" (full access — random code nobody saw: the Office sets it
+             in Settings → Accounts); Ghiath, Sarah, Mohammad Azmi, Wijdan keep
+             exactly their old access. Sign-in Office row: Office, Omar,
+             Ghiath, Sarah, Mohammad Azmi, Wijdan (positions 100-105).
+             The app: data.js PERMS / can(who, perm) / isPerson; seesAll,
+             readOnly, canExportInsurance, canEditSchedule read the ticks;
+             every role === 'admin' check is a tick now (act_all, lists,
+             office_queue, insurance_dash…). It read the old kinds too, so it
+             went out first, then the database (schema-50, rehearsed per
+             account: identical access before/after, guards, anon refused).
+             Admin Demo rebuilt + VERSION 8.
  2026-10-19  Sign-in: the Office section is four across (two rows of four), not
              two narrow columns that kept stacking (user). CSS .lp-wh .lp-grid.
  2026-10-19  Before launch: EVERY BRANCH SIGNED OUT on every device (user) — the
