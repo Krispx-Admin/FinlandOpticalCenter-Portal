@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, BRANCH_KINDS, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
+import { LOCATIONS, ROLES, BRANCH_KINDS, can, isPerson, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
 import { captchaOn, mountCaptcha } from './captcha.js';
 import { damagedView } from './damaged.js';
 import { outsideView } from './outside.js';
@@ -70,7 +70,7 @@ function renderLogin(preselect = null) {
             <h2>Sign in</h2>
             <p class="lp-sub">${auth.isPractice ? 'Admin Demo — pick a branch, no code needed.' : 'Choose your location.'}</p>
           </header>
-          ${auth.isPractice ? '' : groupHTML(['Office', ['admin', 'scheduler', 'manager']], 'lp-wh')}
+          ${auth.isPractice ? '' : groupHTML(['Office', ['person', 'admin', 'scheduler', 'manager']], 'lp-wh')}
           <div class="lp-cols">
             ${columns.map(c => `
               <div class="lp-col${c.wide ? ' wide' : ''}">${c.groups.map(g => groupHTML(g)).join('')}</div>`).join('')}
@@ -283,27 +283,28 @@ const MODULES = {
   // Branches order shelf lenses inside a new fitting order now, so the tab is
   // for the branches that hold lenses, and the admins who look across
   // everything (user, 2026-10-17).
-  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView, only: me => isLensOwner(me?.code) || seesAll(me?.role) },
-  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me?.role) },
+  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView, only: me => isLensOwner(me?.code) || seesAll(me) },
+  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me) },
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   damaged:  { label: 'Damaged Stock', icon: 'damage', make: damagedView },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
-  settings: { label: 'Settings', icon: 'settings', make: settingsView, adminOnly: true },
+  // Settings: for an account allowed to manage accounts or the lists (schema-50).
+  settings: { label: 'Settings', icon: 'settings', make: settingsView, only: me => can(me, 'accounts') || can(me, 'lists') },
 };
 
 // Where a location lands after signing in: Ghiath's work is the schedule.
-const homeOf = me => (me?.role === 'scheduler' ? '#/schedule' : '#/fitting');
+const homeOf = me => (isPerson(me) && can(me, 'schedule_edit') && !can(me, 'act_all') ? '#/schedule' : '#/fitting');
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
-  return m && (!m.adminOnly || me?.role === 'admin') && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
+  return m && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
 }
 
 // A tab the office switched off in Settings is closed to everyone else; the
 // office can still open it, to see to whatever needed the maintenance.
 const isOff = key => tabOff(store.state.settings, key);
-const moduleOpen = (key, me) => moduleAllowed(key, me) && (me?.role === 'admin' || !isOff(key));
+const moduleOpen = (key, me) => moduleAllowed(key, me) && (can(me, 'lists') || !isOff(key));
 
 // When every tab this location may use is switched off, it lands here.
 const OFF_KEY = 'maintenance';
@@ -328,10 +329,10 @@ function currentModule() {
 
 function badgeCounts(me) {
   // The schedule editor reads everything and is asked to do none of it.
-  if (readOnly(me.role)) return {};
+  if (readOnly(me)) return {};
   const s = store.state;
   const fitting = s.orders.filter(o => canSeeOrder(o, me.code) && needsAction(o, me.code)).length;
-  const stock = me.role === 'admin'
+  const stock = can(me, 'office_queue')
     ? s.requests.filter(r => r.status === 'placed').length
     : s.requests.filter(r => canSeeRequest(r, me.code) && r.status === 'placed').length;
   // Only the branch holding the lenses has something to act on here.
@@ -425,13 +426,13 @@ function renderNav(me, active) {
   if (!nav) return;
   const b = badgeCounts(me);
   nav.innerHTML = Object.entries(MODULES).filter(([key]) => moduleAllowed(key, me)).map(([key, m]) => {
-    const label = (me.role === 'admin' || readOnly(me.role)) && m.adminLabel ? m.adminLabel : m.label;
-    const icon = icons[me.role === 'admin' && m.adminIcon ? m.adminIcon : m.icon];
+    const label = isPerson(me) && m.adminLabel ? m.adminLabel : m.label;
+    const icon = icons[can(me, 'office_queue') && m.adminIcon ? m.adminIcon : m.icon];
     // Switched off: greyed, and said so. Only the office can still go in.
     if (isOff(key)) {
       const inner = `${icon}<span>${label} <i class="nav-off-note">— under maintenance</i></span>`;
       const title = `${esc(label)} — under maintenance`;
-      return me.role === 'admin'
+      return can(me, 'lists')
         ? `<a class="nav-item nav-off ${active === key ? 'on' : ''}" href="#/${key}" title="${title}">${inner}</a>`
         : `<span class="nav-item nav-off" aria-disabled="true" title="${title}">${inner}</span>`;
     }

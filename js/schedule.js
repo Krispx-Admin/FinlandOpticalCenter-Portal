@@ -390,7 +390,7 @@ export async function mountScheduleViewer(stage, subEl) {
 }
 
 export function scheduleView(me) {
-  const editor = canEditSchedule(me.role);
+  const editor = canEditSchedule(me);
   let root, bridge = null, busy = false;
 
   // The Publish bar: which week is open, whether the branches can see it, and

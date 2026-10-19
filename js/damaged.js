@@ -3,14 +3,14 @@
 // report: the name of the glasses, the barcode, how many — as many lines as it
 // needs. Omar (Office), Wijdan and Sarah print the paper and send it on;
 // Ghiath can look. No statuses: a report is a piece of paper (user, 2026-10-15).
-import { BRANCHES, locName, seesAll } from './data.js';
+import { BRANCHES, locName, seesAll, can } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer } from './ui.js';
 
 const pcsOf = r => r.lines.reduce((s, l) => s + (l.qty || 0), 0);
 
 export function damagedView(me) {
-  const overseer = seesAll(me.role);          // Omar, Wijdan, Sarah, Ghiath
+  const overseer = seesAll(me);          // Omar, Wijdan, Sarah, Ghiath
   const canSend = !overseer;                  // the branches
   const ui = { q: '', branch: 'all' };
   let root, drawer = null, drawerId = null;
@@ -27,7 +27,7 @@ export function damagedView(me) {
     }
     return list.sort((a, b) => b.createdAt - a.createdAt);
   }
-  const canDelete = r => r.branch === me.code || me.role === 'admin';
+  const canDelete = r => r.branch === me.code || can(me, 'act_all');
 
   function statsHTML() {
     const list = all();

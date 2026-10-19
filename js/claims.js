@@ -1,7 +1,7 @@
 // ── Module 5: Reimbursement Invoice (was Insurance Claims) — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance,
+  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance, can,
 } from './data.js';
 import { store } from './store.js';
 import { supabase } from './auth.js';
@@ -575,8 +575,8 @@ function periodRange(key) {
 export function claimsView(me, kind = 'claim') {
   // The office and the schedule editor see every branch's records; the
   // schedule editor may open and print them but not raise, edit or delete.
-  const isAdmin = seesAll(me.role);
-  const viewOnly = readOnly(me.role);
+  const isAdmin = seesAll(me);
+  const viewOnly = readOnly(me);
   const direct = kind === 'direct';
   const T = KINDS[kind];
   const ui = { q: '', branch: 'all', insurer: 'all', period: '30d' };
@@ -916,7 +916,7 @@ export function claimsView(me, kind = 'claim') {
       <div class="form">
         <div class="grid2">
           <label>Date<input type="date" id="f-date" value="${esc(draft.date)}"></label>
-          ${me.role === 'admin' ? `<label>Branch
+          ${can(me, 'act_all') ? `<label>Branch
             <select id="f-branch">
               ${BRANCHES.map(b => `<option value="${b.code}" ${draft.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
             </select>
@@ -1172,7 +1172,7 @@ export function claimsView(me, kind = 'claim') {
           ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} ${T.add}</button>`}
         </div>
       </header>
-      ${direct && isAdmin ? `<div id="d-dash">${dashHTML()}</div><h2 class="dash-list-h">Every insurance customer</h2>` : ''}
+      ${direct && can(me, 'insurance_dash') ? `<div id="d-dash">${dashHTML()}</div><h2 class="dash-list-h">Every insurance customer</h2>` : ''}
       <section class="toolbar">
         <div class="searchbox">${icons.search}<input id="c-q" placeholder="Search invoice, customer, member ID, bill${direct ? ', insurer, salesperson' : ''}…" value="${esc(ui.q)}"></div>
         ${isAdmin ? `<select class="sel" id="c-branch"><option value="all">All branches</option>${

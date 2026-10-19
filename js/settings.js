@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES } from './data.js';
+import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES, PERMS, can } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime, openLayer } from './ui.js';
@@ -108,7 +108,7 @@ export function settingsView(me) {
   const kindOptions = sel => BRANCH_KINDS.map(k =>
     `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('');
   // Every account: a branch, or a person (schema-41).
-  const PERSON_KINDS = ['manager', 'scheduler', 'admin'];
+  const PERSON_KINDS = ['person'];
   const accountOptions = sel => `<optgroup label="Branch">${kindOptions(sel)}</optgroup>
     <optgroup label="Person">${PERSON_KINDS.map(k => `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('')}</optgroup>`;
 
@@ -126,8 +126,6 @@ export function settingsView(me) {
     host.innerHTML = ordered.map(r => {
       const lensLocked = r.holds_lens_stock;      // a lens holder stays an open fitting centre
       const fitting = r.role === 'fitting' && r.active;
-      const office = r.role === 'admin';
-      const canExport = office || !!LOCATIONS.find(l => l.code === r.code)?.canExport;
       // Every account has the same controls (user, 2026-10-17); one that
       // cannot apply to this kind of account is greyed out, saying why.
       const off = (on, why) => (on ? '' : `disabled title="${esc(why)}"`);
@@ -160,14 +158,52 @@ export function settingsView(me) {
             <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(fitting, 'Only an open fitting centre can hold lens stock')}><i></i></span>
             <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
           </label>
-          <label class="br-lens ${office ? 'is-off' : ''}" title="${office ? 'The office can always export' : 'Shows the Export (Insurance Sales) button in Direct Insurance'}">
-            <span class="sw"><input type="checkbox" data-br-export="${esc(r.code)}" ${canExport ? 'checked' : ''} ${off(!office, 'The office can always export')}><i></i></span>
-            <span>Can export Insurance Sales</span>
-          </label>
+          <button type="button" class="btn btn-ghost btn-sm br-perms" data-br-perms="${esc(r.code)}">${icons.shield} Access Permissions <em>${esc(permSummary(r.code))}</em></button>
         </div>
         <div class="ba-msg"></div>
       </div>`;
     }).join('');
+  }
+
+  // ── Access permissions (schema-50): tick boxes per account ──
+  const permsOf = code => LOCATIONS.find(l => l.code === code)?.perms ?? [];
+  function permSummary(code) {
+    const ps = permsOf(code), all = PERMS.filter(([k]) => k !== 'view_only').map(([k]) => k);
+    const n = all.filter(k => ps.includes(k)).length;
+    const view = ps.includes('view_only') ? ' · view only' : '';
+    return n === all.length ? `Full access${view}` : n ? `${n} of ${all.length}${view}` : `Own branch only${view}`;
+  }
+  function permissionsModal(code) {
+    const b = LOCATIONS.find(l => l.code === code);
+    if (!b) return;
+    const had = new Set(permsOf(code));
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">${esc(code)} · ${esc(b.name)}</div><h2>Access Permissions</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <form class="form perm-form" id="perm-form">
+        <p class="muted sm">${BRANCH_KINDS.includes(b.role) ? 'A branch always has its own work. Tick what it may do beyond that.' : 'Tick what this person may do in the portal.'}</p>
+        <div class="perm-list">
+          ${PERMS.filter(([k]) => k !== 'view_only').map(([k, label, help]) => `
+          <label class="perm-row"><span class="cbx"><input type="checkbox" name="p" value="${k}" ${had.has(k) ? 'checked' : ''}><i></i></span>
+            <span class="perm-txt"><b>${esc(label)}</b><span>${esc(help)}</span></span></label>`).join('')}
+        </div>
+        <label class="perm-row perm-view"><span class="cbx"><input type="checkbox" name="p" value="view_only" ${had.has('view_only') ? 'checked' : ''}><i></i></span>
+          <span class="perm-txt"><b>View only</b><span>Sees what the ticks above allow, but changes nothing — not even with a tick that changes things.</span></span></label>
+        <div class="form-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">${icons.check} Save</button>
+        </div>
+      </form>`);
+    layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    layer.el.addEventListener('submit', async e => {
+      e.preventDefault();
+      const perms = new FormData(e.target).getAll('p').map(String);
+      if (code === me.code && had.has('accounts') && !perms.includes('accounts')
+          && !confirm('Take "Settings: accounts & codes" off your own account?\n\nYou will no longer be able to manage accounts.')) return;
+      if (await store.setPermissions(code, perms)) { layer.close(); loadBranches(); }
+    });
   }
 
   // Branch or Person: a person has no kind to choose — it is a view-only admin.
@@ -190,7 +226,7 @@ export function settingsView(me) {
     msg.className = 'ba-msg';
     if (!/^\d{6}$/.test(pin)) { msg.classList.add('bad'); msg.textContent = 'The sign-in code is six digits.'; return; }
     msg.textContent = 'Adding…';
-    // A person is a view-only admin (role 'manager'); a branch is what was chosen.
+    // A person starts able to look, not change (schema-50); a branch is what was chosen.
     const person = root.querySelector('#add-kind .chip.on')?.dataset.kind === 'person';
     const done = await store.addBranch({ code: d.get('code'), name: d.get('name'), role: person ? d.get('personRole') : d.get('role'), pin });
     if (!done) { msg.textContent = ''; return; }
@@ -354,19 +390,19 @@ export function settingsView(me) {
   // that has something to set — named and drawn like the tab itself. A page
   // may hold several sections (Stock Requests: categories and brand groups).
   const PAGES = [
-    { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'],
+    { key: 'tabs',   group: 'General', icon: 'menu',   title: 'Tabs', sections: ['tabs'], need: 'lists',
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
-    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Accounts', sections: ['branches', 'addBranch'],
+    { key: 'branches', group: 'General', icon: 'warehouse', title: 'Accounts', sections: ['branches', 'addBranch'], need: 'accounts',
       desc: 'Every sign-in — branches and people: add, rename, set what each one is, close or delete, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
-    { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'],
+    { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'], need: 'accounts',
       desc: 'The staff by full name — the Direct Insurance salesperson list. The schedule keeps its own in the Schedule tab',
       sum: () => (staffCount == null ? '' : count(staffCount, 'employee')) },
-    { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'],
+    { key: 'stock',  group: 'By tab',  icon: 'box',    title: 'Stock Requests', sections: ['cats', 'groups'], need: 'lists',
       desc: 'Categories — the fields each needs, how it is counted — and the brand groups they offer',
       sum: () => `${count(store.settings.categories.length, 'category', 'categories')} · ${count(groups().length, 'brand group')}` },
-    { key: 'direct', group: 'By tab',  icon: 'shield', title: 'Direct Insurance', sections: ['ins'],
+    { key: 'direct', group: 'By tab',  icon: 'shield', title: 'Direct Insurance', sections: ['ins'], need: 'lists',
       desc: 'The insurers a branch picks from for an insurance customer',
       sum: () => count((store.settings.insurers ?? []).length, 'insurer') },
   ];
@@ -453,11 +489,13 @@ export function settingsView(me) {
       </section>`,
   };
 
+  // Each page shows to an account with its permission (schema-50).
+  const myPages = () => PAGES.filter(pg => can(me, pg.need));
   function listHTML() {
-    const heads = [...new Set(PAGES.map(pg => pg.group))];
+    const heads = [...new Set(myPages().map(pg => pg.group))];
     return `<div class="set-index">${heads.map(h => `
       <h2 class="set-group">${esc(h)}</h2>
-      ${PAGES.filter(pg => pg.group === h).map(pg => `
+      ${myPages().filter(pg => pg.group === h).map(pg => `
       <button class="set-entry" data-page="${pg.key}">
         <span class="set-entry-ico">${icons[pg.icon]}</span>
         <span class="set-entry-txt"><b>${esc(pg.title)}</b><span>${esc(pg.desc)}</span></span>
@@ -467,7 +505,7 @@ export function settingsView(me) {
   }
 
   function render() {
-    const pg = PAGES.find(x => x.key === page);
+    const pg = myPages().find(x => x.key === page);
     root.innerHTML = pg ? `
       <header class="mod-head set-page-head">
         <div>
@@ -590,7 +628,6 @@ export function settingsView(me) {
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);
       if (d.brLab) return store.setLab(d.brLab, e.target.value);
-      if (d.brExport) return store.setInsuranceExport(d.brExport, e.target.checked);
       if (d.flag) {
         // Ticking Brand on a category with no group gives it the first one.
         const cat = store.settings.categories.find(c => c.name === d.cat);
@@ -618,6 +655,8 @@ export function settingsView(me) {
     root.addEventListener('click', e => {
       const kind = e.target.closest('#add-kind [data-kind]');
       if (kind) return setAddKind(kind.dataset.kind);
+      const bp = e.target.closest('[data-br-perms]');
+      if (bp) return permissionsModal(bp.dataset.brPerms);
       const bd = e.target.closest('[data-br-del]');
       if (bd) return deleteBranchModal(bd.dataset.brDel);
       if (e.target.closest('[data-emp-new]')) return employeeModal(null);

@@ -714,6 +714,14 @@ export const store = {
     }, { module: 'settings', title });
   },
 
+  // An account's access permissions (schema-50).
+  setPermissions(code, perms) {
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_permissions', { p_code: code, p_perms: perms }));
+      return true;
+    }, { module: 'settings', title: `${code}: access permissions saved` });
+  },
+
   // The branch's name in Arabic (schema-49) — the WhatsApp message uses it.
   setBranchNameAr(code, name) {
     return run(['branches'], async () => {

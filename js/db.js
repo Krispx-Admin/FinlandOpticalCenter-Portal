@@ -232,9 +232,11 @@ const OLDER = {
 };
 export const hasOlder = key => !!OLDER[key];
 
-async function fetchCollection(key, { older = false } = {}) {
+// Signed in, the accounts come back whole — with their permissions
+// (schema-50), which the sign-in screen is not allowed to read.
+async function fetchCollection(key, { older = false, signedIn = false } = {}) {
   const [table, select, order, map] = SELECTS[key];
-  let q = supabase.from(table).select(select);
+  let q = supabase.from(table).select(key === 'branches' && signedIn ? '*' : select);
   const limit = older ? OLDER[key] : RECENT[key];
   if (limit) q = limit(q);
   const { data, error } = await q.order(order.column, { ascending: order.asc });
@@ -289,7 +291,7 @@ export function forgetLocalCopy() {
 // Everything the signed-in branch can see, in parallel.
 export async function loadAll() {
   const docs = Object.keys(DOCS);
-  const all = await Promise.all([...docs.map(fetchDoc), ...COLLECTIONS.map(fetchCollection)]);
+  const all = await Promise.all([...docs.map(fetchDoc), ...COLLECTIONS.map(k => fetchCollection(k, { signedIn: true }))]);
   const out = {};
   docs.forEach((k, i) => { out[k] = all[i]; });
   COLLECTIONS.forEach((k, i) => { out[k] = all[docs.length + i]; });
@@ -299,7 +301,7 @@ export async function loadAll() {
 // Reload named collections only — a write touches one or two, not all six.
 export async function reload(keys) {
   const list = [...new Set(keys)].filter(k => DOCS[k] || SELECTS[k]);
-  const vals = await Promise.all(list.map(k => (DOCS[k] ? fetchDoc(k) : fetchCollection(k))));
+  const vals = await Promise.all(list.map(k => (DOCS[k] ? fetchDoc(k) : fetchCollection(k, { signedIn: true }))));
   return Object.fromEntries(list.map((k, i) => [k, vals[i]]));
 }
 

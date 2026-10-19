@@ -8,6 +8,7 @@ import {
   isBenchClosed, isLabOff, labMode, LAB_MODES, benchNote,
   canEditOrder, canEditOutsideRx, canDeleteOrder, canUndoOrder, undoTarget,
   collectOf, frameLoc, canChangeCollect, LOCATIONS, LENS_HOLDERS, FIRST_SHELF,
+  can,
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
@@ -64,8 +65,8 @@ export function fittingView(me) {
   let root, drawer = null, drawerId = null;
   let shelfView = null; // the Lens stock window, while open
   // The office and the schedule editor see every frame; only the office acts.
-  const isAdmin = seesAll(me.role);
-  const viewOnly = readOnly(me.role);
+  const isAdmin = seesAll(me);
+  const viewOnly = readOnly(me);
 
   // ── data ──
   // Everything the toolbar narrows by — the chips' counts follow it too.
@@ -1194,7 +1195,7 @@ export function fittingView(me) {
         <span id="f-bench">${benchBtnHTML()}</span>
         ${!isAdmin && LENS_HOLDERS.length ? `<button class="btn btn-ghost" data-shelves>${icons.lens} Lens stock</button>` : ''}
         ${!isAdmin ? `<button class="btn btn-primary" data-new>${icons.plus} New fitting order</button>`
-          : me.role === 'admin' ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
+          : can(me, 'lists') ? `<button class="btn btn-ghost" data-cutters>${icons.settings} Outside cutters</button>` : ''}
         </div>
       </header>
       <section class="toolbar">

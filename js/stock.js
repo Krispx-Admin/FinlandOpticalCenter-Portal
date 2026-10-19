@@ -1,5 +1,5 @@
 // ── Module 2: Stock Requests — branch composer + office fulfilment queue ──
-import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll } from './data.js';
+import { REQ_STATUS, AUDIENCES, BRANCHES, locName, seesAll, can } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
@@ -25,8 +25,9 @@ function unitsBreakdown(lines) {
 
 export function stockView(me) {
   // The office fulfils; the schedule editor sees the same queue, hands off.
-  const isAdmin = me.role === 'admin';
-  const overseer = seesAll(me.role);
+  // Completes requests: the Office Queue permission (schema-50).
+  const isAdmin = can(me, 'office_queue');
+  const overseer = seesAll(me);
   const ui = {
     chip: overseer ? 'placed' : 'all', q: '', branch: 'all',
     seen: new Set(store.state.requests.map(r => r.id)),

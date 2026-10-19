@@ -4,7 +4,7 @@
 // selection, or everything shown (e.g. one branch's day) — sends them to the
 // supplier, and confirms them ordered so they move out of the way. The frame's
 // own journey stays in the Fitting Log.
-import { outsideHandler, outsideCopyText, outsideRxLine, locName, readOnly, BRANCHES } from './data.js';
+import { outsideHandler, outsideCopyText, outsideRxLine, locName, readOnly, BRANCHES, can } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, locChip, toast, chipCount } from './ui.js';
 
@@ -15,8 +15,8 @@ const TABS = [
 
 export function outsideView(me) {
   // MGM marks them ordered; the office can too. Ghiath only looks.
-  const canMark = me.code === outsideHandler() || me.role === 'admin';
-  const viewOnly = readOnly(me.role);
+  const canMark = me.code === outsideHandler() || can(me, 'act_all');
+  const viewOnly = readOnly(me);
   const ui = { tab: 'to_order', q: '', branch: 'all', selected: new Set() };
   let root;
 
@@ -157,7 +157,7 @@ export function outsideView(me) {
           <h1>Outside Lens Orders</h1>
           <p class="mod-sub">Lenses from outside brands the branches need — copy them for the supplier, then confirm the order</p>
         </div>
-        ${me.role === 'admin' ? `<label class="set-ctl ol-handler"><span>Ordered by</span>
+        ${can(me, 'lists') ? `<label class="set-ctl ol-handler"><span>Ordered by</span>
           <select id="ol-handler">${BRANCHES.map(b => `<option value="${b.code}" ${b.code === outsideHandler() ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
       </header>
       <section class="stats" id="ol-stats">${statsHTML()}</section>

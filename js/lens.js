@@ -3,6 +3,7 @@ import {
   LENS_HOLDERS, FIRST_SHELF, BARE_COATING, LOW_LENS_STOCK, FULFILMENT, canCutOwnLenses,
   LENSREQ_STATUS, BRANCHES, locName, isLensOwner, fmtPwr, lensLabel, lensFull, seesAll, readOnly, fulfilmentSwitch,
   isBenchClosed, benchNote,
+  can,
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount, olderHTML } from './ui.js';
@@ -102,10 +103,10 @@ export function openShelfBrowser(me, { onNew } = {}) {
 export function lensView(me) {
   const isOwner = isLensOwner(me.code);
   // The office and the schedule editor look on; neither shops the shelf.
-  const isAdmin = seesAll(me.role);
+  const isAdmin = seesAll(me);
   // The branch that keeps the lenses decides what may go on the shelf. The
   // office can too — it is the same pair the database lets write.
-  const canEditLists = isOwner || me.role === 'admin';
+  const canEditLists = isOwner || can(me, 'lists');
 
   // One tab per shelf, Muscat Grand Mall always first (user, 2026-10-12), then
   // the others in branch order — a shelf added later simply joins the row.
@@ -376,7 +377,7 @@ export function lensView(me) {
 
   // ── drawer: request detail ──
   function drawerHTML() {
-    const viewOnlySwitch = readOnly(me.role);
+    const viewOnlySwitch = readOnly(me);
     const r = store.lensRequest(drawerId);
     if (!r) return `<div class="pad">Request no longer exists.</div>`;
     const canAct = r.holder === me.code && r.status === 'requested';

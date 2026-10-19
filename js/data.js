@@ -21,15 +21,17 @@ export const LOCATIONS = [
   { code: 'SALFEC', name: 'Salalah FEC',      role: 'clinic' },
   { code: 'SOHFEC', name: 'Sohar FEC',        role: 'clinic' },
   { code: 'NIZFEC', name: 'Nizwa FEC',        role: 'clinic' },
-  // The office runs the network; Ghiath reads all of it and writes the rota.
-  { code: 'OFC',    name: 'Omar',             role: 'admin' },
-  { code: 'GHIATH', name: 'Ghiath',           role: 'scheduler' },
+  // The Office, and its people (what each may do: its permissions, schema-50).
+  { code: 'OFC',    name: 'Office',           role: 'person' },
+  { code: 'GHIATH', name: 'Ghiath',           role: 'person' },
 ];
 
 export const ROLES = {
   retail:  { label: 'Retail branch',  hue: 'blue'  },
   fitting: { label: 'Fitting centre', hue: 'teal'  },
   clinic:  { label: 'Clinic',         hue: 'purple' },
+  // People: one kind since schema-50 — what each may do is its permissions.
+  person:  { label: 'Office', hue: 'navy' },
   admin:   { label: 'Office · Admin', hue: 'navy' },
   scheduler: { label: 'Schedule editor', hue: 'blue' },
   // Wijdan, Sarah (schema-37): admins who see everything and change little.
@@ -79,6 +81,9 @@ export function setLocations(rows) {
     code: r.code, name: r.name, nameAr: r.name_ar ?? '', role: r.role, active: r.active !== false, holdsLens: !!r.holds_lens_stock,
     benchClosed: !!r.bench_closed, benchUntil: r.bench_closed_until ?? null, benchOwnOnly: !!r.bench_own_only,
     canExport: !!r.can_export_insurance,
+    // The ticks (schema-50); before signing in they are not readable, and an
+    // older database had kinds instead — read those the same way.
+    perms: Array.isArray(r.perms) ? r.perms : legacyPerms(r),
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
@@ -86,13 +91,46 @@ export function setLocations(rows) {
   LENS_HOLDERS.splice(0, LENS_HOLDERS.length, ...next.filter(l => isOpen(l) && l.holdsLens));
 }
 
-// Who looks at the whole network. The office runs it; the schedule editor
-// reads every module but changes nothing outside the schedule.
-export const seesAll = role => role === 'admin' || role === 'scheduler' || role === 'manager';
-export const readOnly = role => role === 'scheduler' || role === 'manager';
-// May export Direct Insurance to Excel: the office, and any profile switched on (Sarah).
-export const canExportInsurance = code => loc(code)?.role === 'admin' || !!loc(code)?.canExport;
-export const canEditSchedule = role => role === 'admin' || role === 'scheduler';
+// ── Access permissions (schema-50, user 2026-10-19) ──
+// Each account has tick boxes for what it may do; View only takes back every
+// tick that changes something. The database checks the same ticks.
+export const PERMS = [
+  ['see_all', 'See every branch', 'Orders, stock and lens requests, invoices, insurance and damaged stock across all branches'],
+  ['act_all', 'Change any branch’s records', 'Move, edit, undo or delete any order; act on invoices, insurance, damaged stock, lens stock and outside lenses for any branch'],
+  ['office_queue', 'Office Queue', 'Fulfil and complete the branches’ stock requests'],
+  ['accounts', 'Settings: accounts & codes', 'Add, rename, close or delete accounts; sign-in codes, permissions and the employee list'],
+  ['lists', 'Settings: lists & tabs', 'Categories, brand groups, insurers, lens lists and outside cutters; switch tabs on and off'],
+  ['insurance_dash', 'Direct Insurance dashboard', 'What the insurers paid — by insurer, branch and salesperson'],
+  ['export_insurance', 'Export Insurance Sales', 'The Excel export in Direct Insurance'],
+  ['schedule_edit', 'Schedule: edit', 'Build and publish the staff schedule'],
+  ['view_only', 'View only', 'Sees what the ticks above allow, but changes nothing'],
+];
+const CHANGING = ['act_all', 'office_queue', 'accounts', 'lists', 'schedule_edit'];
+const ALL_PERMS = PERMS.map(([k]) => k).filter(k => k !== 'view_only');
+// The kinds an older database had, read as ticks.
+function legacyPerms(r) {
+  if (r.role === 'admin') return [...ALL_PERMS];
+  if (r.role === 'scheduler') return ['see_all', 'insurance_dash', 'schedule_edit'];
+  if (r.role === 'manager') return ['see_all', 'insurance_dash', 'view_only', ...(r.can_export_insurance ? ['export_insurance'] : [])];
+  return r.can_export_insurance ? ['export_insurance'] : [];
+}
+const who = w => (typeof w === 'string' ? loc(w) : w);
+// A person (the Office and its people) rather than a branch.
+export const isPerson = w => !!who(w) && !BRANCH_KINDS.includes(who(w).role);
+export function can(w, perm) {
+  const ps = who(w)?.perms ?? [];
+  if (CHANGING.includes(perm) && ps.includes('view_only')) return false;
+  if (perm === 'see_all') return ps.some(x => ['see_all', 'act_all', 'office_queue'].includes(x));
+  return ps.includes(perm);
+}
+// Looks at the whole network (the overseer's screens): a person, or an
+// account allowed to see every branch.
+export const seesAll = w => isPerson(w) || can(w, 'see_all');
+// Looks but does not change other branches' work: a person without "change
+// any branch's records", or anyone on View only.
+export const readOnly = w => (who(w)?.perms ?? []).includes('view_only') || (isPerson(w) && !can(w, 'act_all'));
+export const canExportInsurance = w => can(w, 'export_insurance');
+export const canEditSchedule = w => can(w, 'schedule_edit');
 
 // ── Catalogue ──
 export const BRANDS = [
@@ -198,7 +236,7 @@ export const flowFor = o => {
 };
 // Anyone the frame passes through, or who collects it, is on its route.
 export const onRoute = (o, code) => [o.origin, o.fitter, o.collect, o.toCode, o.frameAt].includes(code) || (o.stops ?? []).includes(code);
-export const canChangeCollect = (o, code) => o.status !== 'collected' && (onRoute(o, code) || loc(code)?.role === 'admin');
+export const canChangeCollect = (o, code) => o.status !== 'collected' && (onRoute(o, code) || can(code, 'act_all'));
 
 // These labels are the generic ones, for the filter chips, where no single
 // order is in view. An order's own words come from fitStep.
@@ -264,24 +302,24 @@ export const outsideBlocked = o => !!o.outsideLens && o.outsideLens.fulfilment =
 export const canSendOutside = (o, code) => {
   const ol = o.outsideLens, H = outsideHandler();
   return !!ol && ol.status === 'ordered' && !!ol.arrivedAt && !ol.sentAt && ol.branch !== H && !isBack(o)
-    && (code === H || loc(code)?.role === 'admin');
+    && (code === H || can(code, 'act_all'));
 };
 // The handler marks the lenses in when they reach it from the supplier.
 export const canArriveOutside = (o, code) => {
   const ol = o.outsideLens, H = outsideHandler();
   return !!ol && ol.status === 'ordered' && !ol.arrivedAt && ol.branch !== H && !isBack(o)
-    && (code === H || loc(code)?.role === 'admin');
+    && (code === H || can(code, 'act_all'));
 };
 export const canReceiveOutside = (o, code) => {
   const ol = o.outsideLens;
   return !!ol && ol.fulfilment === 'send_frames' && !!ol.sentAt && !ol.receivedAt
-    && (code === ol.dest || loc(code)?.role === 'admin');
+    && (code === ol.dest || can(code, 'act_all'));
 };
 // The way, or the fitter, can change while nothing has moved.
 export function outsideCanChange(o, code) {
   const ol = o?.outsideLens;
   if (!ol || ol.branch === outsideHandler() || ol.sentAt) return false;
-  if (!(ol.branch === code || loc(code)?.role === 'admin')) return false;
+  if (!(ol.branch === code || can(code, 'act_all'))) return false;
   return (ol.fulfilment === 'receive_lens' && o.status === 'pending')
     || (ol.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === ol.dest);
 }
@@ -311,7 +349,7 @@ export function outsideCopyText(x, order) {
 // lenses" while the frame has not been sent (schema-22).
 export function fulfilmentSwitch(r, o, code) {
   if (!r || !o || r.status === 'declined') return null;
-  if (!(r.branch === code || loc(code)?.role === 'admin')) return null;
+  if (!(r.branch === code || can(code, 'act_all'))) return null;
   if (r.fulfilment === 'receive_lens' && o.status === 'pending') return 'send_frames';
   if (r.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === r.holder) return 'receive_lens';
   return null;
@@ -325,7 +363,7 @@ export function fulfilmentSwitch(r, o, code) {
 const LENS_WAIT = { label: 'Waiting for Lenses', color: 'slate', action: 'Send Lenses', actor: 'lens' };
 export const awaitingLens = o => o.status === 'pending' && o.lensRequest?.status === 'requested';
 export const canSendLenses = (o, code) =>
-  awaitingLens(o) && (o.lensRequest.holder === code || loc(code)?.role === 'admin');
+  awaitingLens(o) && (o.lensRequest.holder === code || can(code, 'act_all'));
 
 // What one order's pill and button say. A frame on the road names the place it
 // is heading for rather than the role, so a branch reads where its own frame
@@ -406,7 +444,7 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
 // outside-lens prescription until the handler confirms it — and deletes it
 // while nothing has moved. Undo puts it back one step; the fitting centre on
 // the order may undo too. The database checks all of it again.
-const isAdminLoc = code => loc(code)?.role === 'admin';
+const isAdminLoc = code => can(code, 'act_all');
 export const canEditOrder = (o, code) => o.origin === code || isAdminLoc(code);
 export const canEditOutsideRx = (o, code) => canEditOrder(o, code) && o.outsideLens?.status === 'to_order';
 export function canDeleteOrder(o, code) {
@@ -589,7 +627,7 @@ export function itemCounts(items) {
 // sent them — after that, where the job goes is not its concern (user,
 // 2026-10-13); the request stays in its Lens Stock tab.
 export function canSeeOrder(o, code) {
-  return seesAll(loc(code)?.role) || onRoute(o, code)
+  return seesAll(code) || onRoute(o, code)
     || o.lensRequest?.holder === code   // the stock holder, for the whole job (user, 2026-10-15)
     || (!!o.outsideLens && code === outsideHandler());   // the handler, for the whole job (user, 2026-10-16)
 }
@@ -639,20 +677,19 @@ export function canAdvanceOrder(o, code) {
   if (o.status === 'collected' || awaitingLens(o) || awaitingOutside(o) || outsideBlocked(o)) return false;
   // A frame cannot be sent to a closed bench.
   if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) return false;
-  const me = loc(code);
-  return me?.role === 'admin' || fitActor(o) === code;
+  return can(code, 'act_all') || fitActor(o) === code;
 }
 export function canSeeRequest(r, code) {
-  return seesAll(loc(code)?.role) || r.branch === code;
+  return seesAll(code) || r.branch === code;
 }
 // A branch sees the claims it raised; the office oversees all of them.
 export function canSeeClaim(c, code) {
-  return seesAll(loc(code)?.role) || c.branch === code;
+  return seesAll(code) || c.branch === code;
 }
 // A holder edits its own shelf and answers the requests made to it; the
 // office may look on at all of them.
 export const isLensOwner = code => LENS_HOLDERS.some(l => l.code === code);
 export function canSeeLensRequest(r, code) {
-  return seesAll(loc(code)?.role) || r.branch === code || r.holder === code;
+  return seesAll(code) || r.branch === code || r.holder === code;
 }
 
