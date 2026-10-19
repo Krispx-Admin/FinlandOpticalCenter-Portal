@@ -1229,6 +1229,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  Edit fitting order: the customer phone is editable too (user), with
+             the country picker — the saved number opens split back into its
+             country and the rest (phone.js splitPhone: longest calling code,
+             the code's main country); emptied takes the number off. Saved
+             through store.setOrderPhone (orders_update lets the branch do it).
  2026-10-19  ACCESS PERMISSIONS (user: instead of admin / schedule editor /
              view-only admin, each account gets "Access Permissions" — tick
              boxes, and View only). Settings → Accounts: every account (branch

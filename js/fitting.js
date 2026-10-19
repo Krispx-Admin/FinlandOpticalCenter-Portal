@@ -12,7 +12,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
-import { phoneFieldHTML, wirePhoneFields, phoneValue } from './phone.js';
+import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -343,6 +343,8 @@ export function fittingView(me) {
     if (!o) return;
     const ol = o.outsideLens, rxOk = canEditOutsideRx(o, me.code);
     const v = (eye, k) => esc(ol?.rx?.[eye]?.[k] ?? '');
+    const { iso, local } = splitPhone(o.phone);
+    const saved = { iso, value: local };
     const layer = openLayer('modal', () => `
       <div class="dw-head">
         <div><div class="dw-kicker">Edit fitting order</div><h2>${esc(o.ref)}</h2></div>
@@ -353,6 +355,7 @@ export function fittingView(me) {
           <label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>
           <label>Customer name <input name="customer" required value="${esc(o.customer ?? '')}"></label>
         </div>
+        <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message</span></span>${phoneFieldHTML(saved)}</div>
         ${ol ? (rxOk ? `
         <div class="fieldset ol-fields">
           <div class="fs-head"><span>Prescription</span></div>
@@ -369,6 +372,7 @@ export function fittingView(me) {
         </div>
       </form>`);
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
+    wirePhoneFields(layer.el);
     layer.el.querySelector('#eo').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -383,10 +387,16 @@ export function fittingView(me) {
         if (!rx.r.sph && !rx.l.sph) return toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' });
         if (!lensType) return toast({ title: 'Type the lens type', tone: 'stock' });
       }
+      // The phone: emptied takes it off; anything typed has to be a number.
+      const field = e.target.querySelector('[data-ph]');
+      const typed = field.querySelector('input[inputmode=tel]').value.trim();
+      const phone = typed ? phoneValue(field) : null;
+      if (typed && !phone) return toast({ title: 'That phone number does not look right', sub: 'Type the number — the country is picked on its left.', tone: 'stock' });
       const go = e.target.querySelector('[type=submit]');
       go.disabled = true;
       let ok = true;
       if (ref !== o.ref || customer !== (o.customer ?? '')) ok = !!(await store.editOrder(id, { ref, customer }, me.code));
+      if (ok && (phone ?? '') !== String(o.phone ?? '').replace(/\D/g, '')) ok = !!(await store.setOrderPhone(id, phone, me.code));
       const rxChanged = rx && (lensType !== ol.lensType || JSON.stringify(rx) !== JSON.stringify(Object.fromEntries(['r', 'l'].map(eye => [eye, Object.fromEntries(['sph', 'cyl', 'axis', 'add'].map(k => [k, String(ol.rx?.[eye]?.[k] ?? '')]))]))));
       if (ok && rxChanged) ok = !!(await store.editOutsideLens(ol.id, { rx, lensType }, me.code));
       if (ok) layer.close(); else go.disabled = false;

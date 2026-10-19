@@ -774,7 +774,7 @@ export const store = {
     return run(['orders'], async () => {
       ok(await supabase.from('orders').update({ phone }).eq('id', id));
       return true;
-    }, { by, module: 'fitting', title: `${this.order(id)?.ref ?? 'Order'} — customer phone saved`, refs: [id] });
+    }, { by, module: 'fitting', title: `${this.order(id)?.ref ?? 'Order'} — customer phone ${phone ? 'saved' : 'removed'}`, refs: [id] });
   },
 
   // A branch's opening hours as the schedule has them this week (schema-48):

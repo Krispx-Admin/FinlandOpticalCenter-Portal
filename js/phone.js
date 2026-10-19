@@ -101,6 +101,19 @@ export function wirePhoneFields(root) {
   });
 }
 
+// A saved number back into its country and the rest, to edit it: the longest
+// calling code it starts with (the code's main country where several share
+// it — 44 is the United Kingdom); 8 digits alone are an Omani number.
+export function splitPhone(saved) {
+  const d = String(saved ?? '').replace(/\D/g, '');
+  if (!d) return { iso: DEFAULT, local: '' };
+  if (d.length === 8) return { iso: DEFAULT, local: d };
+  const fits = [...byIso.values()].filter(c => d.startsWith(String(c.cc)) && d.length > String(c.cc).length)
+    .sort((a, b) => String(b.cc).length - String(a.cc).length || (b.main ? 1 : 0) - (a.main ? 1 : 0));
+  const c = fits[0];
+  return c ? { iso: c.iso, local: d.slice(String(c.cc).length) } : { iso: DEFAULT, local: d };
+}
+
 // The number as WhatsApp wants it — country code, then the number without
 // its leading 0 — or null when there is not enough of a number. A number
 // typed with its own "+" or "00" keeps the code it was given.
