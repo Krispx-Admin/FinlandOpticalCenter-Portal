@@ -1218,6 +1218,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-19  LIVE DATABASE CLEARED again (user, to retrain staff), MGM's shelf
+             kept: 5 orders, 2 outside-lens orders, 1 lens / 1 stock request, 2
+             insurance records, 1 damaged report deleted; numbering restarted.
+             Shelf 10 rows, 147 pcs (nothing was set aside).
  2026-10-18  Both outside-lens TRIALS REMOVED (user: "I don't like it, don't use
              this in the real and remove it from practice"): the ordering
              branch's plain view + its own "Outside Lens Orders" tab (olmine),
