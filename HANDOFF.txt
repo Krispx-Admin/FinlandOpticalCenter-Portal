@@ -1247,6 +1247,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  BACKUPS: the user moved Supabase to the Pro plan. Daily backups
+             (physical, Supabase-run) about 18:35 UTC = 22:35 Oman, the last 7
+             kept; checked through the Management API (GET /v1/projects/<ref>/
+             database/backups: 7 COMPLETED, 13–19 Oct). No PITR (not needed).
+             Restore: dashboard → Database → Backups → Restore — puts the WHOLE
+             database back to that night (later entries lost, a few minutes
+             down); for one wrong record, fix it by hand instead. Backups
+             before 2026-10-19 hold pre-launch test data. Not built: a second,
+             off-Supabase copy (nightly GitHub job) — offered, not chosen.
  2026-10-20  NOTIFICATION BELLS (user; replaces the two fixed chimes below):
              a bell beside every work tab's title (Fitting Log, Stock
              Requests / Office Queue, Lens Stock, Outside Lens Orders,
