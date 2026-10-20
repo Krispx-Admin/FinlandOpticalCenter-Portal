@@ -77,6 +77,7 @@ img/                brand logos used on the printed receipt
 supabase/*.sql      schema, row level security, functions, realtime
 js/demo.js          Admin Demo (?AdminDemo=SCC): the database inside the browser
 js/phone.js         phone number with a country picker; js/countries.js the codes
+js/sound.js         the new-order chimes (Office Queue, outside lenses) — Web Audio, no file
 demo/               practice copy's layout + starting data, and build.py that makes them
 ```
 

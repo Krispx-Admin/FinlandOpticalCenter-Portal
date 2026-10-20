@@ -7,6 +7,7 @@ import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
+import { armSound, chime } from './sound.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
 import { lensView } from './lens.js';
@@ -277,6 +278,8 @@ async function enterShell() {
 }
 
 // ─────────────────────────── SHELL ───────────────────────────
+armSound();
+
 const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
   stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
@@ -394,6 +397,28 @@ function renderShell() {
   });
   mountModule(mod);
 
+  // ── A sound for a new order (sound.js; user 2026-10-20) ──
+  // The Office Queue hears a new stock request; the outside-lens handler a new
+  // outside order. Only what arrives from now on — not what was already
+  // there, nor older ones loaded later — and never your own.
+  const since = Date.now() - 60e3;
+  const known = {
+    stock: new Set(store.state.requests.map(r => r.id)),
+    outside: new Set((store.state.outsideOrders ?? []).map(x => x.id)),
+  };
+  const arrived = (key, list, wanted) => list.filter(x => {
+    if (known[key].has(x.id)) return false;
+    known[key].add(x.id);
+    return wanted(x) && x.createdAt >= since && x.branch !== me.code;
+  }).length;
+  function newOrderSounds() {
+    const who = store.session ?? me;   // as it is now: its ticks can change while signed in
+    const s = can(who, 'office_queue') && arrived('stock', store.state.requests, r => r.status === 'placed');
+    const o = who.code === outsideHandler() && arrived('outside', store.state.outsideOrders ?? [], x => x.status === 'to_order');
+    if (s) chime('stock');
+    if (o) setTimeout(() => chime('outside'), s ? 900 : 0);
+  }
+
   const shellRole = me.role;
   unsub = store.subscribe(event => {
     // The office closed this branch, or changed what it is: sign out, or
@@ -405,6 +430,7 @@ function renderShell() {
       return;
     }
     if (now && now.role !== shellRole) { renderShell(); return; }
+    newOrderSounds();
     // A tab switched off while someone is on it moves them to one still open.
     const next = currentModule();
     if (next !== mountedKey) mountModule(next);

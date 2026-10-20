@@ -1247,6 +1247,18 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  New-order sounds (user): js/sound.js makes two chimes with Web
+             Audio (no file, nothing for the CSP). app.js renderShell watches
+             the live data: a new stock request ('placed', from another
+             branch) chimes "ding-dong" for any account with the Office Queue
+             tick; a new outside-lens order ('to_order', from another branch)
+             chimes three rising notes for the outside-lens handler (AV).
+             Only orders that arrive after the page opened (created within a
+             minute of opening or later) — not ones already there, older ones
+             loaded later, or your own; each once. Browsers allow sound only
+             after a click or key on the page, so it is armed by the first one
+             (a freshly reloaded page that nobody touched stays silent).
+             Tested in the Admin Demo with a fake AudioContext.
  2026-10-19  Outside Lens Orders (user): the WhatsApp text has the customer's
              phone under the bill number (when the order has one). The
              supplier's WhatsApp number is kept on the page (schema-51) — a
