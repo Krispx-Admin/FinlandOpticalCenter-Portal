@@ -1254,6 +1254,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  Pick sheet notes (user): a product's note is its own row under the
+             product ("NOTE black or tortoise", one tbody per product so the
+             two never part, the tick box spans both); the request's note is a
+             highlighted box "Note from <branch>" above the table. No note, no
+             row / box. SR-1003 (the user's example) had no notes at all.
  2026-10-20  Excel export Status column: "Completed" / "Cancelled" (user; was
              Sold / Canceled), totals row "Total (cancelled not counted)".
              The portal screens still say Canceled. Note: a tab opened before

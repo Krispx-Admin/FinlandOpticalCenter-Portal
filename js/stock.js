@@ -230,15 +230,20 @@ export function stockView(me) {
   // page never runs over; what the rows leave becomes a Notes box.
   function printRequest(r) {
     if (!r) return;
+    // One tbody per product, so a product's note (its own row under it —
+    // user 2026-10-20; none when there is no note) never parts from it.
     const lines = r.lines.map((l, i) => `
+      <tbody class="${i % 2 ? 'odd' : ''}">
       <tr>
         <td class="i">${i + 1}</td>
-        <td>${esc(l.category)}${l.note ? `<span class="n"> · ${esc(l.note)}</span>` : ''}</td>
+        <td>${esc(l.category)}</td>
         <td>${esc(l.brand ?? '—')}</td>
         <td>${esc(l.audience ?? '')}</td>
         <td class="num">${l.qty != null ? `${l.qty} ${unitLbl(l)}` : '—'}</td>
-        <td class="pick">${l.done ? '✓' : ''}</td>
-      </tr>`).join('');
+        <td class="pick" rowspan="${l.note ? 2 : 1}">${l.done ? '✓' : ''}</td>
+      </tr>
+      ${l.note ? `<tr class="ln"><td></td><td colspan="4"><span>Note</span>${esc(l.note)}</td></tr>` : ''}
+      </tbody>`).join('');
     const units = unitsBreakdown(r.lines);
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.ref)} — Pick Sheet</title>
       <style>
@@ -251,15 +256,20 @@ export function stockView(me) {
         .hd h1{font-size:15px;margin:0;}
         .hd .meta{color:#4c5a6b;font-size:10.5px;text-align:right;}
         .hd .meta b{color:#17202b;}
-        .note{margin-top:4px;font-size:10.5px;}
+        .note{margin-top:6px;font-size:11px;background:#fff6e0;border:1px solid #f0c674;border-left:4px solid #d99a00;border-radius:4px;padding:4px 8px;}
+        .note b{text-transform:uppercase;font-size:9px;letter-spacing:.05em;color:#8a5a00;margin-right:6px;}
         .order{margin-top:6px;}
         .order.two{column-count:2;column-gap:5mm;}
         .order table{width:100%;border-collapse:collapse;}
         .order.two table{break-inside:auto;}
-        .order tr{break-inside:avoid;}
+        .order tbody{break-inside:avoid;}
         .order th{font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:#6b7a8c;text-align:left;padding:2px 4px;border-bottom:1px solid #9aa6b5;}
-        .order td{padding:2.5px 4px;border-bottom:1px solid #e3e8f0;vertical-align:top;}
-        .order tbody tr:nth-child(even) td{background:#f6f8fb;}
+        .order td{padding:2.5px 4px;vertical-align:top;}
+        .order tbody{border-bottom:1px solid #e3e8f0;}
+        .order tbody.odd td{background:#f6f8fb;}
+        .order tr.ln td{border-top:0;padding-top:0;}
+        .order tr.ln td[colspan]{color:#5b3d00;font-style:italic;}
+        .order tr.ln span{font-style:normal;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#8a5a00;background:#fff1cc;border-radius:3px;padding:0 4px;margin-right:6px;}
         .order .i{color:#8593a5;width:1%;white-space:nowrap;}
         .order .num{text-align:right;white-space:nowrap;font-weight:600;}
         .order .pick{width:7mm;border:1px solid #9aa6b5;text-align:center;}
@@ -282,10 +292,10 @@ export function stockView(me) {
         <h1>Stock Request — ${esc(r.ref)}</h1>
         <div class="meta"><b>${esc(locName(r.branch))}</b> (${esc(r.branch)}) → Office · Placed ${esc(fmtDT(r.createdAt))}</div>
       </div>
-      ${r.note ? `<div class="note"><b>Note:</b> ${esc(r.note)}</div>` : ''}
+      ${r.note ? `<div class="note"><b>Note from ${esc(r.branch)}</b>${esc(r.note)}</div>` : ''}
       <div class="order"><table>
         <thead><tr><th>#</th><th>Category</th><th>Brand</th><th>For</th><th class="num">Qty</th><th>✓</th></tr></thead>
-        <tbody>${lines}</tbody>
+        ${lines}
       </table></div>
       <div class="sum">${r.lines.length} line${r.lines.length === 1 ? '' : 's'}${units ? ` · ${units}` : ''}</div>
       <div class="fill">
