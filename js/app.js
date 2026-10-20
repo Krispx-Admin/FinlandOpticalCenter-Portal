@@ -7,7 +7,8 @@ import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer } from './ui.js';
-import { armSound, chime } from './sound.js';
+import { armSound } from './sound.js';
+import { notifier, actionIds, relevantNotice } from './notify.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
 import { lensView } from './lens.js';
@@ -333,20 +334,8 @@ function currentModule() {
 function badgeCounts(me) {
   // The schedule editor reads everything and is asked to do none of it.
   if (readOnly(me)) return {};
-  const s = store.state;
-  const fitting = s.orders.filter(o => canSeeOrder(o, me.code) && needsAction(o, me.code)).length;
-  const stock = can(me, 'office_queue')
-    ? s.requests.filter(r => r.status === 'placed').length
-    : s.requests.filter(r => canSeeRequest(r, me.code) && r.status === 'placed').length;
-  // Only the branch holding the lenses has something to act on here.
-  const lens = isLensOwner(me.code)
-    ? s.lensRequests.filter(r => r.holder === me.code && r.status === 'requested').length
-    : 0;
-  // Outside lenses waiting to be ordered are MGM's to do.
-  // Outside lenses to order, and to send on, are the handler's to do.
-  const outside = me.code === outsideHandler() ? (s.outsideOrders ?? []).filter(x =>
-    x.status === 'to_order' || (!x.sentAt && x.branch !== me.code)).length : 0;
-  return { fitting, stock, lens, outside };
+  // The same list the notification bells ring for (notify.js).
+  return Object.fromEntries(Object.entries(actionIds(me)).map(([k, ids]) => [k, ids.length]));
 }
 
 // The sidebar folds to its icon rail and back. Remembered per browser — a
@@ -395,29 +384,9 @@ function renderShell() {
   app.querySelector('#signout').addEventListener('click', () => {
     auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
   });
+  // The notification bells (notify.js): set up before the first tab mounts.
+  bells = notifier(me);
   mountModule(mod);
-
-  // ── A sound for a new order (sound.js; user 2026-10-20) ──
-  // The Office Queue hears a new stock request; the outside-lens handler a new
-  // outside order. Only what arrives from now on — not what was already
-  // there, nor older ones loaded later — and never your own.
-  const since = Date.now() - 60e3;
-  const known = {
-    stock: new Set(store.state.requests.map(r => r.id)),
-    outside: new Set((store.state.outsideOrders ?? []).map(x => x.id)),
-  };
-  const arrived = (key, list, wanted) => list.filter(x => {
-    if (known[key].has(x.id)) return false;
-    known[key].add(x.id);
-    return wanted(x) && x.createdAt >= since && x.branch !== me.code;
-  }).length;
-  function newOrderSounds() {
-    const who = store.session ?? me;   // as it is now: its ticks can change while signed in
-    const s = can(who, 'office_queue') && arrived('stock', store.state.requests, r => r.status === 'placed');
-    const o = who.code === outsideHandler() && arrived('outside', store.state.outsideOrders ?? [], x => x.status === 'to_order');
-    if (s) chime('stock');
-    if (o) setTimeout(() => chime('outside'), s ? 900 : 0);
-  }
 
   const shellRole = me.role;
   unsub = store.subscribe(event => {
@@ -430,16 +399,13 @@ function renderShell() {
       return;
     }
     if (now && now.role !== shellRole) { renderShell(); return; }
-    newOrderSounds();
+    bells?.onEvent(event);
     // A tab switched off while someone is on it moves them to one still open.
     const next = currentModule();
     if (next !== mountedKey) mountModule(next);
     else { renderNav(store.session, next); view?.onChange(event); }
     if (event?.remote && event.title && event.module !== 'system') {
-      const relevant =
-        (event.module === 'fitting' && event.refs?.some(id => { const o = store.state.orders.find(x => x.id === id); return o && canSeeOrder(o, me.code); })) ||
-        (event.module === 'stock' && event.refs?.some(id => { const r = store.state.requests.find(x => x.id === id); return r && canSeeRequest(r, me.code); })) ||
-        (event.module === 'lens' && event.refs?.some(id => { const r = store.state.lensRequests.find(x => x.id === id); return r && canSeeLensRequest(r, me.code); }));
+      const relevant = relevantNotice(event, me);
       const tone = event.module === 'fitting' ? 'info' : event.module === 'lens' ? 'lens' : 'stock';
       if (relevant) toast({ title: event.title, sub: event.sub ?? '', tone });
     }
@@ -484,13 +450,21 @@ function mountModule(key) {
   content.classList.remove('mod-in'); void content.offsetWidth; content.classList.add('mod-in');
   view.mount(content);
   mountedKey = key;
+  // The bell beside the title; the views redraw their headers, so keep it there.
+  bells?.ensureBell(content, key);
+  bellWatch?.disconnect();
+  bellWatch = new MutationObserver(() => bells?.ensureBell(content, key));
+  bellWatch.observe(content, { childList: true, subtree: true });
   // Sent elsewhere (a closed tab, say): the address says where they really are.
   if (key !== OFF_KEY && location.hash !== `#/${key}`) history.replaceState(null, '', `#/${key}`);
   renderNav(me, key);
 }
 
+let bells = null, bellWatch = null;
 function teardownShell() {
   unsub?.(); unsub = null;
+  bells?.stop(); bells = null;
+  bellWatch?.disconnect(); bellWatch = null;
   clearInterval(clockTimer); clockTimer = null;
   view?.unmount(); view = null;
 }

@@ -389,7 +389,8 @@ export function watch(onChange) {
 
   const flush = () => {
     timer = null;
-    if (document.hidden) return;              // picked up when the tab is shown again
+    // Kept up to date in the background too: the notification bells
+    // (notify.js) must ring while staff work in another window.
     const c = change, news = notices;
     change = { full: new Set(), ids: new Map(), gone: new Map() };
     notices = [];

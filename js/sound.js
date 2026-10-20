@@ -1,8 +1,10 @@
 // ── Notification sounds (user 2026-10-20) ──
-// A new stock request in the Office Queue, and a new outside-lens order for
-// the handler, chime. The notes are made here (Web Audio), so there is no file
-// to load. Browsers only let a page make sound once someone has clicked or
-// typed on it, so the sound is switched on by the first click or key.
+// Two single notes, made here with Web Audio (no file to load), quiet and
+// plain — a notification, not a game:
+//   action — a clear, bell-like ding: something needs you.
+//   all    — a softer, lower tone: something new happened.
+// Browsers only let a page make sound once someone has clicked or typed on
+// it, so the sound is switched on by the first click or key.
 let ctx = null;
 
 function audio() {
@@ -22,26 +24,31 @@ export function armSound() {
   addEventListener('keydown', go, true);
 }
 
-// The two sounds: a stock request is a two-note "ding-dong"; outside lenses
-// a quick three notes going up — different enough to tell apart unseen.
-const TUNES = {
-  stock:   [[784, 0], [523.25, 0.22]],
-  outside: [[659.25, 0], [880, 0.14], [1174.66, 0.28]],
+// [frequency, loudness] partials, the peak, and how long it rings.
+const TONES = {
+  // E6 with a faint bell overtone: bright enough to notice, short and soft.
+  action: { partials: [[1318.5, 1], [2637, 0.12], [3955.5, 0.04]], peak: 0.2, ring: 1.1 },
+  // G5, pure and lower, dies away quickly.
+  all: { partials: [[783.99, 1], [1567.98, 0.06]], peak: 0.12, ring: 0.55 },
 };
 
-export function chime(kind = 'stock') {
+export function chime(kind = 'action') {
   const ac = audio();
   if (!ac || ac.state !== 'running') return;
+  const tone = TONES[kind] ?? TONES.action;
   const t0 = ac.currentTime + 0.02;
-  for (const [freq, at] of TUNES[kind] ?? TUNES.stock) {
-    const osc = ac.createOscillator(), gain = ac.createGain();
+  const out = ac.createGain();
+  out.gain.setValueAtTime(0.0001, t0);
+  out.gain.exponentialRampToValueAtTime(tone.peak, t0 + 0.012);
+  out.gain.exponentialRampToValueAtTime(0.0001, t0 + tone.ring);
+  out.connect(ac.destination);
+  for (const [freq, level] of tone.partials) {
+    const osc = ac.createOscillator(), g = ac.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t0 + at);
-    gain.gain.exponentialRampToValueAtTime(0.35, t0 + at + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.6);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(t0 + at);
-    osc.stop(t0 + at + 0.65);
+    g.gain.value = level;
+    osc.connect(g).connect(out);
+    osc.start(t0);
+    osc.stop(t0 + tone.ring + 0.05);
   }
 }

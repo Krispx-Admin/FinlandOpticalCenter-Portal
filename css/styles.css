@@ -464,6 +464,26 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 /* ── Module header, stats, toolbar ── */
 .mod-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
 .mod-head h1 { font-size: 23px; }
+/* Notification bell beside each tab's title (notify.js) */
+.mod-head h1 { display: flex; align-items: center; gap: 8px; }
+.nb-bell { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface, #fff); color: var(--ink-3); cursor: pointer; flex: none; transition: background .15s, color .15s, border-color .15s; }
+.nb-bell svg { width: 16px; height: 16px; }
+.nb-bell:hover { background: var(--page); color: var(--ink); }
+.nb-bell.nb-all { color: #b45309; border-color: #f5c98f; background: #fdf6ec; }
+.nb-bell.nb-action { color: var(--brand, #1d3b6a); border-color: #c9d5e6; }
+.nb-bell.nb-off { color: #a0abba; }
+.nb-pop { position: absolute; z-index: 1000; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 30, 55, .16); padding: 6px; }
+.nb-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 8px 10px 6px; }
+.nb-opt { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; padding: 9px 10px; border: 0; background: none; border-radius: 10px; cursor: pointer; font: inherit; color: var(--ink); }
+.nb-opt:hover { background: var(--page); }
+.nb-opt.on { background: #eef3fa; }
+.nb-ic svg { width: 17px; height: 17px; margin-top: 1px; color: var(--ink-3); }
+.nb-opt.on .nb-ic svg { color: var(--brand, #1d3b6a); }
+.nb-txt { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.nb-txt b { font-size: 13.5px; }
+.nb-txt span { font-size: 12px; color: var(--ink-3); }
+.nb-tick svg { width: 16px; height: 16px; color: var(--brand, #1d3b6a); }
+.nb-foot { font-size: 11px; color: var(--ink-3); padding: 6px 10px 4px; border-top: 1px solid var(--border); margin-top: 4px; }
 .mod-sub { color: var(--ink-2); margin: 4px 0 0; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .stat {

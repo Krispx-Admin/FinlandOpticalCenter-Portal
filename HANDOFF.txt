@@ -1247,6 +1247,25 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  NOTIFICATION BELLS (user; replaces the two fixed chimes below):
+             a bell beside every work tab's title (Fitting Log, Stock
+             Requests / Office Queue, Lens Stock, Outside Lens Orders,
+             Reimbursement Invoice, Direct Insurance, Damaged Stock) — not
+             Schedule or Settings. Click: All notifications / My Action / Off
+             (tabs with nothing to act on: All / Off). Saved per account on
+             this computer (localStorage focp.notify.<code>; no settings page,
+             user). Default: My Action where the tab has an orange count, Off
+             elsewhere. js/notify.js: My Action = a new id in actionIds(me),
+             the same list as the sidebar's orange counts (badgeCounts now
+             reads it) → a clear single ding (sound.js 'action', E6). All also
+             gives a softer lower tone (sound.js 'all', G5) for anything new by
+             another account: narrated changes it may see (fitting / stock /
+             lens), new outside orders, invoices, damaged reports. Never your
+             own (records you made; ids you touched in the last 15 s), only
+             what arrives after the page opened, one sound per burst (the ding
+             wins). db.js now applies live changes while the tab is hidden
+             (it used to wait until shown) so the bells ring in the
+             background. Tested in the Admin Demo with a fake AudioContext.
  2026-10-20  New-order sounds (user): js/sound.js makes two chimes with Web
              Audio (no file, nothing for the CSP). app.js renderShell watches
              the live data: a new stock request ('placed', from another
