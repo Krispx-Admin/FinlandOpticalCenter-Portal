@@ -851,6 +851,11 @@ export const store = {
     return saveSettings({ module: 'outside', title: `${code} now orders outside lenses` });
   },
 
+  // How full the database is, and its daily readings (schema-52; office only).
+  async storageUsage() {
+    return ok(await supabase.rpc('storage_usage'));
+  },
+
   // The outside-lens supplier's name and WhatsApp number (schema-51).
   setOutsideSupplier(name, phone, by) {
     return run(['settings'], async () => {

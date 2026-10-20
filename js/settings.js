@@ -382,6 +382,103 @@ export function settingsView(me) {
     setTimeout(() => { msg.textContent = ''; msg.className = 'ba-msg'; }, 4000);
   }
 
+  // ── Data usage (schema-52; user 2026-10-20) ──
+  // How much of the Pro plan's 8 GB the database uses, what takes it, and how
+  // fast it grows — from one reading a day the database takes by itself.
+  let usage = null, usageLoading = false;
+  const bytes = n => {
+    const v = Number(n) || 0;
+    if (v < 1024 * 1024) return `${Math.max(1, Math.round(v / 1024))} KB`;
+    if (v < 1024 ** 3) return `${(v / 1024 ** 2).toFixed(v < 10 * 1024 ** 2 ? 1 : 0)} MB`;
+    return `${(v / 1024 ** 3).toFixed(2)} GB`;
+  };
+  // Each table, under the tab it belongs to.
+  const AREAS = [
+    ['Fitting Log', ['orders', 'order_events'], c => `${c.orders} order${c.orders === 1 ? '' : 's'}`],
+    ['Reimbursement Invoice & Direct Insurance', ['claims', 'claim_items', 'claim_prescriptions'], c => `${c.claims} invoice${c.claims === 1 ? '' : 's'}`],
+    ['Stock Requests', ['stock_requests', 'stock_request_lines', 'stock_request_events'], c => `${c.stock_requests} request${c.stock_requests === 1 ? '' : 's'}`],
+    ['Lens Stock', ['lens_requests', 'lens_request_lines', 'lens_request_events', 'lens_stock', 'lens_catalogue'], c => `${c.lens_requests} lens request${c.lens_requests === 1 ? '' : 's'}`],
+    ['Outside Lens Orders', ['outside_lens_orders'], c => `${c.outside} order${c.outside === 1 ? '' : 's'}`],
+    ['Damaged Stock', ['damaged_reports', 'damaged_lines'], c => `${c.damaged} report${c.damaged === 1 ? '' : 's'}`],
+    ['Schedule', t => t.startsWith('schedule_'), () => ''],
+  ];
+  async function loadUsage() {
+    if (usageLoading) return;
+    usageLoading = true;
+    try { usage = await store.storageUsage(); }
+    catch (err) {
+      const host = root.querySelector('#set-usage');
+      if (host) host.innerHTML = `<p class="muted sm">Could not read the data usage — ${esc(err.message)}</p>`;
+      return;
+    } finally { usageLoading = false; }
+    const host = root.querySelector('#set-usage');
+    if (host) host.innerHTML = usageHTML();
+    const ix = root.querySelector('.set-index');
+    if (ix) ix.outerHTML = listHTML();
+  }
+  function usageHTML() {
+    const u = usage, limit = u.limit_bytes, db = u.db_bytes;
+    const tables = u.tables ?? [];
+    const data = tables.reduce((s, t) => s + t.bytes, 0);
+    const pct = db / limit * 100;
+    const taken = new Set();
+    const areas = AREAS.map(([name, which, label]) => {
+      const mine = tables.filter(t => (typeof which === 'function' ? which(t.t) : which.includes(t.t)));
+      mine.forEach(t => taken.add(t.t));
+      return { name, size: mine.reduce((s, t) => s + t.bytes, 0), label: label(u.counts ?? {}) };
+    });
+    areas.push({ name: 'Accounts, settings & the rest', size: tables.filter(t => !taken.has(t.t)).reduce((s, t) => s + t.bytes, 0), label: '' });
+    areas.sort((a, b) => b.size - a.size);
+    const top = Math.max(...areas.map(a => a.size), 1);
+
+    // Growth: from the readings of the last 90 days.
+    const hist = (u.history ?? []).slice(-90);
+    let growth;
+    if (hist.length >= 7) {
+      const a = hist[0], b = hist[hist.length - 1];
+      const days = Math.max(1, (new Date(b.day) - new Date(a.day)) / 864e5);
+      const perDay = (b.data - a.data) / days;
+      if (perDay <= 0) growth = `<p class="us-growth"><b>Not growing</b> over the last ${Math.round(days)} days.</p>`;
+      else {
+        const years = (limit - db) / (perDay * 365);
+        growth = `<p class="us-growth">Growing about <b>${bytes(perDay * 30)} a month</b> — at this pace the 8 GB lasts <b>${years > 50 ? 'more than 50 years' : `about ${Math.round(years)} year${Math.round(years) === 1 ? '' : 's'}`}</b>.</p>`;
+      }
+    } else {
+      growth = `<p class="us-growth muted">${hist.length} daily reading${hist.length === 1 ? '' : 's'} so far — the database takes one every night. How fast it grows shows after a week.</p>`;
+    }
+    const W = 600, H = 120, max = Math.max(...hist.map(h => h.data), 1);
+    const bw = W / Math.max(hist.length, 1);
+    const chart = hist.length ? `
+      <div class="us-chart">
+        <div class="us-chart-head"><span>Your records, one reading a day</span><span>${bytes(max)}</span></div>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Your records over the last ${hist.length} days">
+          ${hist.map((h, i) => {
+            const bh = Math.max(2, h.data / max * (H - 4));
+            return `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - bh).toFixed(1)}" width="${Math.max(1, bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="${Math.min(4, bw / 3).toFixed(1)}"><title>${esc(h.day)} · ${bytes(h.data)} (whole database ${bytes(h.db)})</title></rect>`;
+          }).join('')}
+        </svg>
+        <div class="us-chart-foot"><span>${esc(hist[0].day)}</span><span>${esc(hist[hist.length - 1].day)}</span></div>
+      </div>` : '';
+
+    return `
+      <div class="us-top">
+        <div class="us-big"><b>${bytes(db)}</b><span>of 8 GB used</span></div>
+        <div class="us-pct">${pct < 0.1 ? '< 0.1' : pct.toFixed(pct < 10 ? 1 : 0)}%</div>
+      </div>
+      <div class="us-bar" title="${bytes(db)} of 8 GB"><i style="width:${Math.max(0.6, Math.min(100, pct)).toFixed(2)}%"></i></div>
+      <p class="muted sm">Your records are <b>${bytes(data)}</b> of it — the part that grows. The rest is the database’s own fixed parts. (The disk also keeps about 330 MB of system files that do not grow; Supabase enlarges the disk by itself if it is ever needed.)</p>
+      <h3 class="us-h">Growth</h3>
+      ${growth}
+      ${chart}
+      <h3 class="us-h">What takes the space</h3>
+      <div class="us-areas">${areas.map(a => `
+        <div class="us-area">
+          <span class="us-area-name"><b>${esc(a.name)}</b>${a.label ? `<span>${esc(a.label)}</span>` : ''}</span>
+          <span class="us-area-bar"><i style="width:${Math.max(1, a.size / top * 100).toFixed(1)}%"></i></span>
+          <span class="us-area-size">${bytes(a.size)}</span>
+        </div>`).join('')}</div>`;
+  }
+
   // Settings opens on a list; each entry opens its own page, with a way back.
   // Which one is open is only this screen's state — it starts on the list.
   let page = null;
@@ -396,6 +493,9 @@ export function settingsView(me) {
     { key: 'branches', group: 'General', icon: 'warehouse', title: 'Accounts', sections: ['branches', 'addBranch'], need: 'accounts',
       desc: 'Every sign-in — branches and people: add, rename, set what each one is, close or delete, and the code each signs in with',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
+    { key: 'usage', group: 'General', icon: 'database', title: 'Data usage', sections: ['usage'], need: 'accounts',
+      desc: 'How much of the 8 GB the database uses, what takes the space, and how fast it grows',
+      sum: () => (usage ? `${bytes(usage.db_bytes)} of 8 GB` : '') },
     { key: 'staff', group: 'General', icon: 'users', title: 'Employees', sections: ['staff'], need: 'accounts',
       desc: 'The staff by full name — the Direct Insurance salesperson list. The schedule keeps its own in the Schedule tab',
       sum: () => (staffCount == null ? '' : count(staffCount, 'employee')) },
@@ -460,6 +560,13 @@ export function settingsView(me) {
         </div>
         <div id="set-branches"><p class="muted sm">Loading…</p></div>
       </section>`,
+    usage: () => `
+      <section class="set-card">
+        <div class="set-card-head">
+          <h2>${icons.database} Data usage</h2>
+        </div>
+        <div id="set-usage">${usage ? usageHTML() : '<p class="muted sm">Reading…</p>'}</div>
+      </section>`,
     staff: () => `
       <section class="set-card">
         <div class="set-card-head">
@@ -523,6 +630,8 @@ export function settingsView(me) {
       ${listHTML()}`;
     if (pg?.sections.includes('branches')) loadBranches();
     if (pg?.sections.includes('staff')) loadStaff();
+    // Read fresh on opening the page; on the list, once, for its summary.
+    if (pg?.sections.includes('usage') || (!pg && !usage && can(me, 'accounts'))) loadUsage();
   }
 
   // Re-rendering destroys the text box you may be typing in — the per-group

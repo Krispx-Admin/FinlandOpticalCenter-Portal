@@ -304,6 +304,12 @@ create table public."stock_requests" (
   "updated_at" timestamp with time zone default now() not null
 );
 
+create table public."storage_usage_log" (
+  "day" date not null,
+  "db_bytes" bigint not null,
+  "data_bytes" bigint not null
+);
+
 alter table public."app_settings" add constraint "app_settings_id_check" CHECK ((id = 1));
 
 alter table public."app_settings" add constraint "app_settings_pkey" PRIMARY KEY (id);
@@ -407,6 +413,8 @@ alter table public."stock_requests" add constraint "stock_requests_status_check"
 alter table public."stock_requests" add constraint "stock_requests_pkey" PRIMARY KEY (id);
 
 alter table public."stock_requests" add constraint "stock_requests_ref_key" UNIQUE (ref);
+
+alter table public."storage_usage_log" add constraint "storage_usage_log_pkey" PRIMARY KEY (day);
 
 alter table public."claim_items" add constraint "claim_items_claim_id_fkey" FOREIGN KEY (claim_id) REFERENCES claims(id) ON DELETE CASCADE;
 
@@ -1506,6 +1514,21 @@ begin
   return x;
 end $function$;
 
+CREATE OR REPLACE FUNCTION public.record_storage_usage()
+ RETURNS void
+ LANGUAGE sql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  insert into public.storage_usage_log (day, db_bytes, data_bytes)
+  select (now() at time zone 'Asia/Muscat')::date,
+         pg_database_size(current_database()),
+         coalesce(sum(pg_total_relation_size(c.oid)), 0)
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind in ('r', 'm')
+  on conflict (day) do update set db_bytes = excluded.db_bytes, data_bytes = excluded.data_bytes;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.rls_auto_enable()
  RETURNS event_trigger
  LANGUAGE plpgsql
@@ -1972,6 +1995,32 @@ CREATE OR REPLACE FUNCTION public.staff_list()
  SET search_path TO 'public'
 AS $function$ select e.id::text, e.name, '{}'::text[] from public.employees e order by lower(e.name) $function$;
 
+CREATE OR REPLACE FUNCTION public.storage_usage()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not public.has_perm('accounts') then raise exception 'Only the office can see the data usage'; end if;
+  perform public.record_storage_usage();
+  return jsonb_build_object(
+    'db_bytes', pg_database_size(current_database()),
+    'limit_bytes', 8::bigint * 1024 * 1024 * 1024,
+    'tables', (select coalesce(jsonb_agg(jsonb_build_object('t', c.relname, 'bytes', pg_total_relation_size(c.oid))), '[]'::jsonb)
+                 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relkind in ('r', 'm')),
+    'counts', jsonb_build_object(
+      'orders', (select count(*) from public.orders),
+      'claims', (select count(*) from public.claims),
+      'stock_requests', (select count(*) from public.stock_requests),
+      'lens_requests', (select count(*) from public.lens_requests),
+      'outside', (select count(*) from public.outside_lens_orders),
+      'damaged', (select count(*) from public.damaged_reports)),
+    'history', (select coalesce(jsonb_agg(jsonb_build_object('day', day, 'db', db_bytes, 'data', data_bytes) order by day), '[]'::jsonb)
+                  from public.storage_usage_log where day > current_date - 400));
+end $function$;
+
 CREATE OR REPLACE FUNCTION public.touch_schedule()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -2168,6 +2217,8 @@ alter table public."stock_request_lines" enable row level security;
 alter table public."stock_requests" enable row level security;
 
 alter table public."claim_items" enable row level security;
+
+alter table public."storage_usage_log" enable row level security;
 
 alter table public."lens_catalogue" enable row level security;
 

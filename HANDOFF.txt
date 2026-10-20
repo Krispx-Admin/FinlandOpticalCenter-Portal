@@ -825,6 +825,13 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-52-storage-usage.sql  storage_usage_log (one reading a day: whole
+                             database + the portal's tables; RLS on, no
+                             grants); record_storage_usage() (nobody may
+                             call it but the job); storage_usage() for
+                             'accounts' — sizes per table, counts, readings.
+                             pg_cron enabled; job storage-usage-daily at
+                             19:50 UTC (23:50 Oman). Applied 2026-10-20.
   schema-51-outside-supplier.sql  app_settings.outside_supplier_name /
                              outside_supplier_phone; set_outside_supplier()
                              (outside-lens handler or 'lists'; 8–15 digits or
@@ -1247,6 +1254,16 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  Settings → Data usage (user: the office watches the database
+             grow; 'accounts' permission): "X of 8 GB used" with a bar, how
+             much is the portal's own records, growth per month and how long
+             8 GB lasts at that pace (after 7 daily readings), a bar chart of
+             the readings (90 days), and what takes the space per tab with
+             counts. schema-52 (readings taken nightly by pg_cron and on
+             opening the page). Admin Demo rebuilt (VERSION 10). Context: 8 GB
+             is the Pro plan's disk; ~330 MB of it is fixed system space (WAL
+             128 MB, Postgres files) that does not grow; portal data was
+             1.6 MB at launch.
  2026-10-20  BACKUPS: the user moved Supabase to the Pro plan. Daily backups
              (physical, Supabase-run) about 18:35 UTC = 22:35 Oman, the last 7
              kept; checked through the Management API (GET /v1/projects/<ref>/
