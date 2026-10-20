@@ -1254,6 +1254,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  Excel export Status column: "Completed" / "Cancelled" (user; was
+             Sold / Canceled), totals row "Total (cancelled not counted)".
+             The portal screens still say Canceled. Note: a tab opened before
+             a deploy keeps the old code until refreshed (the user exported
+             the old layout that way).
  2026-10-20  EXCEL EXPORTS (user). claims.js claimsWorkbook(list, {kind,…})
              replaces insuranceWorkbook. Data sheets have NO title band any
              more — the header is row 1, the only frozen row (the band now
