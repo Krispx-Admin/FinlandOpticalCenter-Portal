@@ -721,6 +721,13 @@ export const store = {
       return true;
     }, { module: 'settings', title: `${code}: tabs saved` });
   },
+  // Hidden, and given on top of what it sees by itself (schema-57).
+  setTabs(code, hidden, shown) {
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_tabs', { p_code: code, p_hidden: hidden, p_shown: shown }));
+      return true;
+    }, { module: 'settings', title: `${code}: tabs saved` });
+  },
 
   // An account's access permissions (schema-50).
   setPermissions(code, perms) {

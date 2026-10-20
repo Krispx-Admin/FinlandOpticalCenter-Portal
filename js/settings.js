@@ -1,5 +1,5 @@
 // ── Module 3: Settings (admin) — request categories & brand groups ──
-import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES, PERMS, can } from './data.js';
+import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES, PERMS, can, seesTab, tabByDefault } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
 import { esc, icons, relTime, openLayer } from './ui.js';
@@ -119,11 +119,11 @@ export function settingsView(me) {
   // open or closed. The list searches and filters; branches, then people.
   let accRows = [], accUi = { q: '', show: 'all' }, accDrawer = null;
   const isPersonRow = r => !BRANCH_KINDS.includes(r.role);
-  const hiddenOf = code => LOCATIONS.find(l => l.code === code)?.tabsHidden ?? [];
-  // Every tab an account can be shown or not (Settings follows its permissions).
+  // What it really sees (seesTab: by itself, hidden or given — schema-57).
   const tabsSummary = code => {
-    const h = hiddenOf(code).filter(k => TABS.some(t => t.key === k)).length;
-    return h ? `${TABS.length - h} of ${TABS.length} tabs` : 'All tabs';
+    const L = LOCATIONS.find(l => l.code === code);
+    const n = TABS.filter(t => seesTab(t.key, L)).length;
+    return n === TABS.length ? 'All tabs' : `${n} of ${TABS.length} tabs`;
   };
   const seenText = r => (!r.active ? 'Closed — cannot sign in' : r.has_account
     ? (r.last_sign_in ? `Signed in ${relTime(Date.parse(r.last_sign_in))}` : 'Never signed in')
@@ -199,8 +199,12 @@ export function settingsView(me) {
       if (d.brLens) return saveLens(e.target);
       if (d.brLab) return store.setLab(d.brLab, e.target.value);
       if (d.accTab) {
-        const hidden = [...el.querySelectorAll('[data-acc-tab]')].filter(x => !x.checked).map(x => x.dataset.accTab);
-        return store.setTabsHidden(code, hidden);
+        // Unticked: hidden. Ticked where it would not show by itself: given.
+        const L = LOCATIONS.find(l => l.code === code);
+        const boxes = [...el.querySelectorAll('[data-acc-tab]')];
+        const hidden = boxes.filter(x => !x.checked).map(x => x.dataset.accTab);
+        const shown = boxes.filter(x => x.checked && !tabByDefault(x.dataset.accTab, L)).map(x => x.dataset.accTab);
+        return store.setTabs(code, hidden, shown);
       }
     });
     el.addEventListener('submit', e => {
@@ -221,7 +225,6 @@ export function settingsView(me) {
     if (!r || !L) return `<div class="dw-body"><p class="muted">This account is gone.</p></div>`;
     const person = isPersonRow(r), fitting = r.role === 'fitting' && r.active;
     const lensLocked = r.holds_lens_stock;
-    const hidden = new Set(hiddenOf(code));
     const off = (on, why) => (on ? '' : `disabled title="${esc(why)}"`);
     const sec = (icon, title, body, sub = '') => `
       <section class="acc-sec"><h3>${icons[icon]} ${title}</h3>${sub ? `<p class="acc-sub">${sub}</p>` : ''}${body}</section>`;
@@ -250,9 +253,12 @@ export function settingsView(me) {
         ${sec('shield', 'What it can do', `
           <button type="button" class="btn btn-ghost acc-perm" data-br-perms="${esc(code)}">${icons.shield} Access Permissions <em>${esc(permSummary(code))}</em> ${icons.chevronRight}</button>`)}
         ${sec('menu', 'Tabs it sees', `
-          <div class="acc-tabs">${TABS.map(tb => `
-            <label class="acc-tab"><span class="cbx"><input type="checkbox" data-acc-tab="${tb.key}" ${hidden.has(tb.key) ? '' : 'checked'}><i></i></span>${icons[tb.icon] ?? ''}<span>${esc(tb.label)}</span></label>`).join('')}</div>`,
-          'Untick to hide a tab from this account’s sidebar. A tick never opens a tab the account cannot use — Lens Stock is for lens-stock holders, Outside Lens Orders for the handler, unless it sees every branch.')}
+          <div class="acc-tabs">${TABS.map(tb => {
+            const given = !tabByDefault(tb.key, L) && seesTab(tb.key, L);
+            return `
+            <label class="acc-tab"><span class="cbx"><input type="checkbox" data-acc-tab="${tb.key}" ${seesTab(tb.key, L) ? 'checked' : ''}><i></i></span>${icons[tb.icon] ?? ''}<span>${esc(tb.label)}${given ? ' <em class="acc-given">given</em>' : ''}</span></label>`;
+          }).join('')}</div>`,
+          'Ticked = in its sidebar now. Lens Stock shows by itself to a lens-stock holder and Outside Lens Orders to the outside-lens handler (both to anyone who sees every branch); tick them to give them to anyone else.')}
         ${sec('lens', 'Lens stock and lab', `
           <label class="acc-switch ${r.active ? '' : 'is-off'}">
             <span class="sw"><input type="checkbox" data-br-lens="${esc(code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(r.active, 'Open the account first')}><i></i></span>

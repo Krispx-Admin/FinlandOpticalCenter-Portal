@@ -87,8 +87,10 @@ export function setLocations(rows) {
     // The ticks (schema-50); before signing in they are not readable, and an
     // older database had kinds instead — read those the same way.
     perms: Array.isArray(r.perms) ? r.perms : legacyPerms(r),
-    // The sidebar tabs this account does not see (schema-53).
+    // The sidebar tabs this account does not see (schema-53), and those given
+    // to it on top of what it sees by itself (schema-57).
     tabsHidden: Array.isArray(r.tabs_hidden) ? r.tabs_hidden : [],
+    tabsShown: Array.isArray(r.tabs_shown) ? r.tabs_shown : [],
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
@@ -131,6 +133,15 @@ export function can(w, perm) {
 // Looks at the whole network (the overseer's screens): a person, or an
 // account allowed to see every branch.
 export const seesAll = w => isPerson(w) || can(w, 'see_all');
+// The sidebar tabs (schema-53, -57). Lens Stock shows by itself to a lens-stock
+// holder, Outside Lens Orders to the handler, both to anyone who sees every
+// branch; every other tab to everyone. The office hides a tab from an account,
+// or gives it one it would not see by itself. Settings is not here — it
+// follows the permissions.
+export const tabByDefault = (key, w) => (key === 'lens' ? isLensOwner(w?.code) || seesAll(w)
+  : key === 'outside' ? w?.code === outsideHandler() || seesAll(w) : true);
+export const seesTab = (key, w) => !!w && !(w.tabsHidden ?? []).includes(key)
+  && (tabByDefault(key, w) || (w.tabsShown ?? []).includes(key));
 // Looks but does not change other branches' work: a person without "change
 // any branch's records", or anyone on View only.
 export const readOnly = w => (who(w)?.perms ?? []).includes('view_only') || (isPerson(w) && !can(w, 'act_all'));

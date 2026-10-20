@@ -42,7 +42,8 @@ create table public."branches" (
   "can_export_insurance" boolean default false not null,
   "name_ar" text,
   "perms" text[] default '{}'::text[] not null,
-  "tabs_hidden" text[] default '{}'::text[] not null
+  "tabs_hidden" text[] default '{}'::text[] not null,
+  "tabs_shown" text[] default '{}'::text[] not null
 );
 
 create table public."claim_items" (
@@ -2041,6 +2042,24 @@ begin
     raise exception '% is the last account that can manage accounts - give that to another first', b.name;
   end if;
   update public.branches set perms = nxt where code = p_code;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.set_tabs(p_code text, p_hidden text[], p_shown text[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  ok text[] := array['fitting', 'stock', 'lens', 'outside', 'claims', 'direct', 'damaged', 'schedule', 'data'];
+begin
+  if not public.has_perm('accounts') then raise exception 'Only the office can choose the tabs'; end if;
+  update public.branches
+     set tabs_hidden = coalesce((select array_agg(distinct t order by t) from unnest(p_hidden) t where t = any(ok)), '{}'),
+         tabs_shown  = coalesce((select array_agg(distinct t order by t) from unnest(p_shown) t where t = any(ok)
+                                   and not (t = any(coalesce(p_hidden, '{}')))), '{}')
+   where code = p_code;
+  if not found then raise exception 'No such account'; end if;
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.set_tabs_hidden(p_code text, p_tabs text[])

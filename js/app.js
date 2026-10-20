@@ -1,5 +1,5 @@
 // ── App shell: login, sidebar navigation, routing, live toasts ──
-import { LOCATIONS, ROLES, BRANCH_KINDS, can, isPerson, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
+import { LOCATIONS, ROLES, BRANCH_KINDS, can, isPerson, seesTab, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
 import { captchaOn, mountCaptcha } from './captcha.js';
 import { damagedView } from './damaged.js';
 import { insightsView } from './insights.js';
@@ -288,8 +288,9 @@ const MODULES = {
   // Branches order shelf lenses inside a new fitting order now, so the tab is
   // for the branches that hold lenses, and the admins who look across
   // everything (user, 2026-10-17).
-  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView, only: me => isLensOwner(me?.code) || seesAll(me) },
-  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView, only: me => me?.code === outsideHandler() || seesAll(me) },
+  // Who sees these by itself, and what the office gives or hides: seesTab (data.js).
+  lens:     { label: 'Lens Stock', icon: 'lens', make: lensView },
+  outside:  { label: 'Outside Lens Orders', icon: 'truck', make: outsideView },
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   damaged:  { label: 'Damaged Stock', icon: 'damage', make: damagedView },
@@ -306,9 +307,11 @@ const homeOf = me => (isPerson(me) && can(me, 'schedule_edit') && !can(me, 'act_
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
-  // The office hides tabs per account (schema-53); Settings follows the permissions.
-  const hidden = key !== 'settings' && (me?.tabsHidden ?? []).includes(key);
-  return m && !hidden && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
+  // The office hides or gives tabs per account (schema-53, -57); Settings
+  // follows the permissions.
+  if (!m) return false;
+  if (key === 'settings') return m.only(me);
+  return seesTab(key, me) && !(auth.isPractice && key === 'schedule');
 }
 
 // A tab the office switched off in Settings is closed to everyone else; the

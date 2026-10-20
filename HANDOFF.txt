@@ -825,6 +825,9 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-57-tabs-given.sql   branches.tabs_shown text[] (anon cannot read);
+                             set_tabs(code, hidden, shown) for 'accounts'.
+                             Applied 2026-10-20.
   schema-56-step-log.sql     step_log (kind order|request|lens, row_id, status,
                              at, by_code): AFTER INSERT / UPDATE OF status
                              triggers on orders, stock_requests, lens_requests
@@ -1274,6 +1277,17 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  Tabs per account, take two (user: the ticks showed Lens Stock and
+             Outside Lens Orders on for every branch though they could not see
+             them; wants to be able to give them later). data.js seesTab /
+             tabByDefault: Lens Stock shows by itself to a lens-stock holder,
+             Outside Lens Orders to the handler, both to anyone who sees every
+             branch, every other tab to everyone; tabs_hidden hides,
+             tabs_shown (schema-57) gives. The ticks show what the account
+             really sees; ticking one it would not see by itself saves it as
+             given (a green "given" tag). app.js moduleAllowed uses seesTab
+             (Settings still follows the permissions). Tested: QCC given both,
+             signed in as QCC, both open. Admin Demo VERSION 13.
  2026-10-20  DATA: JOURNEY TIMES + COMPARE GROUPS (user chose parts 1 and 2 of
              the ideas; clock time; a fitting order's time stops at "Ready for
              collection" — pick-up is the customer's). schema-56 step_log.
