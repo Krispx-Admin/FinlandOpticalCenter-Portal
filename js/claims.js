@@ -310,9 +310,9 @@ export async function claimsWorkbook(list, { kind = 'direct', scope, period, by 
   const head = [
     `${scope} · ${period}`,
     `Exported ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${by ? ` by ${by}` : ''}`,
-    `${live.length} ${direct ? 'sale' : 'invoice'}${live.length === 1 ? '' : 's'} · ${money(total)} ${CURRENCY}${list.length > live.length ? ` · ${list.length - live.length} canceled (listed, not counted)` : ''}`,
+    `${live.length} ${direct ? 'sale' : 'invoice'}${live.length === 1 ? '' : 's'} · ${money(total)} ${CURRENCY}${list.length > live.length ? ` · ${list.length - live.length} cancelled (listed, not counted)` : ''}`,
   ];
-  const TOT = direct ? 'Total (canceled not counted)' : 'Total';
+  const TOT = direct ? 'Total (cancelled not counted)' : 'Total';
 
   const ws1 = wb.addWorksheet(name, { properties: { tabColor: { argb: XL.navy } } });
   xlTable(ws1, {
@@ -330,7 +330,7 @@ export async function claimsWorkbook(list, { kind = 'direct', scope, period, by 
     rows: list.map(c => ({
       ref: c.ref, date: c.date, branch: locName(c.branch), bill: c.billNo, customer: c.customer, member: c.memberId,
       insurer: c.insurer, sales: c.employeeName, frame: r3(spent(c, 'frame')), lens: r3(spent(c, 'lens')),
-      total: r3(claimTotal(c)), payment: pay(c), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+      total: r3(claimTotal(c)), payment: pay(c), status: cx(c) ? 'Cancelled' : 'Completed', _cx: cx(c),
     })),
     canceled: r => r._cx,
     totals: { label: TOT, frame: r3(sum(live, c => spent(c, 'frame'))), lens: r3(sum(live, c => spent(c, 'lens'))), total: r3(total) },
@@ -339,7 +339,7 @@ export async function claimsWorkbook(list, { kind = 'direct', scope, period, by 
   const lines = list.flatMap(c => (c.items ?? []).map(i => ({
     ref: c.ref, date: c.date, branch: locName(c.branch), customer: c.customer,
     item: ITEM_KINDS[i.kind]?.label ?? '', desc: i.name, qty: itemQty(i), each: r3(i.price),
-    amount: r3(itemAmount(i, c.kind)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+    amount: r3(itemAmount(i, c.kind)), status: cx(c) ? 'Cancelled' : 'Completed', _cx: cx(c),
   })));
   if (lines.length) {
     const ws2 = wb.addWorksheet('Products', { properties: { tabColor: { argb: 'FF2E7D6B' } } });
