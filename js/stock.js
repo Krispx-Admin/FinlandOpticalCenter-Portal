@@ -25,7 +25,7 @@ function unitsBreakdown(lines) {
 
 export function stockView(me) {
   // The office fulfils; the schedule editor sees the same queue, hands off.
-  // Completes requests: the Office Queue permission (schema-50).
+  // Completes requests: the Stock Orders permission (office_queue, schema-50).
   const isAdmin = can(me, 'office_queue');
   const overseer = seesAll(me);
   const ui = {
@@ -489,7 +489,7 @@ export function stockView(me) {
     root.innerHTML = `
       <header class="mod-head">
         <div>
-          <h1>${overseer ? 'Office — Request Queue' : 'Stock Requests'}</h1>
+          <h1>${overseer ? 'Stock Orders' : 'Stock Requests'}</h1>
           <p class="mod-sub">${isAdmin ? 'Print each request, fulfil it, then mark it completed' : overseer ? 'Every stock request across the network' : 'Request inventory from the office and track it here'}</p>
         </div>
         ${!overseer ? `<button class="btn btn-primary" data-new>${icons.plus} New stock request</button>` : ''}

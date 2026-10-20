@@ -859,6 +859,14 @@ export const store = {
     return saveSettings({ module: 'outside', title: `${code} now orders outside lenses` });
   },
 
+  // When each order / stock request / lens request changed step, since a time
+  // (schema-56) — read by the Data tab, not kept live.
+  async stepLog(sinceISO) {
+    const { data, error } = await supabase.from('step_log').select('kind, row_id, status, at').gte('at', sinceISO).order('at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+
   // How full the database is, and its daily readings (schema-52; office only).
   async storageUsage() {
     return ok(await supabase.rpc('storage_usage'));

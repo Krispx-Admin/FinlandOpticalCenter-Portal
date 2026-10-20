@@ -102,7 +102,7 @@ export function setLocations(rows) {
 export const PERMS = [
   ['see_all', 'See every branch', 'Orders, stock and lens requests, invoices, insurance and damaged stock across all branches'],
   ['act_all', 'Change any branch’s records', 'Move, edit, undo or delete any order; act on invoices, insurance, damaged stock, lens stock and outside lenses for any branch'],
-  ['office_queue', 'Office Queue', 'Fulfil and complete the branches’ stock requests'],
+  ['office_queue', 'Stock Orders', 'Fulfil and complete the branches’ stock requests (the Stock Orders tab)'],
   ['accounts', 'Settings: accounts & codes', 'Add, rename, close or delete accounts; sign-in codes, permissions and the employee list'],
   ['lists', 'Settings: lists & tabs', 'Categories, brand groups, insurers, lens lists and outside cutters; switch tabs on and off'],
   ['insurance_dash', 'Direct Insurance dashboard', 'What the insurers paid — by insurer, branch and salesperson'],
@@ -165,7 +165,7 @@ export const AUDIENCES = ['Men', 'Women', 'Unisex', 'Kids'];
 // Settings itself is never on the list — it is how they are switched back on.
 export const TABS = [
   { key: 'fitting',  label: 'Fitting Log',      icon: 'glasses' },
-  { key: 'stock',    label: 'Stock Requests',   icon: 'box', note: 'Office Queue for the office' },
+  { key: 'stock',    label: 'Stock Requests',   icon: 'box', note: 'Stock Orders for the office' },
   { key: 'lens',     label: 'Lens Stock',       icon: 'lens' },
   { key: 'outside',  label: 'Outside Lens Orders', icon: 'truck' },
   { key: 'claims',   label: 'Reimbursement Invoice', icon: 'receipt' },

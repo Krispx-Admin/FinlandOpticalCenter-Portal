@@ -284,7 +284,7 @@ armSound();
 
 const MODULES = {
   fitting:  { label: 'Fitting Log', icon: 'glasses', make: fittingView },
-  stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Office Queue', adminIcon: 'warehouse' },
+  stock:    { label: 'Stock Requests', icon: 'box', make: stockView, adminLabel: 'Stock Orders', adminIcon: 'warehouse' },
   // Branches order shelf lenses inside a new fitting order now, so the tab is
   // for the branches that hold lenses, and the admins who look across
   // everything (user, 2026-10-17).

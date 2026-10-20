@@ -13,6 +13,8 @@ create sequence public."claim_seq" start 3001;
 
 create sequence public."damage_seq" start 1001;
 
+create sequence public."step_log_id_seq" start 1;
+
 create table public."app_settings" (
   "id" integer default 1 not null,
   "brand_groups" jsonb default '[]'::jsonb not null,
@@ -274,6 +276,15 @@ create table public."schedule_weeks" (
   "published_by" text
 );
 
+create table public."step_log" (
+  "id" bigint default nextval('step_log_id_seq'::regclass) not null,
+  "kind" text not null,
+  "row_id" uuid not null,
+  "status" text not null,
+  "at" timestamp with time zone default now() not null,
+  "by_code" text
+);
+
 create table public."stock_request_events" (
   "id" uuid default gen_random_uuid() not null,
   "request_id" uuid not null,
@@ -405,6 +416,10 @@ alter table public."schedule_state" add constraint "schedule_state_pkey" PRIMARY
 
 alter table public."schedule_weeks" add constraint "schedule_weeks_pkey" PRIMARY KEY (week_start);
 
+alter table public."step_log" add constraint "step_log_kind_check" CHECK ((kind = ANY (ARRAY['order'::text, 'request'::text, 'lens'::text])));
+
+alter table public."step_log" add constraint "step_log_pkey" PRIMARY KEY (id);
+
 alter table public."stock_request_events" add constraint "stock_request_events_pkey" PRIMARY KEY (id);
 
 alter table public."stock_request_lines" add constraint "stock_request_lines_pkey" PRIMARY KEY (id);
@@ -530,6 +545,10 @@ CREATE INDEX outside_lens_orders_branch_idx ON public.outside_lens_orders USING 
 CREATE INDEX outside_lens_orders_dest_idx ON public.outside_lens_orders USING btree (dest_code);
 
 CREATE INDEX outside_lens_orders_status_idx ON public.outside_lens_orders USING btree (status, created_at);
+
+CREATE INDEX step_log_at ON public.step_log USING btree (at);
+
+CREATE INDEX step_log_row ON public.step_log USING btree (row_id, at);
 
 CREATE INDEX stock_request_events_req_idx ON public.stock_request_events USING btree (request_id, at);
 
@@ -1363,6 +1382,20 @@ CREATE OR REPLACE FUNCTION public.lens_owner_code()
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$ select code from public.branches where holds_lens_stock and active order by position limit 1 $function$;
+
+CREATE OR REPLACE FUNCTION public.log_step()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if tg_op = 'INSERT' or new.status is distinct from old.status then
+    insert into public.step_log (kind, row_id, status, by_code)
+    values (tg_argv[0], new.id, new.status, nullif(public.jwt_branch(), ''));
+  end if;
+  return new;
+end $function$;
 
 CREATE OR REPLACE FUNCTION public.manages_accounts(b branches)
  RETURNS boolean
@@ -2207,6 +2240,8 @@ CREATE TRIGGER claims_touch BEFORE UPDATE ON public.claims FOR EACH ROW EXECUTE 
 
 CREATE TRIGGER lens_catalogue_touch BEFORE UPDATE ON public.lens_catalogue FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
+CREATE TRIGGER lens_requests_step_log AFTER INSERT OR UPDATE OF status ON public.lens_requests FOR EACH ROW EXECUTE FUNCTION log_step('lens');
+
 CREATE TRIGGER lens_requests_touch BEFORE UPDATE ON public.lens_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 CREATE TRIGGER orders_bench_lock BEFORE UPDATE OF status ON public.orders FOR EACH ROW EXECUTE FUNCTION bench_lock_gate();
@@ -2214,6 +2249,8 @@ CREATE TRIGGER orders_bench_lock BEFORE UPDATE OF status ON public.orders FOR EA
 CREATE TRIGGER orders_outside_lens_gate BEFORE UPDATE OF status ON public.orders FOR EACH ROW EXECUTE FUNCTION outside_lens_gate();
 
 CREATE TRIGGER orders_route_gate BEFORE UPDATE OF status ON public.orders FOR EACH ROW EXECUTE FUNCTION orders_route_gate();
+
+CREATE TRIGGER orders_step_log AFTER INSERT OR UPDATE OF status ON public.orders FOR EACH ROW EXECUTE FUNCTION log_step('order');
 
 CREATE TRIGGER orders_touch BEFORE UPDATE ON public.orders FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
@@ -2224,6 +2261,8 @@ CREATE TRIGGER schedule_employees_touch BEFORE INSERT OR UPDATE ON public.schedu
 CREATE TRIGGER schedule_state_touch BEFORE INSERT OR UPDATE ON public.schedule_state FOR EACH ROW EXECUTE FUNCTION touch_schedule();
 
 CREATE TRIGGER schedule_weeks_touch BEFORE INSERT OR UPDATE ON public.schedule_weeks FOR EACH ROW EXECUTE FUNCTION touch_schedule();
+
+CREATE TRIGGER stock_requests_step_log AFTER INSERT OR UPDATE OF status ON public.stock_requests FOR EACH ROW EXECUTE FUNCTION log_step('request');
 
 CREATE TRIGGER stock_requests_touch BEFORE UPDATE ON public.stock_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
@@ -2276,6 +2315,8 @@ alter table public."schedule_state" enable row level security;
 alter table public."outside_lens_orders" enable row level security;
 
 alter table public."damaged_lines" enable row level security;
+
+alter table public."step_log" enable row level security;
 
 create policy "app_settings_read" on public."app_settings" as permissive for select to authenticated using (true);
 
@@ -2396,6 +2437,20 @@ create policy "schedule_employees_all" on public."schedule_employees" as permiss
 create policy "schedule_state_all" on public."schedule_state" as permissive for all to authenticated using (( SELECT can_schedule() AS can_schedule)) with check (( SELECT can_schedule() AS can_schedule));
 
 create policy "schedule_weeks_all" on public."schedule_weeks" as permissive for all to authenticated using (( SELECT can_schedule() AS can_schedule)) with check (( SELECT can_schedule() AS can_schedule));
+
+create policy "step_log_read" on public."step_log" as permissive for select to authenticated using (
+CASE kind
+    WHEN 'order'::text THEN (EXISTS ( SELECT 1
+       FROM orders o
+      WHERE (o.id = step_log.row_id)))
+    WHEN 'request'::text THEN (EXISTS ( SELECT 1
+       FROM stock_requests r
+      WHERE (r.id = step_log.row_id)))
+    WHEN 'lens'::text THEN (EXISTS ( SELECT 1
+       FROM lens_requests l
+      WHERE (l.id = step_log.row_id)))
+    ELSE NULL::boolean
+END);
 
 create policy "stock_events_all" on public."stock_request_events" as permissive for all to authenticated using ((EXISTS ( SELECT 1
    FROM stock_requests r

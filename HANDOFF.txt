@@ -825,6 +825,13 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-56-step-log.sql     step_log (kind order|request|lens, row_id, status,
+                             at, by_code): AFTER INSERT / UPDATE OF status
+                             triggers on orders, stock_requests, lens_requests
+                             (log_step, security definer). Read under the
+                             parent's row rules; anon none. Started 2026-10-20
+                             16:44 UTC with one row per existing record (its
+                             status at updated_at). Applied 2026-10-20.
   schema-55-mend-dashes.sql  assert_good_pin, confirm/send/decline_lens_request:
                              "—" had been stored as "â€”" (applied through a
                              cp1252 console). Applied 2026-10-20. Apply SQL as
@@ -1267,6 +1274,25 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  DATA: JOURNEY TIMES + COMPARE GROUPS (user chose parts 1 and 2 of
+             the ideas; clock time; a fitting order's time stops at "Ready for
+             collection" — pick-up is the customer's). schema-56 step_log.
+             insights.js: on Fitting Log, Stock Requests, Lens Stock, Outside
+             Lenses a Journey card — average / median / slowest 10% / count of
+             finished-and-fully-timed, a bar split into steps (width = average),
+             a step table (went through, average, median, slowest 10%, in it
+             now). Fitting Log adds time by branch / fitting centre / lens
+             source and the slowest orders with their longest step. Steps
+             before STEP_FROM (2026-10-20 16:44 UTC; 0 in the Admin Demo) are
+             not timed; a journey counts only if its first step row is its
+             creation. Outside lenses use their own ordered/arrived/sent/
+             received times. "Compare groups": up to 3 groups (branch chips;
+             fitting-centre chips on Fitting Log; none = all), named, side by
+             side — the numbers, the journey, each step's average, and the
+             journeys as bars. Not built: what-if estimates (offered; later,
+             once weeks of data exist). Admin Demo rebuilt (VERSION 12).
+             Office Queue renamed "Stock Orders" (user): the office's sidebar
+             label, the page title, the permission's name.
  2026-10-20  DATA TAB + TABS PER ACCOUNT + ACCOUNTS PAGE + LENS STOCK + POP-UPS.
              · Data (js/insights.js; sidebar "Data", chart icon): sections
                Fitting Log, Stock Requests, Lens Stock, Outside Lenses, Direct
