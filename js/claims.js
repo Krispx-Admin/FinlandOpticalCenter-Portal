@@ -1,7 +1,7 @@
 // ── Module 5: Reimbursement Invoice (was Insurance Claims) — compose, preview, print ──
 import {
   BRANCHES, locName, CURRENCY, money, PAYMENT_TYPES,
-  RX_ROWS, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance, can,
+  RX_ROWS, RX_EYES, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance, can,
 } from './data.js';
 import { store } from './store.js';
 import { supabase } from './auth.js';
@@ -187,12 +187,11 @@ function rxTableHTML(rx) {
     </table>`;
 }
 
-// ── Insurance Sales workbook (user, 2026-10-18: "a much nicer layout with
-// titles and correct column sizing so we can easily read it") ──
+// ── Excel exports (user, 2026-10-18: "a much nicer layout with titles and
+// correct column sizing so we can easily read it") ──
 // ExcelJS (styles, frozen header, filters, number formats), loaded only when
-// someone exports. Three sheets: the entries, every product line, and the
-// sums by insurer, branch and salesperson. Canceled entries are listed —
-// grey, marked — but never added into a total.
+// someone exports. Canceled entries are listed — grey, marked — but never
+// added into a total.
 const XL = { navy: 'FF133056', navySoft: 'FFE8EEF6', zebra: 'FFF6F8FB', line: 'FFD5DCE6', grey: 'FF8A94A6', red: 'FFB42318', white: 'FFFFFFFF' };
 const MONEY_FMT = '#,##0.000';
 let excelLoading = null;
@@ -285,84 +284,123 @@ function xlTable(ws, { title = null, lines = [], cols, rows, totals = null, canc
   if (rows.length) ws.autoFilter = { from: { row: head, column: 1 }, to: { row: head + rows.length, column: n } };
   ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${head}:${head}`,
     margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 } };
-  ws.headerFooter.oddFooter = '&L&8Finland Optical Center — Insurance Sales&R&8Page &P of &N';
+  ws.headerFooter.oddFooter = `&L&8Finland Optical Center — ${ws.name}&R&8Page &P of &N`;
   return last;
 }
 
-export async function insuranceWorkbook(list, { scope, period, by }) {
+// Both exports (user 2026-10-20). The data sheets start with their header in
+// row 1 — only that row frozen; what was exported, when and by whom heads the
+// Summary sheet. Frame and lenses are money (what each came to), the total
+// beside them. Direct Insurance: entries, products, sums by insurer / branch /
+// salesperson. Reimbursement Invoice: invoices with payment, products (price
+// each × qty), each eye's prescription, sums by branch and payment.
+export async function claimsWorkbook(list, { kind = 'direct', scope, period, by }) {
   const ExcelJS = await loadExcel();
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FOC Portal'; wb.created = new Date();
+  const direct = kind === 'direct';
+  const name = direct ? 'Insurance Sales' : 'Reimbursement Invoices';
   const cx = c => !!c.canceledAt;
   const live = list.filter(c => !cx(c));
   const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
-  const count = (c, k) => (c.items ?? []).filter(i => i.kind === k).reduce((s, i) => s + itemQty(i), 0);
+  const r3 = v => Number(Number(v || 0).toFixed(3));
+  const spent = (c, k) => (c.items ?? []).filter(i => i.kind === k).reduce((s, i) => s + itemAmount(i, c.kind), 0);
   const total = sum(live, claimTotal);
+  const pay = c => PAYMENT_TYPES.find(p => p.value === c.payment)?.label ?? '';
   const head = [
     `${scope} · ${period}`,
     `Exported ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${by ? ` by ${by}` : ''}`,
-    `${live.length} sale${live.length === 1 ? '' : 's'} · ${money(total)} ${CURRENCY}${list.length > live.length ? ` · ${list.length - live.length} canceled (listed, not counted)` : ''}`,
+    `${live.length} ${direct ? 'sale' : 'invoice'}${live.length === 1 ? '' : 's'} · ${money(total)} ${CURRENCY}${list.length > live.length ? ` · ${list.length - live.length} canceled (listed, not counted)` : ''}`,
   ];
+  const TOT = direct ? 'Total (canceled not counted)' : 'Total';
 
-  const ws1 = wb.addWorksheet('Insurance Sales', { properties: { tabColor: { argb: XL.navy } } });
+  const ws1 = wb.addWorksheet(name, { properties: { tabColor: { argb: XL.navy } } });
   xlTable(ws1, {
-    title: 'Finland Optical Center — Insurance Sales', lines: head,
     cols: [
       { header: 'Invoice No.', key: 'ref' }, { header: 'Date', key: 'date', date: true, min: 12 },
       { header: 'Branch', key: 'branch' }, { header: 'Bill Number', key: 'bill' },
       { header: 'Customer Name', key: 'customer', min: 18 }, { header: 'Member ID', key: 'member' },
-      { header: 'Insurer', key: 'insurer' }, { header: 'Salesperson', key: 'sales', min: 14 },
-      { header: 'Frames', key: 'frames', num: true }, { header: 'Lenses', key: 'lenses', num: true },
+      ...(direct ? [{ header: 'Insurer', key: 'insurer' }, { header: 'Salesperson', key: 'sales', min: 14 }] : []),
+      { header: `Frame (${CURRENCY})`, key: 'frame', num: true, money: true, min: 12 },
+      { header: `Lenses (${CURRENCY})`, key: 'lens', num: true, money: true, min: 12 },
       { header: `Total (${CURRENCY})`, key: 'total', num: true, money: true, min: 12 },
-      { header: 'Status', key: 'status' },
+      { header: 'Payment', key: 'payment', min: 11 },
+      ...(direct ? [{ header: 'Status', key: 'status' }] : []),
     ],
     rows: list.map(c => ({
       ref: c.ref, date: c.date, branch: locName(c.branch), bill: c.billNo, customer: c.customer, member: c.memberId,
-      insurer: c.insurer, sales: c.employeeName, frames: count(c, 'frame'), lenses: count(c, 'lens'),
-      total: Number(claimTotal(c).toFixed(3)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+      insurer: c.insurer, sales: c.employeeName, frame: r3(spent(c, 'frame')), lens: r3(spent(c, 'lens')),
+      total: r3(claimTotal(c)), payment: pay(c), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
     })),
     canceled: r => r._cx,
-    totals: { label: 'Total (canceled not counted)', frames: sum(live, c => count(c, 'frame')), lenses: sum(live, c => count(c, 'lens')), total: Number(total.toFixed(3)) },
+    totals: { label: TOT, frame: r3(sum(live, c => spent(c, 'frame'))), lens: r3(sum(live, c => spent(c, 'lens'))), total: r3(total) },
   });
 
   const lines = list.flatMap(c => (c.items ?? []).map(i => ({
     ref: c.ref, date: c.date, branch: locName(c.branch), customer: c.customer,
-    item: ITEM_KINDS[i.kind]?.label ?? '', desc: i.name, qty: itemQty(i),
-    amount: Number(itemAmount(i, c.kind).toFixed(3)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
+    item: ITEM_KINDS[i.kind]?.label ?? '', desc: i.name, qty: itemQty(i), each: r3(i.price),
+    amount: r3(itemAmount(i, c.kind)), status: cx(c) ? 'Canceled' : 'Sold', _cx: cx(c),
   })));
   if (lines.length) {
     const ws2 = wb.addWorksheet('Products', { properties: { tabColor: { argb: 'FF2E7D6B' } } });
     const liveLines = lines.filter(l => !l._cx);
     xlTable(ws2, {
-      title: 'Finland Optical Center — Products sold', lines: head,
       cols: [
         { header: 'Invoice No.', key: 'ref' }, { header: 'Date', key: 'date', date: true, min: 12 },
         { header: 'Branch', key: 'branch' }, { header: 'Customer Name', key: 'customer', min: 18 },
         { header: 'Item', key: 'item' }, { header: 'Description', key: 'desc', min: 22 },
-        { header: 'Qty', key: 'qty', num: true }, { header: `Amount (${CURRENCY})`, key: 'amount', num: true, money: true, min: 12 },
-        { header: 'Status', key: 'status' },
+        { header: 'Qty', key: 'qty', num: true },
+        // A reimbursement line is a price each × qty; a direct one is the line's whole price.
+        ...(direct ? [] : [{ header: `Price each (${CURRENCY})`, key: 'each', num: true, money: true, min: 12 }]),
+        { header: `Amount (${CURRENCY})`, key: 'amount', num: true, money: true, min: 12 },
+        ...(direct ? [{ header: 'Status', key: 'status' }] : []),
       ],
       rows: lines, canceled: r => r._cx,
-      totals: { label: 'Total (canceled not counted)', qty: sum(liveLines, l => l.qty), amount: Number(sum(liveLines, l => l.amount).toFixed(3)) },
+      totals: { label: TOT, qty: sum(liveLines, l => l.qty), amount: r3(sum(liveLines, l => l.amount)) },
     });
   }
 
-  // The sums: by insurer, by branch, by salesperson — sold only.
+  // Reimbursement: the prescription, one row per eye.
+  if (!direct) {
+    const v = x => (x == null ? '' : String(x));
+    const eyes = list.flatMap(c => {
+      const rx = normaliseRx(c.rx);
+      return RX_EYES.map(e => ({
+        ref: c.ref, date: c.date, customer: c.customer, eye: `${e.label} (${e.title})`,
+        ...Object.fromEntries(RX_ROWS.flatMap(r => RX_COLS.map(col => [`${r.key}_${col.key}`, v(rx[r.key]?.[e.key]?.[col.key])]))),
+        add: v(rx.add?.[e.key]),
+      }));
+    });
+    const ws4 = wb.addWorksheet('Prescriptions', { properties: { tabColor: { argb: 'FF6B4FA0' } } });
+    xlTable(ws4, {
+      cols: [
+        { header: 'Invoice No.', key: 'ref' }, { header: 'Date', key: 'date', date: true, min: 12 },
+        { header: 'Customer Name', key: 'customer', min: 18 }, { header: 'Eye', key: 'eye', min: 16 },
+        ...RX_ROWS.flatMap(r => RX_COLS.map(col => ({ header: `${r.title} ${col.label}`, key: `${r.key}_${col.key}`, num: true, min: 9 }))),
+        { header: 'Add', key: 'add', num: true, min: 7 },
+      ],
+      rows: eyes,
+    });
+  }
+
+  // The sums — sold only — under the export's details.
   const ws3 = wb.addWorksheet('Summary', { properties: { tabColor: { argb: 'FFB45309' } } });
-  const groups = [['By insurer', c => c.insurer || '—'], ['By branch', c => locName(c.branch)], ['By salesperson', c => c.employeeName || '—']];
+  const groups = direct
+    ? [['By insurer', c => c.insurer || '—'], ['By branch', c => locName(c.branch)], ['By salesperson', c => c.employeeName || '—']]
+    : [['By branch', c => locName(c.branch)], ['By payment', c => pay(c) || '—']];
   let at = 0;
-  groups.forEach(([name, key], gi) => {
+  groups.forEach(([gname, key], gi) => {
     const m = new Map();
     for (const c of live) { const k = key(c); const g = m.get(k) ?? { name: k, n: 0, amount: 0 }; g.n += 1; g.amount += claimTotal(c); m.set(k, g); }
     const rows = [...m.values()].sort((a, b) => b.amount - a.amount)
-      .map(g => ({ name: g.name, n: g.n, amount: Number(g.amount.toFixed(3)), share: total ? `${Math.round((g.amount / total) * 100)}%` : '' }));
+      .map(g => ({ name: g.name, n: g.n, amount: r3(g.amount), share: total ? `${Math.round((g.amount / total) * 100)}%` : '' }));
     at = xlTable(ws3, {
-      ...(gi ? {} : { title: 'Finland Optical Center — Insurance Sales summary', lines: head }),
-      top: gi ? at + 2 : 1, section: name, freeze: false,
-      cols: [{ header: name.replace('By ', '').replace(/^./, s => s.toUpperCase()), key: 'name', min: 24 }, { header: 'Customers', key: 'n', num: true, min: 11 },
+      ...(gi ? {} : { title: `Finland Optical Center — ${name}`, lines: head }),
+      top: gi ? at + 2 : 1, section: gname, freeze: false,
+      cols: [{ header: gname.replace('By ', '').replace(/^./, s => s.toUpperCase()), key: 'name', min: 24 }, { header: direct ? 'Customers' : 'Invoices', key: 'n', num: true, min: 11 },
         { header: `Total (${CURRENCY})`, key: 'amount', num: true, money: true, min: 14 }, { header: 'Share', key: 'share', num: true, min: 8 }],
       rows,
-      totals: { label: 'Total', n: live.length, amount: Number(total.toFixed(3)), share: live.length ? '100%' : '' },
+      totals: { label: 'Total', n: live.length, amount: r3(total), share: live.length ? '100%' : '' },
     });
   });
   ws3.views = [{ showGridLines: false }];
@@ -1072,10 +1110,11 @@ export function claimsView(me, kind = 'claim') {
   }
 
   // ── render ──
-  // ── Export to Excel: "Insurance Sales" (Sarah and the office; schema-37) ──
-  // Every Direct Insurance entry for one branch or all, one insurer or all, over the last 1 / 7 /
-  // 30 days or a range of dates — one row per invoice, and a second sheet with
-  // every product line.
+  // ── Export to Excel (Sarah and the office; schema-37) ──
+  // Direct Insurance ("Insurance Sales"): one branch or all, one insurer or
+  // all. Reimbursement Invoice (user 2026-10-20): the same without an insurer.
+  // Over the last 1 / 7 / 30 days or a range of dates. The file is named
+  // Branch_Insurer_DateRange (Branch_Reimbursement_DateRange).
   function exportModal() {
     const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
@@ -1083,24 +1122,24 @@ export function claimsView(me, kind = 'claim') {
     const range = () => (st.period === 'range' ? [st.from, st.to] : [daysAgo(st.period - 1), iso(new Date())]);
     const picked = () => {
       const [from, to] = range();
-      return store.state.claims.filter(c => c.kind === 'direct' && (st.branch === 'all' || c.branch === st.branch)
-        && (st.insurer === 'all' || c.insurer === st.insurer) && c.date >= from && c.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      return store.state.claims.filter(c => (c.kind || 'claim') === kind && (st.branch === 'all' || c.branch === st.branch)
+        && (!direct || st.insurer === 'all' || c.insurer === st.insurer) && c.date >= from && c.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     };
     const layer = openLayer('modal', () => {
       const n = picked().length;
       return `
       <div class="dw-head">
-        <div><div class="dw-kicker">Export to Excel</div><h2>Insurance Sales</h2></div>
+        <div><div class="dw-kicker">Export to Excel</div><h2>${direct ? 'Insurance Sales' : 'Reimbursement Invoices'}</h2></div>
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
-        <div class="grid2">
+        <div class="${direct ? 'grid2' : ''}">
           <label>Branch
             <select id="x-branch"><option value="all">All branches</option>${BRANCHES.map(b => `<option value="${b.code}" ${st.branch === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
           </label>
-          <label>Insurer
+          ${direct ? `<label>Insurer
             <select id="x-ins"><option value="all">All insurers</option>${insurerChoices().map(n => `<option value="${esc(n)}" ${st.insurer === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-          </label>
+          </label>` : ''}
         </div>
         <div class="fieldset">
           <div class="fs-head"><span>Period</span></div>
@@ -1139,15 +1178,22 @@ export function claimsView(me, kind = 'claim') {
         const fmt = d => asDate(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
         const branchName = st.branch === 'all' ? 'All branches' : locName(st.branch);
         const insurerName = st.insurer === 'all' ? 'All insurers' : st.insurer;
-        const blob = await insuranceWorkbook(list, {
-          scope: `${branchName} · ${insurerName}`,
+        const blob = await claimsWorkbook(list, {
+          kind,
+          scope: direct ? `${branchName} · ${insurerName}` : branchName,
           period: from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`,
           by: me.name ?? me.code,
         });
-        const who = [st.branch === 'all' ? 'All branches' : st.branch, st.insurer === 'all' ? '' : st.insurer].filter(Boolean).join(' - ');
+        // Branch_Insurer_DateRange (user 2026-10-20), e.g. SCC_OQIC_2026-10-01-to-2026-10-20.
+        const part = s => String(s).trim().replace(/[\/:*?"<>|]/g, '').replace(/\s+/g, '-');
+        const file = [
+          st.branch === 'all' ? 'All-branches' : st.branch,
+          direct ? (st.insurer === 'all' ? 'All-insurers' : st.insurer) : 'Reimbursement',
+          from === to ? from : `${from}-to-${to}`,
+        ].map(part).join('_');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Insurance Sales - ${who.replace(/[\/:*?"<>|]/g, '')} - ${from === to ? from : `${from} to ${to}`}.xlsx`;
+        a.download = `${file}.xlsx`;
         document.body.append(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 4000);
         layer.close();
@@ -1168,7 +1214,7 @@ export function claimsView(me, kind = 'claim') {
           <p class="mod-sub">${T.sub}</p>
         </div>
         <div class="mod-head-acts">
-          ${direct && canExportInsurance(me.code) ? `<button class="btn btn-ghost" data-export>${icons.download} Export</button>` : ''}
+          ${canExportInsurance(me.code) ? `<button class="btn btn-ghost" data-export>${icons.download} Export</button>` : ''}
           ${viewOnly ? '' : `<button class="btn btn-primary" data-new>${icons.plus} ${T.add}</button>`}
         </div>
       </header>

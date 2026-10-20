@@ -101,7 +101,7 @@ export const PERMS = [
   ['accounts', 'Settings: accounts & codes', 'Add, rename, close or delete accounts; sign-in codes, permissions and the employee list'],
   ['lists', 'Settings: lists & tabs', 'Categories, brand groups, insurers, lens lists and outside cutters; switch tabs on and off'],
   ['insurance_dash', 'Direct Insurance dashboard', 'What the insurers paid — by insurer, branch and salesperson'],
-  ['export_insurance', 'Export Insurance Sales', 'The Excel export in Direct Insurance'],
+  ['export_insurance', 'Excel exports', 'The Excel export in Direct Insurance and in Reimbursement Invoice'],
   ['schedule_edit', 'Schedule: edit', 'Build and publish the staff schedule'],
   ['view_only', 'View only', 'Sees what the ticks above allow, but changes nothing'],
 ];

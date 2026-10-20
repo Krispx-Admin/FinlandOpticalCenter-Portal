@@ -1254,6 +1254,22 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  EXCEL EXPORTS (user). claims.js claimsWorkbook(list, {kind,…})
+             replaces insuranceWorkbook. Data sheets have NO title band any
+             more — the header is row 1, the only frozen row (the band now
+             heads only the Summary sheet: scope, period, exported by,
+             totals). Frame (OMR) and Lenses (OMR) = what each came to, then
+             Total, then Payment (were frame / lens counts).
+             Direct Insurance: Insurance Sales, Products, Summary (insurer /
+             branch / salesperson). Reimbursement Invoice gets its own Export
+             (same window, no insurer): Reimbursement Invoices, Products
+             (qty × price each), Prescriptions (one row per eye: Distance and
+             Near SPH / CYL / AXIS / V.A., Add), Summary (branch / payment).
+             File name Branch_Insurer_DateRange, e.g.
+             SCC_OQIC_2026-10-01-to-2026-10-20.xlsx (All-branches /
+             All-insurers; Reimbursement in place of the insurer). Both behind
+             the 'export_insurance' tick, relabelled "Excel exports". Tested
+             in the Admin Demo, files read back.
  2026-10-20  Settings → Data usage (user: the office watches the database
              grow; 'accounts' permission): "X of 8 GB used" with a bar, how
              much is the portal's own records, growth per month and how long
