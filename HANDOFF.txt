@@ -825,6 +825,15 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-58-open-as.sql      account_switches (by_code, to_code, at): read by
+                             'accounts', written only by the edge function.
+                             Applied 2026-10-20.
+  EDGE FUNCTION open-as      supabase/functions/open-as/index.ts, deployed via
+                             the Management API (POST /v1/projects/<ref>/
+                             functions/deploy?slug=open-as, multipart metadata +
+                             file; verify_jwt false — it checks the caller with
+                             auth.getUser itself). Redeploy the same way after
+                             editing; there is no CLI on this machine.
   schema-57-tabs-given.sql   branches.tabs_shown text[] (anon cannot read);
                              set_tabs(code, hidden, shown) for 'accounts'.
                              Applied 2026-10-20.
@@ -1277,6 +1286,22 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  "OPEN AS…" (user asked for a master code into every branch; chose
+             instead, when offered, a switch inside the portal). Sidebar
+             "Open as…" for an account with 'accounts' (not View only): pick
+             any open account → the edge function open-as checks the caller's
+             session and permission, makes a one-time sign-in link for the
+             target (never sent), turns it into a session, records the switch
+             in account_switches, and returns the session; the browser takes
+             it (auth.openAs). The session you came from is kept in this tab
+             (sessionStorage focp.openedFrom) — "Back to <you>" in the sidebar
+             returns to it; Sign out clears it. NO master code exists and no
+             code is stored, read or changed; every account keeps its own.
+             Why it is safe: only an account that can already set any code
+             can use it. Admin Demo: switches straight away (no server).
+             CORS: foc-portal.org only. Tested live: refuses no session /
+             fake session (401); the full switch tested in the Admin Demo —
+             first live use to be confirmed (account_switches gets a row).
  2026-10-20  Tabs per account, take two (user: the ticks showed Lens Stock and
              Outside Lens Orders on for every branch though they could not see
              them; wants to be able to give them later). data.js seesTab /

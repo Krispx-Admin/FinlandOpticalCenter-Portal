@@ -7,7 +7,7 @@ import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
 import * as auth from './auth.js';
-import { esc, icons, toast, closeLayer } from './ui.js';
+import { esc, icons, toast, closeLayer, openLayer } from './ui.js';
 import { armSound } from './sound.js';
 import { notifier, actionIds, relevantNotice } from './notify.js';
 import { fittingView } from './fitting.js';
@@ -376,6 +376,8 @@ function renderShell() {
             </div>
           </div>
           <div class="side-actions">
+            ${auth.openedFrom() ? `<button class="side-link side-back" id="open-back">${icons.history}<span>Back to ${esc(loc(auth.openedFrom().code)?.name ?? auth.openedFrom().code)}</span></button>` : ''}
+            ${can(me, 'accounts') ? `<button class="side-link" id="open-as">${icons.users}<span>Open as…</span></button>` : ''}
             <button class="side-link" id="signout">${icons.logout}<span>Sign out</span></button>
           </div>
         </div>
@@ -389,6 +391,12 @@ function renderShell() {
     const on = !shell.classList.contains('collapsed');
     shell.classList.toggle('collapsed', on);
     rememberSide(on);
+  });
+  app.querySelector('#open-as')?.addEventListener('click', openAsModal);
+  app.querySelector('#open-back')?.addEventListener('click', async () => {
+    const r = await auth.backFromOpened();
+    if (!r.branch) { toast({ title: 'Could not go back', sub: r.error ?? '', tone: 'stock' }); store.stop(); store.session = null; teardownShell(); return renderLogin(); }
+    await reenter(r.branch);
   });
   app.querySelector('#signout').addEventListener('click', () => {
     auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
@@ -508,6 +516,55 @@ function presenterWanted() {
 // without the form — the same auth.signIn, so it opens no door the form does
 // not. Signing in replaces the session; if the code is refused, the branch
 // that was signed in stays signed in and its screen comes back.
+// ── Open as… (schema-58): any account, for one with 'accounts' — no code ──
+async function reenter(branch) {
+  store.stop(); teardownShell(); closeLayer();
+  store.session = branch;
+  location.hash = homeOf(branch);
+  await enterShell();
+}
+function openAsModal() {
+  const me = store.session;
+  const ui = { q: '' };
+  const list = () => LOCATIONS.filter(l => l.active !== false && l.code !== me.code && (!auth.isPractice || BRANCH_KINDS.includes(l.role)))
+    .filter(l => !ui.q || `${l.code} ${l.name}`.toLowerCase().includes(ui.q.toLowerCase()));
+  const rows = () => {
+    const ls = list();
+    const grp = (title, xs) => (xs.length ? `<div class="oa-h">${title}</div>${xs.map(l => `
+      <button type="button" class="oa-row" data-open="${esc(l.code)}"><span class="loc-chip">${esc(l.code)}</span><b>${esc(l.name)}</b><span class="muted sm">${esc(ROLES[l.role]?.label ?? '')}</span></button>`).join('')}` : '');
+    return grp('Branches', ls.filter(l => BRANCH_KINDS.includes(l.role))) + grp('People', ls.filter(l => !BRANCH_KINDS.includes(l.role)))
+      || '<p class="muted sm">No account matches.</p>';
+  };
+  const layer = openLayer('modal', () => `
+    <div class="dw-head">
+      <div><div class="dw-kicker">Without its code</div><h2>Open as…</h2></div>
+      <button class="icon-btn" data-close>${icons.x}</button>
+    </div>
+    <div class="form">
+      <p class="muted sm">See and work in the portal as that account. “Back to ${esc(me.name)}” in the sidebar brings you back. Every switch is recorded.</p>
+      <div class="searchbox">${icons.search}<input id="oa-q" placeholder="Search accounts…" autocomplete="off"></div>
+      <div class="oa-list" id="oa-list">${rows()}</div>
+    </div>`);
+  layer.el.querySelector('#oa-q').focus();
+  layer.el.addEventListener('input', e => { if (e.target.id === 'oa-q') { ui.q = e.target.value; layer.el.querySelector('#oa-list').innerHTML = rows(); } });
+  layer.el.addEventListener('click', async e => {
+    if (e.target.closest('[data-close]')) return layer.close();
+    const b = e.target.closest('[data-open]');
+    if (!b) return;
+    layer.el.querySelectorAll('[data-open]').forEach(x => { x.disabled = true; });
+    b.classList.add('is-busy');
+    const r = await auth.openAs(b.dataset.open);
+    if (!r.branch) {
+      layer.el.querySelectorAll('[data-open]').forEach(x => { x.disabled = false; });
+      b.classList.remove('is-busy');
+      return toast({ title: `Could not open ${b.dataset.open}`, sub: r.error ?? '', tone: 'stock' });
+    }
+    layer.close();
+    await reenter(r.branch);
+    toast({ title: `Opened as ${r.branch.name}`, sub: 'Use “Back to …” in the sidebar to return.', tone: 'info' });
+  });
+}
+
 async function switchBranch(code, pin) {
   store.stop();
   teardownShell();

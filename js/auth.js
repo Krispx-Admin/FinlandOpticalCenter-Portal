@@ -64,6 +64,7 @@ export async function signIn(branchCode, code, captchaToken = null) {
 // the library's default ('global') would sign the branch out on every device
 // at once — a second till signing out used to log the first one out too.
 export async function signOut() {
+  try { sessionStorage.removeItem(BACK_KEY); } catch { /* fine */ }
   await supabase.auth.signOut({ scope: 'local' });
 }
 
@@ -74,6 +75,49 @@ export function onAuthChange(fn) {
     fn(branchOf(session?.user), event);
   });
   return () => data?.subscription?.unsubscribe();
+}
+
+// ── Open as another account (schema-58, supabase/functions/open-as) ──
+// For an account with 'accounts' (the function checks). The session you came
+// from is kept in this tab, so "Back to …" returns to it without a code.
+const BACK_KEY = 'focp.openedFrom';
+export const openedFrom = () => { try { return JSON.parse(sessionStorage.getItem(BACK_KEY) || 'null'); } catch { return null; } };
+export async function openAs(code) {
+  if (isPractice) {
+    // The Admin Demo has no server: any of its accounts opens straight away.
+    const back = openedFrom() ?? { code: (await currentBranch())?.code, practice: true };
+    const r = await signIn(code, 'practice');
+    if (r.branch) try { sessionStorage.setItem(BACK_KEY, JSON.stringify(back)); } catch { /* fine */ }
+    return r;
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: 'Sign in first' };
+  let body;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/open-as`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ code }),
+    });
+    body = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: body.error || `Could not open ${code}` };
+  } catch { return { error: 'Could not reach the server — check the connection.' }; }
+  // Only the first switch is remembered: "Back" always returns to you.
+  const back = openedFrom() ?? { code: branchOf(session.user)?.code, access_token: session.access_token, refresh_token: session.refresh_token };
+  const { data, error } = await supabase.auth.setSession({ access_token: body.access_token, refresh_token: body.refresh_token });
+  if (error || !branchOf(data?.user)) return { error: error?.message || `Could not open ${code}` };
+  try { sessionStorage.setItem(BACK_KEY, JSON.stringify(back)); } catch { /* fine */ }
+  return { branch: branchOf(data.user) };
+}
+export async function backFromOpened() {
+  const back = openedFrom();
+  if (!back) return { error: 'Nothing to go back to' };
+  const r = back.practice
+    ? await signIn(back.code, 'practice')
+    : await supabase.auth.setSession({ access_token: back.access_token, refresh_token: back.refresh_token })
+      .then(({ data, error }) => (error || !branchOf(data?.user) ? { error: 'Your own sign-in has ended — sign in again.' } : { branch: branchOf(data.user) }));
+  try { sessionStorage.removeItem(BACK_KEY); } catch { /* fine */ }
+  return r;
 }
 
 // ── Office-only: set a branch's code ──
