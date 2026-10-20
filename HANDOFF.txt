@@ -825,6 +825,19 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-55-mend-dashes.sql  assert_good_pin, confirm/send/decline_lens_request:
+                             "—" had been stored as "â€”" (applied through a
+                             cp1252 console). Applied 2026-10-20. Apply SQL as
+                             UTF-8 from now on.
+  schema-54-lens-stock-any-account.sql  set_lens_holder: any open account;
+                             save_branch: a holder may change kind, only not
+                             close; create_lens_request / change_lens_fulfilment:
+                             send_frames only to a shelf at a fitting centre.
+                             Applied 2026-10-20.
+  schema-53-tabs-per-account.sql  branches.tabs_hidden text[] (not readable by
+                             anon); 'data' added for every branch now and by a
+                             before-insert trigger for new ones;
+                             set_tabs_hidden() for 'accounts'. Applied 2026-10-20.
   schema-52-storage-usage.sql  storage_usage_log (one reading a day: whole
                              database + the portal's tables; RLS on, no
                              grants); record_storage_usage() (nobody may
@@ -1254,6 +1267,40 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-20  DATA TAB + TABS PER ACCOUNT + ACCOUNTS PAGE + LENS STOCK + POP-UPS.
+             · Data (js/insights.js; sidebar "Data", chart icon): sections
+               Fitting Log, Stock Requests, Lens Stock, Outside Lenses, Direct
+               Insurance, Reimbursement Invoice, Damaged Stock. Period chips
+               (Today / 7 / 30 / 90 days / 12 months / Dates) + branch. Each:
+               numbers (counts, totals, average times), a bar chart per day /
+               week / month, breakdowns (top 9 + Other, with %), and every
+               record in one sortable, searchable table (200 shown, Show all).
+               A period past the 45-day window loads older work once.
+             · Tabs per account (schema-53; user chose "every sidebar tab"):
+               Settings → Accounts → an account → "Tabs it sees". Hidden =
+               not in its sidebar (app.js moduleAllowed); a tick never opens a
+               tab the account cannot use; Settings follows permissions. Data
+               hidden for branches by default, shown for people.
+             · Accounts page redesigned (user: "too messy"): search, chips
+               All / Branches / People / Closed, one line per account (code,
+               name + Arabic, kind, tags Lens stock / Lab / Closed, access and
+               tabs summary, last sign-in); click → a panel with sections Name
+               and kind · Sign-in code · What it can do · Tabs it sees · Lens
+               stock and lab · Open or closed (+ Delete). Same handlers as
+               before (data-br-*); the permissions window returns to the panel.
+             · Lens stock (schema-54): any open account may hold it. A shelf
+               not at a fitting centre cannot take frames: isBenchClosed() is
+               true for non-fitting accounts, so "send the frame" is greyed
+               ("Not a fitting centre — the lenses come to you").
+             · Stock Requests say "Group" where they said "Brand" (the pick
+               list: Essential / Signature / Elite Line…) — screens, the print
+               sheet's order table, Settings category tick "Group" / "Groups
+               from". The print sheet's fill-in table stays Brand · Barcode ·
+               Qty (the brands actually picked).
+             · Pop-ups (ui.js toast): two at most, compact (2-line clamp),
+               × to close, hover holds them; more fold into one bar "+N more
+               updates · latest: … · Clear all" (gone after 9 s quiet).
+             · Admin Demo rebuilt (VERSION 11).
  2026-10-20  Pick sheet notes (user): a product's note is its own row under the
              product ("NOTE black or tortoise", one tbody per product so the
              two never part, the tick box spans both); the request's note is a

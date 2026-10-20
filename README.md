@@ -78,6 +78,7 @@ supabase/*.sql      schema, row level security, functions, realtime
 js/demo.js          Admin Demo (?AdminDemo=SCC): the database inside the browser
 js/phone.js         phone number with a country picker; js/countries.js the codes
 js/notify.js        the notification bell on each tab (All / My Action / Off) and what rings
+js/insights.js      the Data tab: numbers, a chart, breakdowns and every record, per tab
 js/sound.js         its two sounds — Web Audio, no file
 demo/               practice copy's layout + starting data, and build.py that makes them
 ```
@@ -149,6 +150,9 @@ Applied in order:
 | `supabase/schema-50-permissions.sql` | access permissions per account (tick boxes + View only); people are one kind |
 | `supabase/schema-51-outside-supplier.sql` | the outside-lens supplier's name and WhatsApp number (`set_outside_supplier`) |
 | `supabase/schema-52-storage-usage.sql` | Settings → Data usage: `storage_usage()`, a daily reading (`storage_usage_log`, pg_cron) |
+| `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
+| `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
+| `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
 | `supabase/schema-15-invoice-numbers.sql` | claims are numbered `INV-…` (the three made before are renamed) |
 
 Reference numbers (`SR-…`, `LR-…`, `INV-…`, `DI-…`) are allocated by Postgres sequences

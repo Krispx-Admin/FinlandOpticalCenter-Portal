@@ -116,7 +116,7 @@ export function stockView(me) {
       <table class="lines">
         <thead><tr>
           <th>Category</th>
-          ${anyBrand ? '<th>Brand</th>' : ''}
+          ${anyBrand ? '<th>Group</th>' : ''}
           ${anyAud ? '<th>Audience</th>' : ''}
           ${anyQty ? '<th class="num">Qty</th>' : ''}
           ${partly ? '<th>Sent</th>' : ''}
@@ -294,7 +294,7 @@ export function stockView(me) {
       </div>
       ${r.note ? `<div class="note"><b>Note from ${esc(r.branch)}</b>${esc(r.note)}</div>` : ''}
       <div class="order"><table>
-        <thead><tr><th>#</th><th>Category</th><th>Brand</th><th>For</th><th class="num">Qty</th><th>✓</th></tr></thead>
+        <thead><tr><th>#</th><th>Category</th><th>Group</th><th>For</th><th class="num">Qty</th><th>✓</th></tr></thead>
         ${lines}
       </table></div>
       <div class="sum">${r.lines.length} line${r.lines.length === 1 ? '' : 's'}${units ? ` · ${units}` : ''}</div>
@@ -372,7 +372,7 @@ export function stockView(me) {
           ${sel('category', cats.map(c => c.name), l.category, i)}
           ${c.needsBrand
             ? (bs.length ? sel('brand', bs, l.brand, i)
-                         : '<span class="cl-na" title="This category’s brand group is empty — add brands in Settings.">no brands</span>')
+                         : '<span class="cl-na" title="This category’s list is empty — add to it in Settings.">none set</span>')
             : '<span class="cl-na">—</span>'}
           ${c.needsAudience ? sel('audience', AUDIENCES, l.audience, i) : '<span class="cl-na">—</span>'}
           ${c.needsQty !== false ? `
@@ -392,7 +392,7 @@ export function stockView(me) {
       </div>
       <div class="form">
         <div class="composer-lines">
-          <div class="cl-head"><span>Category</span><span>Brand</span><span>Audience</span><span>Qty</span><span>Note</span><span></span></div>
+          <div class="cl-head"><span>Category</span><span>Group</span><span>Audience</span><span>Qty</span><span>Note</span><span></span></div>
           ${lines.map((l, i) => lineRow(l, i)).join('')}
         </div>
         <button class="btn btn-ghost btn-sm dm-add" data-add>${icons.plus} Add line</button>

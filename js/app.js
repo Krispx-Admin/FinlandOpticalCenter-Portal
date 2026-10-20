@@ -2,6 +2,7 @@
 import { LOCATIONS, ROLES, BRANCH_KINDS, can, isPerson, loc, canSeeOrder, canSeeRequest, canSeeLensRequest, needsAction, isLensOwner, readOnly, tabOff, setLocations, seesAll, outsideHandler } from './data.js';
 import { captchaOn, mountCaptcha } from './captcha.js';
 import { damagedView } from './damaged.js';
+import { insightsView } from './insights.js';
 import { outsideView } from './outside.js';
 import { fetchBranches, fetchDisabledTabs } from './db.js';
 import { store } from './store.js';
@@ -292,6 +293,9 @@ const MODULES = {
   claims:   { label: 'Reimbursement Invoice', icon: 'receipt', make: me => claimsView(me, 'claim') },
   direct:   { label: 'Direct Insurance', icon: 'shield', make: me => claimsView(me, 'direct') },
   damaged:  { label: 'Damaged Stock', icon: 'damage', make: damagedView },
+  // What has been happening, per tab (insights.js) — hidden for branches
+  // unless the office ticks it (schema-53).
+  data:     { label: 'Data', icon: 'chart', make: insightsView },
   schedule: { label: 'Schedule', icon: 'calendar', make: scheduleView },
   // Settings: for an account allowed to manage accounts or the lists (schema-50).
   settings: { label: 'Settings', icon: 'settings', make: settingsView, only: me => can(me, 'accounts') || can(me, 'lists') },
@@ -302,7 +306,9 @@ const homeOf = me => (isPerson(me) && can(me, 'schedule_edit') && !can(me, 'act_
 
 function moduleAllowed(key, me) {
   const m = MODULES[key];
-  return m && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
+  // The office hides tabs per account (schema-53); Settings follows the permissions.
+  const hidden = key !== 'settings' && (me?.tabsHidden ?? []).includes(key);
+  return m && !hidden && (!m.only || m.only(me)) && !(auth.isPractice && key === 'schedule');
 }
 
 // A tab the office switched off in Settings is closed to everyone else; the

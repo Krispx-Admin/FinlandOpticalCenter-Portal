@@ -63,10 +63,13 @@ export const isLabOff = code => {
 };
 export const labMode = code => (isLabOff(code) ? 'off' : LOCATIONS.find(x => x.code === code)?.benchOwnOnly ? 'inhouse' : 'on');
 // Takes no work from other branches (Off or In-house only) — what every
-// "send it there" check asks.
-export const isBenchClosed = code => labMode(code) !== 'on';
+// "send it there" check asks. An account that is not a fitting centre has no
+// lab at all: a lens shelf kept there sends its lenses (schema-54).
+const cutsHere = code => LOCATIONS.find(x => x.code === code)?.role === 'fitting';
+export const isBenchClosed = code => !cutsHere(code) || labMode(code) !== 'on';
 export const LAB_MODES = [['on', 'On'], ['inhouse', 'In-house only'], ['off', 'Off']];
 export const benchNote = code => {
+  if (!cutsHere(code)) return 'Not a fitting centre — the lenses come to you';
   if (labMode(code) === 'inhouse') return 'Lab in-house only';
   const until = LOCATIONS.find(x => x.code === code)?.benchUntil;
   return `Lab off${until ? ` until ${new Date(until + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}` : ''}`;
@@ -84,6 +87,8 @@ export function setLocations(rows) {
     // The ticks (schema-50); before signing in they are not readable, and an
     // older database had kinds instead — read those the same way.
     perms: Array.isArray(r.perms) ? r.perms : legacyPerms(r),
+    // The sidebar tabs this account does not see (schema-53).
+    tabsHidden: Array.isArray(r.tabs_hidden) ? r.tabs_hidden : [],
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));
@@ -167,6 +172,7 @@ export const TABS = [
   { key: 'direct',   label: 'Direct Insurance', icon: 'shield' },
   { key: 'damaged',  label: 'Damaged Stock',    icon: 'damage' },
   { key: 'schedule', label: 'Schedule',         icon: 'calendar' },
+  { key: 'data',     label: 'Data',             icon: 'chart', note: 'Not for branches unless ticked' },
 ];
 export const tabOff = (settings, key) => key !== 'settings' && (settings?.disabledTabs ?? []).includes(key);
 
@@ -353,7 +359,7 @@ export function outsideCopyText(x, order) {
 export function fulfilmentSwitch(r, o, code) {
   if (!r || !o || r.status === 'declined') return null;
   if (!(r.branch === code || can(code, 'act_all'))) return null;
-  if (r.fulfilment === 'receive_lens' && o.status === 'pending') return 'send_frames';
+  if (r.fulfilment === 'receive_lens' && o.status === 'pending' && cutsHere(r.holder)) return 'send_frames';
   if (r.fulfilment === 'send_frames' && o.status === 'lenses_in' && o.fitter === r.holder) return 'receive_lens';
   return null;
 }

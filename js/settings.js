@@ -32,7 +32,7 @@ export function settingsView(me) {
         <div class="set-cat-body">
           <div class="set-cat-name">${icons.tag}<input class="set-bg-name set-cat-input" value="${esc(c.name)}" data-cat-name="${esc(c.name)}" aria-label="Category name" title="Click to rename"></div>
           <div class="set-cat-flags">
-            <label class="check sm"><input type="checkbox" data-flag="needsBrand" data-cat="${esc(c.name)}" ${c.needsBrand ? 'checked' : ''}><i></i>Brand</label>
+            <label class="check sm"><input type="checkbox" data-flag="needsBrand" data-cat="${esc(c.name)}" ${c.needsBrand ? 'checked' : ''}><i></i>Group</label>
             <label class="check sm"><input type="checkbox" data-flag="needsAudience" data-cat="${esc(c.name)}" ${c.needsAudience ? 'checked' : ''}><i></i>Audience</label>
             <label class="check sm"><input type="checkbox" data-flag="needsQty" data-cat="${esc(c.name)}" ${c.needsQty !== false ? 'checked' : ''}><i></i>Quantity</label>
           </div>
@@ -40,7 +40,7 @@ export function settingsView(me) {
             <label class="set-ctl"><span>Counted</span>
               <select data-cat-unit="${esc(c.name)}">${unitOptionsHTML(c.unit)}</select>
             </label>
-            <label class="set-ctl"><span>Brands from</span>
+            <label class="set-ctl"><span>Groups from</span>
               <select data-cat-group="${esc(c.name)}"
                 title="${c.needsBrand ? 'Which brand group this category offers' : 'This category does not ask for a brand'}">
                 ${groupOptionsHTML(c.brandGroup, !c.needsBrand)}
@@ -112,57 +112,163 @@ export function settingsView(me) {
   const accountOptions = sel => `<optgroup label="Branch">${kindOptions(sel)}</optgroup>
     <optgroup label="Person">${PERSON_KINDS.map(k => `<option value="${k}" ${sel === k ? 'selected' : ''}>${esc(ROLES[k].label)}</option>`).join('')}</optgroup>`;
 
+  // ── Accounts (user 2026-10-20: "too messy… make it easier to navigate") ──
+  // A plain list — one line per account, what matters at a glance — and a
+  // panel per account, opened by clicking it, with everything in sections:
+  // name, sign-in, what it can do and which tabs it sees, lens stock & lab,
+  // open or closed. The list searches and filters; branches, then people.
+  let accRows = [], accUi = { q: '', show: 'all' }, accDrawer = null;
+  const isPersonRow = r => !BRANCH_KINDS.includes(r.role);
+  const hiddenOf = code => LOCATIONS.find(l => l.code === code)?.tabsHidden ?? [];
+  // Every tab an account can be shown or not (Settings follows its permissions).
+  const tabsSummary = code => {
+    const h = hiddenOf(code).filter(k => TABS.some(t => t.key === k)).length;
+    return h ? `${TABS.length - h} of ${TABS.length} tabs` : 'All tabs';
+  };
+  const seenText = r => (!r.active ? 'Closed — cannot sign in' : r.has_account
+    ? (r.last_sign_in ? `Signed in ${relTime(Date.parse(r.last_sign_in))}` : 'Never signed in')
+    : 'No sign-in account');
+
   async function loadBranches() {
     const host = root.querySelector('#set-branches');
     if (!host) return;
     const { rows, error } = await branchAccess();
     if (!root.contains(host)) return;
-    if (error) { host.innerHTML = `<p class="muted sm">Could not load the branches — ${esc(error)}</p>`; return; }
-    // Branches first, then the people — the office, Ghiath and the view-only
-    // admins sign in too, but are never a place (user, 2026-10-17).
-    const isPerson = r => !BRANCH_KINDS.includes(r.role);
-    const ordered = [...rows.filter(r => !isPerson(r)), ...rows.filter(isPerson)];
-    const firstPerson = ordered.find(isPerson)?.code;
-    host.innerHTML = ordered.map(r => {
-      const lensLocked = r.holds_lens_stock;      // a lens holder stays an open fitting centre
-      const fitting = r.role === 'fitting' && r.active;
-      // Every account has the same controls (user, 2026-10-17); one that
-      // cannot apply to this kind of account is greyed out, saying why.
-      const off = (on, why) => (on ? '' : `disabled title="${esc(why)}"`);
-      return `${r.code === firstPerson ? '<h3 class="br-sub">People</h3>' : ''}
-      <div class="br-row ${r.active ? '' : 'is-closed'}" data-branch="${esc(r.code)}">
+    if (error) { host.innerHTML = `<p class="muted sm">Could not load the accounts — ${esc(error)}</p>`; return; }
+    accRows = rows;
+    drawAccounts();
+    accDrawer?.update();
+  }
+
+  function drawAccounts() {
+    const host = root.querySelector('#set-branches');
+    if (!host) return;
+    const q = accUi.q.trim().toLowerCase();
+    const fits = r => (!q || [r.code, r.name, LOCATIONS.find(l => l.code === r.code)?.nameAr, ROLES[r.role]?.label].some(v => String(v ?? '').toLowerCase().includes(q)))
+      && (accUi.show === 'all' || (accUi.show === 'branch' && !isPersonRow(r)) || (accUi.show === 'person' && isPersonRow(r)) || (accUi.show === 'closed' && !r.active));
+    const n = k => accRows.filter(r => (k === 'branch' ? !isPersonRow(r) : k === 'person' ? isPersonRow(r) : k === 'closed' ? !r.active : true)).length;
+    const group = (title, list) => (list.length ? `
+      <div class="acc-group"><h3>${title} <span>${list.length}</span></h3>
+        <div class="acc-list">${list.map(rowHTML).join('')}</div></div>` : '');
+    const shown = accRows.filter(fits);
+    host.innerHTML = `
+      <div class="acc-tools">
+        <div class="searchbox">${icons.search}<input id="acc-q" placeholder="Search name, code, kind…" value="${esc(accUi.q)}"></div>
+        <div class="chips status-chips">${[['all', 'All'], ['branch', 'Branches'], ['person', 'People'], ['closed', 'Closed']].map(([k, l]) =>
+          `<button type="button" class="chip ${accUi.show === k ? 'on' : ''}" data-acc-show="${k}">${l} <span class="chip-n">${n(k)}</span></button>`).join('')}</div>
+      </div>
+      ${group('Branches', shown.filter(r => !isPersonRow(r)))}
+      ${group('People', shown.filter(isPersonRow))}
+      ${shown.length ? '' : `<div class="empty">${icons.search}<p>No account matches.</p></div>`}`;
+  }
+
+  function rowHTML(r) {
+    const L = LOCATIONS.find(l => l.code === r.code);
+    const tags = [
+      !r.active ? '<span class="acc-tag t-closed">Closed</span>' : '',
+      r.holds_lens_stock ? `<span class="acc-tag t-lens">${icons.lens} Lens stock</span>` : '',
+      r.role === 'fitting' && r.active && labMode(r.code) !== 'on' ? `<span class="acc-tag t-lab">Lab ${labMode(r.code) === 'off' ? 'off' : 'in-house only'}</span>` : '',
+    ].join('');
+    return `
+      <button type="button" class="acc-row ${r.active ? '' : 'is-closed'}" data-acc="${esc(r.code)}">
         <span class="loc-chip">${esc(r.code)}</span>
-        <input class="br-name" data-br-name="${esc(r.code)}" value="${esc(r.name)}" aria-label="Name of ${esc(r.code)}" required>
-        <select class="br-role" data-br-role="${esc(r.code)}" aria-label="What ${esc(r.code)} is"
-          ${lensLocked ? 'disabled title="Holds lens stock, so it stays a fitting centre"' : ''}>${accountOptions(r.role)}</select>
-        <div class="ba-seen muted sm">${!r.active ? 'closed — cannot sign in' : r.has_account
-          ? (r.last_sign_in ? 'last signed in ' + relTime(Date.parse(r.last_sign_in)) : 'never signed in')
-          : 'no account'}</div>
-        <form class="ba-set" data-set="${esc(r.code)}">
-          <input name="code" inputmode="numeric" maxlength="6" pattern="\\d{6}"
-                 placeholder="new code" ${r.has_account && r.active ? '' : 'disabled'} autocomplete="off">
-          <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account && r.active ? '' : 'disabled'}>Set</button>
-        </form>
-        <label class="br-open ${lensLocked ? 'is-off' : ''}" ${lensLocked ? 'title="Holds lens stock, so it stays open"' : ''}>
-          <span class="sw"><input type="checkbox" data-br-open="${esc(r.code)}" ${r.active ? 'checked' : ''} ${lensLocked ? 'disabled' : ''}><i></i></span>
-          <span>${r.active ? 'Open' : 'Closed'}</span></label>
-        <button class="icon-btn br-del" data-br-del="${esc(r.code)}" title="${lensLocked ? 'Holds lens stock — stop that first' : 'Delete this account'}" ${lensLocked || r.code === me.code ? 'disabled' : ''}>${icons.trash}</button>
-        <div class="br-opts">
-          ${isPerson(r) ? '' : `<label class="br-ar"><span>Arabic name</span>
-            <input dir="rtl" lang="ar" data-br-ar="${esc(r.code)}" value="${esc(LOCATIONS.find(l => l.code === r.code)?.nameAr ?? '')}" placeholder="الاسم بالعربية" aria-label="Arabic name of ${esc(r.code)}"></label>`}
-          <label class="br-lens br-bench ${fitting ? '' : 'is-off'}" title="${fitting ? 'In-house only: it cuts its own jobs, other branches can’t send any. Off: nothing.' : 'Only an open fitting centre has a lab'}">
-            <span>Lab</span>
-            <select class="sel sel-sm" data-br-lab="${esc(r.code)}" ${off(fitting, 'Only an open fitting centre has a lab')}>${LAB_MODES.map(([k, l]) => `<option value="${k}" ${fitting && labMode(r.code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-          </label>
-          <label class="br-lens ${fitting ? '' : 'is-off'}" title="${fitting ? 'Keeps loose-lens stock other branches can request from' : 'Only an open fitting centre can hold lens stock'}">
-            <span class="sw"><input type="checkbox" data-br-lens="${esc(r.code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(fitting, 'Only an open fitting centre can hold lens stock')}><i></i></span>
-            <span>${r.holds_lens_stock ? 'Holds lens stock' : 'No lens stock'}</span>
-          </label>
-          <button type="button" class="btn btn-ghost btn-sm br-perms" data-br-perms="${esc(r.code)}">${icons.shield} Access Permissions <em>${esc(permSummary(r.code))}</em></button>
+        <span class="acc-name"><b>${esc(r.name)}</b>${L?.nameAr ? `<span dir="rtl" lang="ar">${esc(L.nameAr)}</span>` : ''}</span>
+        <span class="acc-kind">${esc(ROLES[r.role]?.label ?? r.role)}</span>
+        <span class="acc-tags">${tags}</span>
+        <span class="acc-access"><span>${esc(permSummary(r.code))}</span><span>${esc(tabsSummary(r.code))}</span></span>
+        <span class="acc-seen">${esc(seenText(r))}</span>
+        ${icons.chevronRight}
+      </button>`;
+  }
+
+  // One account, in sections. The controls carry the same data-* as before,
+  // so the same handlers save them.
+  function accountDrawer(code) {
+    accDrawer = openLayer('drawer', () => accountHTML(code), { onClose: () => { accDrawer = null; } });
+    const el = accDrawer.el;
+    el.addEventListener('change', e => {
+      const d = e.target.dataset;
+      if (d.brName != null) {
+        const v = e.target.value.trim();
+        if (!v) { e.target.value = LOCATIONS.find(l => l.code === d.brName)?.name ?? ''; return; }
+        return store.saveBranch(d.brName, { name: v });
+      }
+      if (d.brAr != null) return store.setBranchNameAr(d.brAr, e.target.value.trim());
+      if (d.brRole) return saveRole(e.target);
+      if (d.brOpen) return saveOpen(e.target);
+      if (d.brLens) return saveLens(e.target);
+      if (d.brLab) return store.setLab(d.brLab, e.target.value);
+      if (d.accTab) {
+        const hidden = [...el.querySelectorAll('[data-acc-tab]')].filter(x => !x.checked).map(x => x.dataset.accTab);
+        return store.setTabsHidden(code, hidden);
+      }
+    });
+    el.addEventListener('submit', e => {
+      const f = e.target.closest('form[data-set]');
+      if (f) { e.preventDefault(); applyCode(f); }
+    });
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-close]')) return accDrawer?.close();
+      const back = () => { if (root.isConnected && root.querySelector('#set-branches')) accountDrawer(code); };
+      if (e.target.closest('[data-br-perms]')) return permissionsModal(code, back);
+      if (e.target.closest('[data-br-del]')) return deleteBranchModal(code);
+    });
+  }
+
+  function accountHTML(code) {
+    const r = accRows.find(x => x.code === code);
+    const L = LOCATIONS.find(l => l.code === code);
+    if (!r || !L) return `<div class="dw-body"><p class="muted">This account is gone.</p></div>`;
+    const person = isPersonRow(r), fitting = r.role === 'fitting' && r.active;
+    const lensLocked = r.holds_lens_stock;
+    const hidden = new Set(hiddenOf(code));
+    const off = (on, why) => (on ? '' : `disabled title="${esc(why)}"`);
+    const sec = (icon, title, body, sub = '') => `
+      <section class="acc-sec"><h3>${icons[icon]} ${title}</h3>${sub ? `<p class="acc-sub">${sub}</p>` : ''}${body}</section>`;
+    return `
+      <div class="dw-head">
+        <div>
+          <div class="dw-kicker">${esc(code)} · ${esc(ROLES[r.role]?.label ?? r.role)}</div>
+          <h2>${esc(r.name)} ${r.active ? '<span class="acc-tag t-open">Open</span>' : '<span class="acc-tag t-closed">Closed</span>'}</h2>
+          <div class="dw-sub">${esc(seenText(r))}</div>
         </div>
-        <div class="ba-msg"></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="dw-body acc-body">
+        ${sec('tag', 'Name and kind', `
+          <div class="acc-grid">
+            <label>Name<input data-br-name="${esc(code)}" value="${esc(r.name)}" required></label>
+            ${person ? '' : `<label>Arabic name <span class="opt">for the WhatsApp message</span><input dir="rtl" lang="ar" data-br-ar="${esc(code)}" value="${esc(L.nameAr ?? '')}" placeholder="الاسم بالعربية"></label>`}
+            <label>Kind<select data-br-role="${esc(code)}">${accountOptions(r.role)}</select></label>
+          </div>`)}
+        ${sec('lock', 'Sign-in code', `
+          <form class="ba-set acc-code" data-set="${esc(code)}" autocomplete="off">
+            <input name="code" inputmode="numeric" maxlength="6" pattern="\\d{6}" placeholder="New 6-digit code" ${r.has_account && r.active ? '' : 'disabled'}>
+            <button class="btn btn-ghost btn-sm" type="submit" ${r.has_account && r.active ? '' : 'disabled'}>Set code</button>
+          </form>
+          <div class="ba-msg"></div>`, r.active ? 'The code it signs in with. Setting a new one does not sign it out.' : 'Closed — open it again to set a code.')}
+        ${sec('shield', 'What it can do', `
+          <button type="button" class="btn btn-ghost acc-perm" data-br-perms="${esc(code)}">${icons.shield} Access Permissions <em>${esc(permSummary(code))}</em> ${icons.chevronRight}</button>`)}
+        ${sec('menu', 'Tabs it sees', `
+          <div class="acc-tabs">${TABS.map(tb => `
+            <label class="acc-tab"><span class="cbx"><input type="checkbox" data-acc-tab="${tb.key}" ${hidden.has(tb.key) ? '' : 'checked'}><i></i></span>${icons[tb.icon] ?? ''}<span>${esc(tb.label)}</span></label>`).join('')}</div>`,
+          'Untick to hide a tab from this account’s sidebar. A tick never opens a tab the account cannot use — Lens Stock is for lens-stock holders, Outside Lens Orders for the handler, unless it sees every branch.')}
+        ${sec('lens', 'Lens stock and lab', `
+          <label class="acc-switch ${r.active ? '' : 'is-off'}">
+            <span class="sw"><input type="checkbox" data-br-lens="${esc(code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(r.active, 'Open the account first')}><i></i></span>
+            <span><b>Holds lens stock</b><span>Its own shelf in Lens Stock that other branches can request from.${fitting ? '' : ' Not a fitting centre, so the lenses are sent to whoever asks.'}</span></span>
+          </label>
+          ${r.role === 'fitting' ? `<label class="acc-lab">Lab
+            <select class="sel" data-br-lab="${esc(code)}" ${off(fitting, 'Open it first')}>${LAB_MODES.map(([k, l]) => `<option value="${k}" ${labMode(code) === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="acc-sub">In-house only: it cuts its own jobs; other branches cannot send any. Off: nothing.</span></label>` : '<p class="acc-sub">Only a fitting centre has a lab.</p>'}`)}
+        ${sec('power', 'Open or closed', `
+          <label class="acc-switch ${lensLocked ? 'is-off' : ''}">
+            <span class="sw"><input type="checkbox" data-br-open="${esc(code)}" ${r.active ? 'checked' : ''} ${off(!lensLocked, 'Holds lens stock, so it stays open')}><i></i></span>
+            <span><b>${r.active ? 'Open' : 'Closed'}</b><span>Closed: off the sign-in screen and the lists; everything it recorded stays.</span></span>
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm acc-del" data-br-del="${esc(code)}" ${lensLocked || code === me.code ? 'disabled' : ''}
+            title="${lensLocked ? 'Holds lens stock — stop that first' : code === me.code ? 'You are signed in with it' : 'Only for an account added by mistake, with nothing recorded'}">${icons.trash} Delete account</button>`)}
       </div>`;
-    }).join('');
   }
 
   // ── Access permissions (schema-50): tick boxes per account ──
@@ -173,10 +279,11 @@ export function settingsView(me) {
     const view = ps.includes('view_only') ? ' · view only' : '';
     return n === all.length ? `Full access${view}` : n ? `${n} of ${all.length}${view}` : `Own branch only${view}`;
   }
-  function permissionsModal(code) {
+  function permissionsModal(code, back = null) {
     const b = LOCATIONS.find(l => l.code === code);
     if (!b) return;
     const had = new Set(permsOf(code));
+    let done = false;
     const layer = openLayer('modal', () => `
       <div class="dw-head">
         <div><div class="dw-kicker">${esc(code)} · ${esc(b.name)}</div><h2>Access Permissions</h2></div>
@@ -195,7 +302,7 @@ export function settingsView(me) {
           <button type="button" class="btn btn-ghost" data-close>Cancel</button>
           <button type="submit" class="btn btn-primary">${icons.check} Save</button>
         </div>
-      </form>`);
+      </form>`, { onClose: () => { if (back) setTimeout(back, 300); } });
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
     layer.el.addEventListener('submit', async e => {
       e.preventDefault();
@@ -367,7 +474,7 @@ export function settingsView(me) {
 
   async function applyCode(form) {
     const branch = form.dataset.set;
-    const row = form.closest('.br-row, .ba-row');
+    const row = form.closest('.br-row, .ba-row, .acc-body');
     const msg = row.querySelector('.ba-msg');
     const input = form.querySelector('input');
     const value = input.value.trim();
@@ -491,7 +598,7 @@ export function settingsView(me) {
       desc: 'Switch sidebar tabs off while they are being worked on',
       sum: () => { const n = (store.settings.disabledTabs ?? []).length; return n ? `${n} under maintenance` : 'All on'; } },
     { key: 'branches', group: 'General', icon: 'warehouse', title: 'Accounts', sections: ['branches', 'addBranch'], need: 'accounts',
-      desc: 'Every sign-in — branches and people: add, rename, set what each one is, close or delete, and the code each signs in with',
+      desc: 'Every sign-in — branches and people: name, sign-in code, what each can do and which tabs it sees, lens stock, open or closed',
       sum: () => { const shut = LOCATIONS.filter(l => l.active === false).length; return `${BRANCHES.length} open${shut ? ` · ${shut} closed` : ''}`; } },
     { key: 'usage', group: 'General', icon: 'database', title: 'Data usage', sections: ['usage'], need: 'accounts',
       desc: 'How much of the 8 GB the database uses, what takes the space, and how fast it grows',
@@ -523,7 +630,7 @@ export function settingsView(me) {
         <div id="set-cats">${categoriesHTML()}</div>
         <form class="set-add" id="add-cat">
           <input name="name" placeholder="New category — e.g. Cleaning Spray" required>
-          <label class="check sm"><input type="checkbox" name="needsBrand" checked><i></i>Brand</label>
+          <label class="check sm"><input type="checkbox" name="needsBrand" checked><i></i>Group</label>
           <label class="check sm"><input type="checkbox" name="needsAudience" checked><i></i>Audience</label>
           <label class="check sm"><input type="checkbox" name="needsQty" checked><i></i>Quantity</label>
           <select name="unit" aria-label="Counted">${unitOptionsHTML('pcs')}</select>
@@ -727,16 +834,6 @@ export function settingsView(me) {
       }
       const d = e.target.dataset;
       if (d.tab) return store.setTabOff(d.tab, !e.target.checked, d.tabLabel);
-      if (d.brName != null) {
-        const v = e.target.value.trim();
-        if (!v) { e.target.value = LOCATIONS.find(l => l.code === d.brName)?.name ?? ''; return; }
-        return store.saveBranch(d.brName, { name: v });
-      }
-      if (d.brAr != null) return store.setBranchNameAr(d.brAr, e.target.value.trim());
-      if (d.brRole) return saveRole(e.target);
-      if (d.brOpen) return saveOpen(e.target);
-      if (d.brLens) return saveLens(e.target);
-      if (d.brLab) return store.setLab(d.brLab, e.target.value);
       if (d.flag) {
         // Ticking Brand on a category with no group gives it the first one.
         const cat = store.settings.categories.find(c => c.name === d.cat);
@@ -761,13 +858,20 @@ export function settingsView(me) {
       }
     });
 
+    root.addEventListener('input', e => {
+      if (e.target.id !== 'acc-q') return;
+      accUi.q = e.target.value;
+      const at = e.target.selectionStart;
+      drawAccounts();
+      const q = root.querySelector('#acc-q'); q.focus(); q.setSelectionRange(at, at);
+    });
     root.addEventListener('click', e => {
+      const acc = e.target.closest('[data-acc]');
+      if (acc) return accountDrawer(acc.dataset.acc);
+      const show = e.target.closest('[data-acc-show]');
+      if (show) { accUi.show = show.dataset.accShow; return drawAccounts(); }
       const kind = e.target.closest('#add-kind [data-kind]');
       if (kind) return setAddKind(kind.dataset.kind);
-      const bp = e.target.closest('[data-br-perms]');
-      if (bp) return permissionsModal(bp.dataset.brPerms);
-      const bd = e.target.closest('[data-br-del]');
-      if (bd) return deleteBranchModal(bd.dataset.brDel);
       if (e.target.closest('[data-emp-new]')) return employeeModal(null);
       const ee = e.target.closest('[data-emp-edit]');
       if (ee) return employeeModal(ee.dataset.empEdit);

@@ -714,6 +714,14 @@ export const store = {
     }, { module: 'settings', title });
   },
 
+  // The sidebar tabs an account does not see (schema-53).
+  setTabsHidden(code, tabs) {
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_tabs_hidden', { p_code: code, p_tabs: tabs }));
+      return true;
+    }, { module: 'settings', title: `${code}: tabs saved` });
+  },
+
   // An account's access permissions (schema-50).
   setPermissions(code, perms) {
     return run(['branches'], async () => {

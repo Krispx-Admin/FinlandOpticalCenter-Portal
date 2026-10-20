@@ -39,7 +39,8 @@ create table public."branches" (
   "bench_own_only" boolean default false not null,
   "can_export_insurance" boolean default false not null,
   "name_ar" text,
-  "perms" text[] default '{}'::text[] not null
+  "perms" text[] default '{}'::text[] not null,
+  "tabs_hidden" text[] default '{}'::text[] not null
 );
 
 create table public."claim_items" (
@@ -647,7 +648,7 @@ begin
                 '666666','777777','888888','999999','123456','654321',
                 '012345','121212','112233')
      or length(regexp_replace(p_code, '(.)\1*', '\1', 'g')) < 3 then
-    raise exception 'That code is too easy to guess â€” choose another';
+    raise exception 'That code is too easy to guess — choose another';
   end if;
 end $function$;
 
@@ -730,6 +731,18 @@ AS $function$
     '{}'::jsonb)) d)
 $function$;
 
+CREATE OR REPLACE FUNCTION public.branches_hide_data()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+begin
+  if new.role in ('retail', 'fitting', 'clinic') and not ('data' = any(coalesce(new.tabs_hidden, '{}'))) then
+    new.tabs_hidden := array_append(coalesce(new.tabs_hidden, '{}'), 'data');
+  end if;
+  return new;
+end $function$;
+
 CREATE OR REPLACE FUNCTION public.can_schedule()
  RETURNS boolean
  LANGUAGE sql
@@ -788,8 +801,11 @@ begin
   if not found then raise exception 'The fitting order for this request is gone'; end if;
 
   if p_fulfilment = 'send_frames' then
+    if not exists (select 1 from public.branches where code = r.holder_code and role = 'fitting') then
+      raise exception '% is not a fitting centre — the lenses come to you', (select name from public.branches where code = r.holder_code);
+    end if;
     if o.status <> 'pending' then
-      raise exception 'Too late to change â€” the lenses have already been marked delivered';
+      raise exception 'Too late to change — the lenses have already been marked delivered';
     end if;
     update public.lens_requests set fulfilment = 'send_frames', status = 'reserved', updated_at = now()
      where id = r.id returning * into r;
@@ -799,7 +815,7 @@ begin
     update public.orders set fitter_code = r.holder_code, status = 'lenses_in', updated_at = now() where id = o.id;
   else
     if o.status <> 'lenses_in' or o.fitter_code is distinct from r.holder_code then
-      raise exception 'Too late to change â€” the frame has already been sent';
+      raise exception 'Too late to change — the frame has already been sent';
     end if;
     cuts := exists (select 1 from public.branches where code = r.branch_code and role in ('fitting', 'admin'));
     update public.lens_requests set fulfilment = 'receive_lens', status = 'requested', updated_at = now()
@@ -816,7 +832,7 @@ begin
   insert into public.order_events (order_id, by_code, text)
   values (o.id, coalesce(nullif(me, ''), r.branch_code),
           case when p_fulfilment = 'send_frames'
-               then format('Changed: the frame goes to %s for cutting â€” the lenses wait there', r.holder_code)
+               then format('Changed: the frame goes to %s for cutting — the lenses wait there', r.holder_code)
                else format('Changed: %s sends the lenses here', r.holder_code) end);
   return r;
 end $function$;
@@ -944,7 +960,7 @@ CREATE OR REPLACE FUNCTION public.confirm_lens_request(p_request uuid)
  SET search_path TO 'public'
 AS $function$
 begin
-  raise exception 'Lens requests are no longer confirmed â€” reload the page';
+  raise exception 'Lens requests are no longer confirmed — reload the page';
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.create_damaged_report(p_lines jsonb, p_note text DEFAULT ''::text)
@@ -1011,6 +1027,10 @@ begin
   -- Receiving: no fitter yet — once the lenses arrive the branch keeps it
   -- (if it has an open bench) or sends frame + lenses to a fitter (schema-29).
   fitter := case when p_fulfilment = 'send_frames' then owner else null end;
+  -- Only a fitting centre cuts: a shelf kept anywhere else sends the lenses (schema-54).
+  if p_fulfilment = 'send_frames' and not exists (select 1 from public.branches where code = owner and role = 'fitting') then
+    raise exception '% is not a fitting centre — choose to receive the lenses', (select name from public.branches where code = owner);
+  end if;
   if p_fulfilment = 'send_frames' and public.bench_closed(owner) then
     raise exception '% is closed — fitter on leave. Choose to receive the lenses', (select name from public.branches where code = owner);
   end if;
@@ -1037,7 +1057,7 @@ begin
       raise exception '% % % SPH % is no longer on %''s shelf', l.t, l.i, l.c, l.sph, owner;
     end if;
     if have < l.qty then
-      raise exception 'Only % left of % % % SPH % â€” ask for % or fewer', have, l.t, l.i, l.c, l.sph, have;
+      raise exception 'Only % left of % % % SPH % — ask for % or fewer', have, l.t, l.i, l.c, l.sph, have;
     end if;
     update public.lens_stock set qty = qty - l.qty, updated_at = now() where id = l.item;
     insert into public.lens_request_lines (request_id, stock_id, lens_type, lens_index, coating, sph, cyl, qty)
@@ -1048,13 +1068,13 @@ begin
     from public.lens_request_lines where request_id = req.id;
 
   insert into public.lens_request_events (request_id, by_code, text)
-  values (req.id, me, format('Requested %s lens type%s, %s pcs from %s â€” bill %s, %s; taken off %s''s shelf',
+  values (req.id, me, format('Requested %s lens type%s, %s pcs from %s — bill %s, %s; taken off %s''s shelf',
             kinds, case when kinds = 1 then '' else 's' end, pcs, owner, trim(p_bill),
             case when p_fulfilment = 'receive_lens' then 'lenses to come here' else 'frame to go over' end,
             owner));
 
   insert into public.order_events (order_id, by_code, text)
-  values (ord.id, me, format('Opened from lens request %s â€” %s',
+  values (ord.id, me, format('Opened from lens request %s — %s',
             req.ref,
             case when p_fulfilment = 'send_frames'
                    then format('lenses set aside at %s; the frame goes there for cutting', owner)
@@ -1129,7 +1149,7 @@ begin
     raise exception 'only the lens-holding branch may decline this request';
   end if;
   if r.status <> 'requested' then
-    raise exception 'request is already % â€” it can only be declined before the lenses are sent', r.status;
+    raise exception 'request is already % — it can only be declined before the lenses are sent', r.status;
   end if;
 
   update public.lens_stock s set qty = s.qty + l.qty, updated_at = now()
@@ -1139,11 +1159,11 @@ begin
   update public.lens_requests set status = 'declined', reason = why, updated_at = now()
    where id = p_request returning * into r;
   insert into public.lens_request_events (request_id, by_code, text)
-  values (p_request, public.jwt_branch(), 'Declined' || case when why <> '' then ' â€” ' || why else '' end || '; lenses back on the shelf');
+  values (p_request, public.jwt_branch(), 'Declined' || case when why <> '' then ' — ' || why else '' end || '; lenses back on the shelf');
   if r.order_id is not null then
     insert into public.order_events (order_id, by_code, text)
     values (r.order_id, public.jwt_branch(),
-            format('%s declined the lenses%s', r.holder_code, case when why <> '' then ' â€” ' || why else '' end));
+            format('%s declined the lenses%s', r.holder_code, case when why <> '' then ' — ' || why else '' end));
     update public.orders set updated_at = now() where id = r.order_id;
   end if;
   return r;
@@ -1591,8 +1611,8 @@ begin
        select 1 from public.branches o where o.code <> p_code and o.active and public.manages_accounts(o)) then
     raise exception '% is the last account that can manage accounts - give that to another first', b.name;
   end if;
-  if b.holds_lens_stock and (p_role <> 'fitting' or not p_active) then
-    raise exception '% holds the lens stock, so it has to stay an open fitting centre', b.name;
+  if b.holds_lens_stock and not p_active then
+    raise exception '% holds lens stock, so it has to stay open', b.name;
   end if;
 
   update public.branches set name = nm, role = p_role, active = p_active,
@@ -1681,7 +1701,7 @@ begin
   values (p_request, public.jwt_branch(), format('Lenses sent to %s', r.branch_code));
   if r.order_id is not null then
     insert into public.order_events (order_id, by_code, text)
-    values (r.order_id, public.jwt_branch(), format('%s sent the lenses â€” on their way to %s', r.holder_code, r.branch_code));
+    values (r.order_id, public.jwt_branch(), format('%s sent the lenses — on their way to %s', r.holder_code, r.branch_code));
     update public.orders set updated_at = now() where id = r.order_id;
   end if;
   return r;
@@ -1882,13 +1902,15 @@ begin
   if not found then raise exception 'No branch %', p_code; end if;
 
   if p_on then
-    if b.role <> 'fitting' or not b.active then
-      raise exception 'Only an open fitting centre can hold lens stock â€” frames are sent to it for cutting';
+    -- Any open account may keep a shelf (user 2026-10-20); only a fitting
+    -- centre's can take frames to cut (create_lens_request).
+    if not b.active then
+      raise exception '% is closed — open it first', b.name;
     end if;
   else
     select coalesce(sum(qty), 0) into n from public.lens_stock where holder_code = p_code;
     if n > 0 then
-      raise exception '% still has % lenses on its shelf â€” clear them first', b.name, n;
+      raise exception '% still has % lenses on its shelf — clear them first', b.name, n;
     end if;
     select count(*) into n from public.lens_requests where holder_code = p_code and status = 'requested';
     if n > 0 then
@@ -1986,6 +2008,21 @@ begin
     raise exception '% is the last account that can manage accounts - give that to another first', b.name;
   end if;
   update public.branches set perms = nxt where code = p_code;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.set_tabs_hidden(p_code text, p_tabs text[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not public.has_perm('accounts') then raise exception 'Only the office can choose the tabs'; end if;
+  update public.branches
+     set tabs_hidden = coalesce((select array_agg(distinct t order by t) from unnest(p_tabs) t
+                                  where t in ('fitting', 'stock', 'lens', 'outside', 'claims', 'direct', 'damaged', 'schedule', 'data')), '{}')
+   where code = p_code;
+  if not found then raise exception 'No such account'; end if;
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.staff_list()
@@ -2159,6 +2196,8 @@ begin
 end $function$;
 
 CREATE TRIGGER app_settings_touch BEFORE UPDATE ON public.app_settings FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+CREATE TRIGGER branches_hide_data BEFORE INSERT ON public.branches FOR EACH ROW EXECUTE FUNCTION branches_hide_data();
 
 CREATE TRIGGER claim_items_total AFTER INSERT OR DELETE OR UPDATE ON public.claim_items FOR EACH ROW EXECUTE FUNCTION recalc_claim_total();
 

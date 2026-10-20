@@ -48,6 +48,9 @@ export const icons = {
   history: I('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'),
   inbox: I('<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
   chat: I('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
+  lock: I('<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+  power: I('<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>'),
+  chart: I('<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'),
   database: I('<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>'),
   bell: I('<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>'),
   bellRing: I('<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M22 8c0-2.3-.8-4.3-2-6"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/>'),
@@ -100,16 +103,62 @@ export function locChip(code, name) {
 }
 
 // ── Toasts ──
-export function toast({ title, sub = '', tone = 'info', ms = 5200 }) {
+// Pop-ups, bottom right (user 2026-10-20: "when they stack up a lot at once
+// they cover the whole page"). Two at most, compact; anything past that folds
+// into one small bar — "+5 more updates · latest: …" with Clear all. Each has
+// an × and holds still while the pointer is on it.
+const TOAST_MAX = 2;
+let toastMore = { n: 0, last: '', timer: null };
+function toastHost() {
   let host = document.getElementById('toasts');
-  if (!host) { host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host); }
-  const t = document.createElement('div');
-  t.className = `toast tone-${tone}`;
-  t.innerHTML = `<i class="t-dot"></i><div class="t-body"><div class="t-title">${esc(title)}</div>${sub ? `<div class="t-sub">${esc(sub)}</div>` : ''}</div>`;
-  host.appendChild(t);
-  requestAnimationFrame(() => t.classList.add('in'));
-  setTimeout(() => { t.classList.remove('in'); t.addEventListener('transitionend', () => t.remove(), { once: true }); setTimeout(() => t.remove(), 600); }, ms);
-  while (host.children.length > 4) host.firstChild.remove();
+  if (!host) {
+    host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host);
+    host.addEventListener('click', e => {
+      const x = e.target.closest('[data-t-x]');
+      if (x) return dropToast(x.closest('.toast'));
+      if (e.target.closest('[data-t-clear]')) { host.querySelectorAll('.toast').forEach(dropToast); clearMore(); }
+    });
+  }
+  return host;
+}
+function dropToast(el) {
+  if (!el || el.dataset.gone) return;
+  el.dataset.gone = '1';
+  clearTimeout(el._timer);
+  el.classList.remove('in');
+  el.addEventListener('transitionend', () => el.remove(), { once: true });
+  setTimeout(() => el.remove(), 600);
+}
+function clearMore() {
+  toastMore = { n: 0, last: '', timer: null };
+  document.querySelector('#toasts .toast-more')?.remove();
+}
+function drawMore(host) {
+  let bar = host.querySelector('.toast-more');
+  if (!bar) {
+    bar = document.createElement('div'); bar.className = 'toast-more';
+    host.prepend(bar);
+  }
+  bar.innerHTML = `<span><b>+${toastMore.n} more update${toastMore.n === 1 ? '' : 's'}</b> · latest: ${esc(toastMore.last)}</span><button type="button" data-t-clear>Clear all</button>`;
+  clearTimeout(toastMore.timer);
+  toastMore.timer = setTimeout(clearMore, 9000);
+}
+export function toast({ title, sub = '', tone = 'info', ms = 5200 }) {
+  const host = toastHost();
+  const live = [...host.querySelectorAll('.toast:not([data-gone])')];
+  if (live.length >= TOAST_MAX) {
+    toastMore.n += 1; toastMore.last = title;
+    return drawMore(host);
+  }
+  const el = document.createElement('div');
+  el.className = `toast tone-${tone}`;
+  el.innerHTML = `<i class="t-dot"></i><div class="t-body"><div class="t-title">${esc(title)}</div>${sub ? `<div class="t-sub">${esc(sub)}</div>` : ''}</div><button type="button" class="t-x" data-t-x aria-label="Close">×</button>`;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  const start = () => { el._timer = setTimeout(() => dropToast(el), ms); };
+  el.addEventListener('mouseenter', () => clearTimeout(el._timer));
+  el.addEventListener('mouseleave', start);
+  start();
 }
 
 // ── Layers: one active modal or drawer at a time ──
