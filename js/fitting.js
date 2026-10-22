@@ -9,10 +9,12 @@ import {
   canEditOrder, canEditOutsideRx, canDeleteOrder, canUndoOrder, undoTarget,
   collectOf, frameLoc, canChangeCollect, LOCATIONS, LENS_HOLDERS, FIRST_SHELF,
   can,
+  isViaHub, atHubCutter, outsideCutHub,
 } from './data.js';
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
 import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
+import { isPractice } from './auth.js';
 import { BILL_ON, billFieldHTML, wireBillFields, billProblem, parseBill, planOrderBill, takePair, fixPairs } from './bill.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
@@ -28,11 +30,15 @@ const CHIP_LABELS = {
   pending: 'Waiting for Lenses', lenses_in: 'Send to Fitting', to_fitter: 'In Transit to Fitting',
   at_fitter: 'In Fitting', ready: 'Ready', returning: 'In Transit to Branch', delivered: 'Ready for Collection',
 };
+// Outside cutting through the hub (schema-62) — tried in the Admin Demo first.
+const OUT_HUB_ON = isPractice;
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
 for (const s of FIT_FLOW.filter(s => s !== 'collected')) CHIP_DEFS.push({ key: s, label: CHIP_LABELS[s], statuses: [s] });
 // A frame at an outside cutter has its own tab, not "In Transit to Fitting".
 CHIP_DEFS.find(d => d.key === 'to_fitter').test = o => o.status === 'to_fitter' && !isOutside(o);
-CHIP_DEFS.push({ key: 'outside', label: 'Outside Cutter', statuses: ['to_fitter'], test: o => o.status === 'to_fitter' && isOutside(o) });
+CHIP_DEFS.push({ key: 'outside', label: 'Outside Cutter', statuses: ['to_fitter', 'at_fitter'], test: o => (o.status === 'to_fitter' && isOutside(o)) || atHubCutter(o) });
+// …and so is one the hub sent out (schema-62), not "In Fitting".
+CHIP_DEFS.find(d => d.key === 'at_fitter').test = o => o.status === 'at_fitter' && !atHubCutter(o);
 // Every order that uses this branch's stock lenses — only a branch holding
 // lens stock has this tab (user, 2026-10-15). Matched in the view (chipHas).
 CHIP_DEFS.push({ key: 'stock', label: 'Stock Lens', statuses: [], holders: true, test: () => false });
@@ -565,6 +571,7 @@ export function fittingView(me) {
       else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
       else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} not taking frames</span>`;
       else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
+      else if (st.hubOut && can && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-hub-out="${o.id}">${icons.send} Send to Outside Cutter</button>`;
       else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
       else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
       else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
@@ -677,7 +684,8 @@ export function fittingView(me) {
         ${journey(o, true)}
         <div class="kv">
           <div><span>Origin</span><b>${locChip(o.origin)} ${esc(locName(o.origin))}</b></div>
-          <div><span>Fitting centre</span><b>${isOutside(o) ? `<span class="loc-chip">OUT</span> ${esc(o.outside)} <span class="muted">· outside, 3rd party</span>`
+          <div><span>Fitting centre</span><b>${isViaHub(o) ? `${locChip(o.fitter)} ${esc(locName(o.fitter))} <span class="muted">→ ${o.outside ? `${esc(o.outside)} (outside)` : 'an outside cutter, to choose'}</span>`
+            : isOutside(o) ? `<span class="loc-chip">OUT</span> ${esc(o.outside)} <span class="muted">· outside, 3rd party</span>`
             : o.fitter ? `${locChip(o.fitter)} ${esc(locName(o.fitter))}${isSelfFit(o) ? ' <span class="muted">· in-house</span>' : ''}` : '<span class="muted">Not assigned yet</span>'}</b></div>
           <div class="kv-wide"><span>Collect at</span><b>${locChip(collectOf(o))} ${esc(locName(collectOf(o)))}${collectOf(o) === o.origin ? ' <span class="muted">· where it was sold</span>' : ''}
             ${canChangeCollect(o, me.code) && !viewOnly ? `<button class="btn btn-ghost btn-sm kv-btn" data-collect="${o.id}">${icons.history} Change</button>` : ''}</b></div>
@@ -691,6 +699,7 @@ export function fittingView(me) {
             canArriveOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-arrive-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>` :
             canSendOutside(o, me.code) && !viewOnly ? `<button class="btn btn-primary" data-send-outside="${o.outsideLens.id}">${icons.send} Send Lenses to ${esc(locName(o.outsideLens.dest))}</button>` :
             needsFitter && can ? `<button class="btn btn-primary" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>` :
+            st.hubOut && can && !viewOnly ? `<button class="btn btn-primary" data-hub-out="${o.id}">${icons.send} Send to Outside Cutter</button>` :
             can && st.action ? `<button class="btn btn-primary" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>` : ''}
           ${waBtn(o, true)}
         </div>
@@ -770,6 +779,8 @@ export function fittingView(me) {
       if (ao) return store.arriveOutsideLenses(ao.dataset.arriveOutside, me.code);
       const sw = e.target.closest('[data-switch]');
       if (sw) return switchFulfilment(sw.dataset.switch, sw.dataset.to);
+      const ho = e.target.closest('[data-hub-out]');
+      if (ho) return hubOutPicker(ho.dataset.hubOut);
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) return fitterPicker(sf.dataset.sendFitter);
       const adv = e.target.closest('[data-advance]');
@@ -880,7 +891,13 @@ export function fittingView(me) {
         </div>
         <h3 class="picker-h">Outside — 3rd-party cutters</h3>
         <div class="picker-grid">
-          ${cutters.map(n => `
+          ${OUT_HUB_ON ? `
+            <button class="picker-card picker-out" data-outside-hub>
+              <span class="loc-chip">OUT</span>
+              <b>Outside cutter <span class="muted">· through ${esc(locName(outsideCutHub()))}</span></b>
+              <span class="picker-note">${esc(outsideCutHub())} picks the cutter and sends it out</span>
+              ${icons.arrowRight}
+            </button>` : cutters.map(n => `
             <button class="picker-card picker-out" data-outside="${esc(n)}">
               <span class="loc-chip">OUT</span>
               <b>${esc(n)}</b>
@@ -896,12 +913,42 @@ export function fittingView(me) {
         store.sendOrdersToFitter(orders.map(o => o.id), f.dataset.fitter, me.code);
         layer.close();
       }
+      if (e.target.closest('[data-outside-hub]')) {
+        ui.selected.clear();
+        store.sendOrdersViaHub(orders.map(o => o.id), me.code);
+        return layer.close();
+      }
       const out = e.target.closest('[data-outside]');
       if (out) {
         ui.selected.clear();
         store.sendOrdersOutside(orders.map(o => o.id), out.dataset.outside, me.code);
         layer.close();
       }
+    });
+  }
+
+  // ── The hub sends a frame out (schema-62): it picks the cutter ──
+  function hubOutPicker(id) {
+    const o = store.order(id);
+    if (!o) return;
+    const listed = store.settings.outsideCutters ?? [];
+    const cutters = listed.length ? listed : [OUTSIDE_DEFAULT];
+    const layer = openLayer('modal', () => `
+      <div class="dw-head">
+        <div><div class="dw-kicker">${esc(o.ref)} · ${esc(o.customer || '')}</div><h2>Send to an outside cutter</h2></div>
+        <button class="icon-btn" data-close>${icons.x}</button>
+      </div>
+      <div class="form">
+        <div class="picker-grid">${cutters.map(n => `
+          <button class="picker-card picker-out" data-hub-cutter="${esc(n)}"><span class="loc-chip">OUT</span><b>${esc(n)}</b>${icons.arrowRight}</button>`).join('')}
+        </div>
+      </div>`);
+    layer.el.addEventListener('click', async e => {
+      if (e.target.closest('[data-close]')) return layer.close();
+      const c = e.target.closest('[data-hub-cutter]');
+      if (!c) return;
+      layer.close();
+      await store.sendHubOut(id, c.dataset.hubCutter, me.code);
     });
   }
 
@@ -915,6 +962,8 @@ export function fittingView(me) {
         <button class="icon-btn" data-close>${icons.x}</button>
       </div>
       <div class="form">
+        ${OUT_HUB_ON ? `<label class="set-ctl">Outside cutting goes through
+          <select id="cut-hub">${FITTERS.map(f => `<option value="${f.code}" ${f.code === outsideCutHub() ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>` : ''}
         ${list.length ? `<div class="set-brands">${list.map(n => `
           <span class="set-brand set-plain">${esc(n)}<button class="brand-x" data-del-cutter="${esc(n)}" title="Remove">${icons.x}</button></span>`).join('')}</div>`
           : `<div class="empty">${icons.glasses}<p>No outside cutters named yet — add the first below.</p></div>`}
@@ -923,6 +972,11 @@ export function fittingView(me) {
           <button class="btn btn-primary btn-sm" type="submit">${icons.plus} Add cutter</button>
         </form>
       </div>`;
+    });
+    layer.el.addEventListener('change', e => {
+      if (e.target.id !== 'cut-hub') return;
+      if (!confirm(`Outside cutting goes through ${locName(e.target.value)} from now on?`)) { e.target.value = outsideCutHub(); return; }
+      store.setOutsideCutHub(e.target.value);
     });
     layer.el.addEventListener('submit', async e => {
       e.preventDefault();
@@ -1410,6 +1464,8 @@ export function fittingView(me) {
       if (ro) { e.stopPropagation(); store.receiveOutsideLenses(ro.dataset.recvOutside, me.code); return; }
       const ao = e.target.closest('[data-arrive-outside]');
       if (ao) { e.stopPropagation(); store.arriveOutsideLenses(ao.dataset.arriveOutside, me.code); return; }
+      const ho = e.target.closest('[data-hub-out]');
+      if (ho) return hubOutPicker(ho.dataset.hubOut);
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');

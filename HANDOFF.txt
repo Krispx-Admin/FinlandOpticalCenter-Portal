@@ -825,6 +825,11 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-62-outside-via-hub.sql  app_settings.outside_cut_hub ('MGM');
+                             orders.outside_hub, outside_out_at, outside_back_at;
+                             orders_route_gate: "ready" puts the frame at the
+                             branch only for a DIRECT outside job (no fitter).
+                             Applied 2026-10-22.
   schema-61-bill-pairs.sql   bill_orders(base) (invoker — row rules);
                              pair_ref(base): locks the bill's orders,
                              renumbers them (i/n+1) by created_at, notes "Bill
@@ -1300,6 +1305,21 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  OUTSIDE CUTTING THROUGH MGM — ADMIN DEMO ONLY (fitting.js
+             OUT_HUB_ON = isPractice). User's route: branch → MGM → outside
+             cutter → back to MGM → branch. "Send to Fitting" offers one card,
+             "Outside cutter · through <hub>" (store.sendOrdersViaHub: fitter =
+             hub, outside_hub = true, to_fitter). The hub: Frame Received →
+             "At MGM — to send out" → Send to Outside Cutter (the HUB picks the
+             cutter — user; store.sendHubOut sets outside_cutter, outside_out_at)
+             → "At <cutter>" (on the Outside Cutter tab, not In Fitting) →
+             Received from <cutter> (advance; outside_back_at; ready at the
+             hub) → Send to <branch> → the branch receives → collect. The hub
+             is a setting (user): Fitting Log → Outside cutters → "Outside
+             cutting goes through" (MGM to start). data.js: isOutside now means
+             DIRECT (outside && !outsideHub); isViaHub, atHubCutter,
+             OUTSIDE_CUT. Direct outside cutting in the live portal unchanged.
+             Tested in the demo, SCC ↔ MGM, every step and the history.
  2026-10-22  Bill letters set (user): SCC SB · AV AV · QCC Q · SAL S · SUR SU ·
              MOUJ MJ · MOO O · MGM MGM (not listed — its code) · QURFEC ·
              SALFEC · SOHFEC · NIZFEC (live branches.bill_prefix; null where

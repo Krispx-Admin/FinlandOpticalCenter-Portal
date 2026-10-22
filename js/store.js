@@ -17,7 +17,7 @@ import {
   locName, fitStep, nextFitStatus,
   canAdvanceOrder, canSeeOrder, canSeeRequest, canSeeLensRequest, canSeeClaim,
   BARE_COATING, lensFull, brandsFor, DEFAULT_BRAND_GROUP,
-  ROLES, loc, setLocations, OUTSIDE,
+  ROLES, loc, setLocations, OUTSIDE, OUTSIDE_CUT, isViaHub,
 } from './data.js';
 import { toast } from './ui.js';
 
@@ -69,6 +69,7 @@ async function pullChange({ full, ids, gone }) {
 function applyBranches() {
   if (state.branches?.length) setLocations(state.branches);
   if (state.settings?.outsideLensHandler) OUTSIDE.handler = state.settings.outsideLensHandler;
+  if (state.settings?.outsideCutHub) OUTSIDE_CUT.hub = state.settings.outsideCutHub;
 }
 
 // An order opened by a lens request carries that request's state: { id,
@@ -302,6 +303,46 @@ export const store = {
 
   async sendToFitter(id, fitter, by) { return (await this.sendOrdersToFitter([id], fitter, by))[0]; },
 
+  // Outside cutting through the hub (schema-62; Admin Demo first): the branch
+  // sends the frame to the hub, which picks the cutter and sends it out.
+  sendOrdersViaHub(ids, by) {
+    const hub = OUTSIDE_CUT.hub;
+    return run(['orders'], async () => {
+      const rows = ok(await supabase.from('orders')
+        .update({ fitter_code: hub, outside_hub: true, status: 'to_fitter' })
+        .in('id', ids).eq('status', 'lenses_in').is('fitter_code', null).is('outside_cutter', null)
+        .select('id, ref'));
+      if (!rows.length) return SKIP;
+      ok(await supabase.from('order_events').insert(rows.map(o => ({
+        order_id: o.id, by_code: by, text: `Sent to ${locName(hub)} — for an outside cutter`,
+      }))));
+      return rows;
+    }, moved => ({
+      by, module: 'fitting',
+      title: moved.length === 1 ? `${by} · ${moved[0].ref} → ${hub}, for an outside cutter` : `${by} sent ${moved.length} orders to ${hub} for an outside cutter`,
+      sub: `In transit to ${locName(hub)}`, refs: moved.map(o => o.id),
+    })).then(moved => (moved ?? []).map(o => this.order(o.id)).filter(Boolean));
+  },
+  // The hub sends it out to the cutter it picks.
+  sendHubOut(id, cutter, by) {
+    return run(['orders'], async () => {
+      const rows = ok(await supabase.from('orders')
+        .update({ outside_cutter: cutter, outside_out_at: new Date().toISOString() })
+        .eq('id', id).eq('status', 'at_fitter').eq('outside_hub', true).is('outside_out_at', null)
+        .select('id, ref'));
+      if (!rows.length) return SKIP;
+      ok(await supabase.from('order_events').insert({ order_id: id, by_code: by, text: `Sent out to ${cutter} — 3rd-party cutting` }));
+      return rows[0];
+    }, row => ({ by, module: 'fitting', title: `${by} · ${row.ref} → sent out to ${cutter}`, sub: '3rd-party cutter', refs: [row.id] }));
+  },
+  // Where outside cutting goes through.
+  setOutsideCutHub(code) {
+    if (!code || code === state.settings.outsideCutHub) return Promise.resolve(null);
+    state.settings.outsideCutHub = code;
+    OUTSIDE_CUT.hub = code;
+    return saveSettings({ module: 'settings', title: `Outside cutting now goes through ${code}` });
+  },
+
   // Send frames to a 3rd-party cutter. Guarded like the above: only orders
   // whose lenses are in and that nobody has sent anywhere yet.
   sendOrdersOutside(ids, cutter, by) {
@@ -333,12 +374,15 @@ export const store = {
     return run(keys, async () => {
       const plan = ids.map(id => this.order(id))
         .filter(o => o && canAdvanceOrder(o, by) && !(o.status === 'lenses_in' && !o.fitter))
+        // Through the hub: it has to be sent out before it can come back (schema-62).
+        .filter(o => !(isViaHub(o) && o.status === 'at_fitter' && !o.outsideOutAt))
         .map(o => ({ o, from: o.status, to: nextFitStatus(o) }))
         .filter(p => p.to);
       if (!plan.length) return SKIP;
 
       const done = (await Promise.all(plan.map(async p => {
-        const rows = ok(await supabase.from('orders').update({ status: p.to })
+        const back = isViaHub(p.o) && p.from === 'at_fitter' ? { outside_back_at: new Date().toISOString() } : {};
+        const rows = ok(await supabase.from('orders').update({ status: p.to, ...back })
           .eq('id', p.o.id).eq('status', p.from).select('id, ref, customer'));
         if (!rows.length) return null;
         ok(await supabase.from('order_events').insert({

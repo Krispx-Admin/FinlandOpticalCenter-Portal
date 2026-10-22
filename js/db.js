@@ -38,6 +38,8 @@ const toOrder = r => ({
   collect: r.collect_code ?? null, frameAt: r.frame_at ?? null, toCode: r.to_code ?? null, stops: r.stops ?? [],
   createdAt: ts(r.created_at), updatedAt: ts(r.updated_at),
   timeline: timeline(r.order_events),
+  // Outside cutting through the hub (schema-62).
+  outsideHub: !!r.outside_hub, outsideOutAt: r.outside_out_at ? ts(r.outside_out_at) : null, outsideBackAt: r.outside_back_at ? ts(r.outside_back_at) : null,
 });
 
 const toRequest = r => ({
@@ -118,6 +120,7 @@ function toSettings(r) {
     disabledTabs: r?.disabled_tabs ?? [], hasDisabledTabs: !!r && 'disabled_tabs' in r,
     outsideCutters: r?.outside_cutters ?? [], hasOutsideCutters: !!r && 'outside_cutters' in r,
     outsideLensHandler: r?.outside_lens_handler || 'AV', hasOutsideHandler: !!r && 'outside_lens_handler' in r,
+    outsideCutHub: r?.outside_cut_hub || 'MGM', hasOutsideCutHub: !!r && 'outside_cut_hub' in r,
     // The outside-lens supplier's WhatsApp (schema-51); written by set_outside_supplier.
     supplierName: r?.outside_supplier_name ?? '', supplierPhone: r?.outside_supplier_phone ?? '',
   };
@@ -324,6 +327,7 @@ export async function saveSettings(settings) {
     ...(settings.hasDisabledTabs ? { disabled_tabs: settings.disabledTabs } : {}),
     ...(settings.hasOutsideCutters ? { outside_cutters: settings.outsideCutters } : {}),
     ...(settings.hasOutsideHandler ? { outside_lens_handler: settings.outsideLensHandler } : {}),
+    ...(settings.hasOutsideCutHub ? { outside_cut_hub: settings.outsideCutHub } : {}),
   }).eq('id', 1);
   if (error) throw new Error(error.message);
 }

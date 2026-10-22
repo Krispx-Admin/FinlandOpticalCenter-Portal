@@ -225,7 +225,15 @@ export const onShortRoad = o => isSelfFit(o) && SELF_FLOW.includes(o.status);
 // account here, so the branch that sent it does every step: it goes, and it
 // comes back. The cutter's name is on the order (outside); fitter stays empty.
 export const OUT_FLOW = ['pending', 'lenses_in', 'to_fitter', 'delivered', 'collected'];
-export const isOutside = o => !!o.outside;
+// A frame sent out directly by the branch. Through the hub (schema-62) it is
+// a fitting-centre job at the hub instead — the hub sends it out (isViaHub).
+export const isOutside = o => !!o.outside && !o.outsideHub;
+export const isViaHub = o => !!o.outsideHub;
+// Where outside cutting goes through (app_settings.outside_cut_hub; the store keeps it in step).
+export const OUTSIDE_CUT = { hub: 'MGM' };
+export const outsideCutHub = () => OUTSIDE_CUT.hub;
+// At the cutter now (sent out by the hub, not back yet).
+export const atHubCutter = o => isViaHub(o) && o.status === 'at_fitter' && !!o.outsideOutAt && !o.outsideBackAt;
 export const OUTSIDE_DEFAULT = 'Outside cutter';
 const OUT_STATUS = {
   to_fitter: { label: 'At outside cutter', color: 'purple', action: 'Frame Received', actor: 'origin', done: 'Received back from the outside cutter' },
@@ -442,6 +450,11 @@ export function fitStep(o, { long = false, viewer = null } = {}) {
     if (viewer && viewer === holder) return { ...base, label: `Waiting for frame from ${where(o.origin)}` };
     return { ...base, label: `Lenses at ${where(holder)}` };
   }
+  // Outside cutting through the hub (schema-62): the hub sends it out, then gets it back.
+  if (isViaHub(o) && o.status === 'at_fitter') {
+    if (!o.outsideOutAt) return { ...base, label: long ? `At ${locName(o.fitter)} — to send to an outside cutter` : `At ${o.fitter} — to send out`, color: 'amber', action: null, actor: 'fitter', hubOut: true };
+    return { ...base, label: long ? `At ${o.outside} (outside cutter)` : `At ${o.outside}`, color: 'purple', action: `Received from ${o.outside}`, actor: 'fitter', done: `Received back from ${o.outside}` };
+  }
   // The road after the fitter, to wherever the customer collects.
   const C = collectOf(o);
   if (o.status === 'at_fitter' && o.fitter && !isSelfFit(o) && C === o.fitter)
@@ -507,7 +520,7 @@ export function fitActor(order) {
 // Sending lenses a branch is waiting for is the holder's to do.
 export const needsAction = (o, code) =>
   (canAdvanceOrder(o, code) && !(o.status === 'pending' && isSelfFit(o))
-   && !(o.status === 'to_fitter' && isOutside(o)))
+   && !(o.status === 'to_fitter' && isOutside(o)) && !atHubCutter(o))
   || canSendLenses(o, code) || canSendOutside(o, code) || canArriveOutside(o, code) || canReceiveOutside(o, code);
 
 // ── Stock request state machine ──

@@ -34,7 +34,8 @@ create table public."app_settings" (
   "outside_cutters" jsonb default '[]'::jsonb not null,
   "outside_lens_handler" text default 'AV'::text not null,
   "outside_supplier_name" text,
-  "outside_supplier_phone" text
+  "outside_supplier_phone" text,
+  "outside_cut_hub" text
 );
 
 create table public."branches" (
@@ -211,7 +212,10 @@ create table public."orders" (
   "collect_code" text,
   "frame_at" text,
   "to_code" text,
-  "stops" text[] default '{}'::text[] not null
+  "stops" text[] default '{}'::text[] not null,
+  "outside_hub" boolean default false not null,
+  "outside_out_at" timestamp with time zone,
+  "outside_back_at" timestamp with time zone
 );
 
 create table public."outside_lens_orders" (
@@ -1463,8 +1467,9 @@ begin
   if current_setting('foc.undo', true) = '1' or current_setting('foc.route', true) = '1' then return new; end if;
 
   if new.status = 'ready' and old.status in ('at_fitter', 'to_fitter') then
-    -- Ready at the fitter (or, from an outside cutter, back at the branch).
-    new.frame_at := case when new.outside_cutter is not null then new.origin_code else new.fitter_code end;
+    -- Ready at the fitter (or, sent out directly to a cutter, back at the branch;
+    -- through the hub it is at the hub — schema-62).
+    new.frame_at := case when new.outside_cutter is not null and new.fitter_code is null then new.origin_code else new.fitter_code end;
     if new.frame_at = c then new.status := 'delivered'; end if;          -- collected right here
   elsif new.status = 'delivered' and old.status = 'at_fitter' and c <> new.fitter_code then
     new.status := 'ready'; new.frame_at := new.fitter_code;             -- in-house job collected elsewhere
@@ -2405,6 +2410,8 @@ alter table public."claim_prescriptions" enable row level security;
 
 alter table public."branches" enable row level security;
 
+alter table public."orders" enable row level security;
+
 alter table public."order_events" enable row level security;
 
 alter table public."lens_request_events" enable row level security;
@@ -2412,8 +2419,6 @@ alter table public."lens_request_events" enable row level security;
 alter table public."lens_request_lines" enable row level security;
 
 alter table public."lens_requests" enable row level security;
-
-alter table public."orders" enable row level security;
 
 alter table public."lens_stock" enable row level security;
 

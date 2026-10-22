@@ -154,6 +154,7 @@ Applied in order:
 | `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
 | `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
 | `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
+| `supabase/schema-62-outside-via-hub.sql` | outside cutting through a hub (MGM): `orders.outside_hub/_out_at/_back_at`, `app_settings.outside_cut_hub`, route gate fix |
 | `supabase/schema-61-bill-pairs.sql` | another pair on a bill: `bill_orders`, `pair_ref` (renumbers (i/n+1)), `pair_fix` |
 | `supabase/schema-60-bill-prefix.sql` | bill numbers: `branches.bill_prefix`, `set_bill_prefix`, `bills_used` (Admin Demo first) |
 | `supabase/schema-59-claims-ipd.sql` | `claims.ipd`: IPD on Direct Insurance (Admin Demo first) |
