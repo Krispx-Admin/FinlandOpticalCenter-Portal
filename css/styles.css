@@ -515,8 +515,7 @@ a.nav-item.nav-off:hover { color: rgba(255,255,255,.6); }
 .bill-box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(19,48,86,.12); }
 .bill-pre { display: flex; align-items: center; padding: 0 10px; background: var(--brand); color: #fff; font-weight: 700; font-size: 13px; letter-spacing: .04em; }
 .form .bill-box input.bill-num { flex: 1; min-width: 0; border: 0; border-radius: 0; box-shadow: none; padding: 9px 10px; font-size: 14px; font-variant-numeric: tabular-nums; outline: none; }
-.grid2 > .bill-field { grid-column: 1 / -1; }
-.bill-box { max-width: 340px; }
+.bill-box { max-width: none; }
 
 /* "Another pair?" — over the order form (bill.js) */
 .pq-back { position: fixed; inset: 0; z-index: 400; background: rgba(12, 33, 56, .45); display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; transition: opacity .18s; }

@@ -1300,6 +1300,9 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  New fitting order form: Bill number and Customer name side by side
+             again (the bill box had been made full width for the Pairs boxes,
+             which are gone).
  2026-10-22  "Add a pair" lines keep the customer's name beside the bill: "SEEB
              10 Ahmed Al Balushi → SEEB 10 (1/2)", "This new order Fatma … →
              SEEB 10 (2/2)" (the name typed in the form; planOrderBill
