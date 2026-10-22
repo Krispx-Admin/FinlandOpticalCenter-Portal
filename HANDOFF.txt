@@ -825,6 +825,8 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-59-claims-ipd.sql   claims.ipd text (the old ipd column had been
+                             dropped). Applied 2026-10-22.
   schema-58-open-as.sql      account_switches (by_code, to_code, at): read by
                              'accounts', written only by the edge function.
                              Applied 2026-10-20.
@@ -1286,6 +1288,18 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  IPD on Direct Insurance — ADMIN DEMO ONLY for now (user: "put
+             this in demo to check"; claims.js ipdBox = direct && isPractice —
+             to go live, drop "&& isPractice"). One IPD box in the middle of the
+             prescription grid, between OD and OS, down all three rows; its own
+             60 px column. The last IPD column squeezed the powers until
+             "-10.25" did not show, so: the Direct Insurance window widens to
+             820 px (.modal.rx-wide) and the grid is width: max(100%, 680px)
+             (a table ignores min-width) — measured: every power box 76 px
+             (71 before), -10.25 and IPD "32/31" fit, nothing cut off. Saved in
+             claims.ipd (schema-59; db.js writes it only when the form had the
+             box). Shown in the middle on the invoice panel and the printed
+             invoice when filled. Reimbursement Invoice unchanged.
  2026-10-20  "OPEN AS…" (user asked for a master code into every branch; chose
              instead, when offered, a switch inside the portal). Sidebar
              "Open as…" for an account with 'accounts' (not View only): pick

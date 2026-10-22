@@ -4,7 +4,7 @@ import {
   RX_ROWS, RX_EYES, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance, can,
 } from './data.js';
 import { store } from './store.js';
-import { supabase } from './auth.js';
+import { supabase, isPractice } from './auth.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
 
 // Absolute, because the print window is an about:blank document with no base
@@ -103,6 +103,8 @@ table.rc-tbl td.num, table.rc-tbl th.num { text-align: right; white-space: nowra
 .rc-rx th, .rc-rx td { text-align: center; padding: 1.3mm 1.2mm; }
 .rc-rx tbody td { height: 6.4mm; font-family: Consolas, ui-monospace, monospace; font-size: 10pt; }
 .rc-rx col.rx-lbl-col { width: 11mm; }
+.rc-rx col.rx-ipd-col { width: 15mm; }
+.rc-rx td.rx-ipd, .rc-rx .rx-ipd-h { background: var(--r-soft); font-weight: 700; color: var(--r-navy); }
 .rc-rx .rx-lbl { background: var(--r-soft); font-weight: 700; font-size: 9.5pt; color: var(--r-navy); }
 .rc-rx .rx-sum td {
   background: #fff; font-family: Consolas, ui-monospace, monospace; font-size: 10pt;
@@ -157,25 +159,30 @@ table.rc-tbl tr, .rc-rx, .rc-foot, .rc-pay, .rc-sign { break-inside: avoid; }
 // Distance / Near rows, OD and OS each with SPH · CYL · AXIS · V.A., and one
 // Add per eye along the bottom. Nine even columns: the colgroup gives every
 // power the same room, so SPH cannot be squeezed by a wordier neighbour.
-function rxTableHTML(rx) {
+// IPD (Direct Insurance, schema-59): one box in the middle, between the eyes,
+// down all three rows — its own narrow column, so the powers keep their room.
+function rxTableHTML(rx, { ipd = false } = {}) {
   const cells = (row, side) => RX_COLS.map(col => `<td>${esc(rx[row][side][col.key] ?? '')}</td>`).join('');
   const heads = () => RX_COLS.map(c => `<th>${esc(c.label)}</th>`).join('');
+  const mid = ipd ? `<td class="rx-ipd" rowspan="${RX_ROWS.length + 1}">${esc(rx.ipd ?? '')}</td>` : '';
   return `
     <table class="rc-tbl rc-rx">
-      <colgroup><col class="rx-lbl-col"><col span="8"></colgroup>
+      <colgroup><col class="rx-lbl-col"><col span="4">${ipd ? '<col class="rx-ipd-col">' : ''}<col span="4"></colgroup>
       <thead>
         <tr>
           <th class="rx-lbl" rowspan="2"></th>
           <th colspan="4">OD</th>
+          ${ipd ? '<th rowspan="2" class="rx-ipd-h">IPD</th>' : ''}
           <th colspan="4">OS</th>
         </tr>
         <tr>${heads()}${heads()}</tr>
       </thead>
       <tbody>
-        ${RX_ROWS.map(r => `
+        ${RX_ROWS.map((r, i) => `
           <tr>
             <th class="rx-lbl" title="${esc(r.title)}">${esc(r.label)}</th>
             ${cells(r.key, 'od')}
+            ${i === 0 ? mid : ''}
             ${cells(r.key, 'os')}
           </tr>`).join('')}
         <tr class="rx-sum">
@@ -456,7 +463,7 @@ export function receiptHTML(c) {
     </table>
 
     <h3 class="rc-sec">Prescription</h3>
-    ${rxTableHTML(normaliseRx(c.rx))}
+    ${rxTableHTML(normaliseRx(c.rx), { ipd: c.kind === 'direct' && !!String(c.rx?.ipd ?? '').trim() })}
 
     <div class="rc-foot">
       <div class="rc-pay ${c.kind === 'direct' ? 'rc-pay-total' : ''}">
@@ -617,6 +624,8 @@ export function claimsView(me, kind = 'claim') {
   const viewOnly = readOnly(me);
   const direct = kind === 'direct';
   const T = KINDS[kind];
+  // IPD box on Direct Insurance (user 2026-10-22) — in the Admin Demo first.
+  const ipdBox = direct && isPractice;
   const ui = { q: '', branch: 'all', insurer: 'all', period: '30d' };
   let root, layer = null;
 
@@ -750,7 +759,9 @@ export function claimsView(me, kind = 'claim') {
     const items = c.items ?? [];
     const rx = normaliseRx(c.rx);
     const cells = [...RX_ROWS.map(r => r.key)].flatMap(k => ['od', 'os'].flatMap(e => RX_COLS.map(col => rx[k][e][col.key])));
-    const hasRx = cells.some(v => String(v ?? '').trim()) || rx.add.od || rx.add.os;
+    const ipdShown = c.kind === 'direct' && !!String(c.rx?.ipd ?? '').trim();
+    if (ipdShown) rx.ipd = c.rx.ipd;
+    const hasRx = cells.some(v => String(v ?? '').trim()) || rx.add.od || rx.add.os || ipdShown;
     const kv = (label, value, wide = false) => `<div${wide ? ' class="kv-wide"' : ''}><span>${label}</span><b>${value}</b></div>`;
     return `
       <div class="dw-head">
@@ -782,9 +793,9 @@ export function claimsView(me, kind = 'claim') {
         ${hasRx ? `
         <h3 class="tl-h">${icons.glasses} Prescription</h3>
         <div class="rx-wrap"><table class="lines rx-mini-tbl">
-          <thead><tr><th></th>${['OD', 'OS'].map(e => RX_COLS.map(col => `<th>${e} ${esc(col.label)}</th>`).join('')).join('')}</tr></thead>
+          <thead><tr><th></th>${RX_COLS.map(col => `<th>OD ${esc(col.label)}</th>`).join('')}${ipdShown ? '<th class="rx-ipd-h">IPD</th>' : ''}${RX_COLS.map(col => `<th>OS ${esc(col.label)}</th>`).join('')}</tr></thead>
           <tbody>
-            ${RX_ROWS.map(r => `<tr><th>${esc(r.label)}</th>${['od', 'os'].map(e => RX_COLS.map(col => `<td>${esc(rx[r.key][e][col.key] || '')}</td>`).join('')).join('')}</tr>`).join('')}
+            ${RX_ROWS.map((r, i) => `<tr><th>${esc(r.label)}</th>${RX_COLS.map(col => `<td>${esc(rx[r.key].od[col.key] || '')}</td>`).join('')}${ipdShown && i === 0 ? `<td class="rx-ipd" rowspan="${RX_ROWS.length + 1}">${esc(rx.ipd)}</td>` : ''}${RX_COLS.map(col => `<td>${esc(rx[r.key].os[col.key] || '')}</td>`).join('')}</tr>`).join('')}
             <tr><th>Add</th><td colspan="4">${esc(rx.add.od || '')}</td><td colspan="4">${esc(rx.add.os || '')}</td></tr>
           </tbody>
         </table></div>` : ''}
@@ -985,12 +996,13 @@ export function claimsView(me, kind = 'claim') {
         <div class="fieldset">
           <div class="fs-head"><span>Prescription</span></div>
           <div class="rx-wrap">
-            <table class="rx-edit">
-              <colgroup><col class="rx-lbl-col"><col span="8"></colgroup>
+            <table class="rx-edit ${ipdBox ? 'has-ipd' : ''}">
+              <colgroup><col class="rx-lbl-col"><col span="4">${ipdBox ? '<col class="rx-ipd-col">' : ''}<col span="4"></colgroup>
               <thead>
                 <tr>
                   <th rowspan="2"></th>
                   <th colspan="4">OD</th>
+                  ${ipdBox ? '<th rowspan="2" class="rx-ipd-h" title="Interpupillary distance, mm">IPD</th>' : ''}
                   <th colspan="4">OS</th>
                 </tr>
                 <tr>
@@ -999,10 +1011,11 @@ export function claimsView(me, kind = 'claim') {
                 </tr>
               </thead>
               <tbody>
-                ${RX_ROWS.map(r => `
+                ${RX_ROWS.map((r, i) => `
                   <tr>
                     <th title="${esc(r.title)}">${esc(r.label)}</th>
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].od[c.key] ?? '')}" data-rx="${r.key}.od.${c.key}"></td>`).join('')}
+                    ${ipdBox && i === 0 ? `<td class="rx-ipd" rowspan="${RX_ROWS.length + 1}"><input value="${esc(draft.rx.ipd ?? '')}" data-rx="ipd" placeholder="mm" aria-label="IPD"></td>` : ''}
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].os[c.key] ?? '')}" data-rx="${r.key}.os.${c.key}"></td>`).join('')}
                   </tr>`).join('')}
                 <tr class="rx-sum">
@@ -1031,6 +1044,8 @@ export function claimsView(me, kind = 'claim') {
       </div>`, { onClose: () => { layer = null; } });
 
     const el = layer.el;
+    // The IPD column needs the room: a wider window, so no power box shrinks.
+    if (ipdBox) el.classList.add('rx-wide');
     const sync = () => {
       draft.date = el.querySelector('#f-date').value;
       draft.branch = el.querySelector('#f-branch')?.value ?? (existing?.branch ?? me.code);
@@ -1094,7 +1109,7 @@ export function claimsView(me, kind = 'claim') {
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
-        const fields = { ...draft, kind, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
+        const fields = { ...draft, kind, ipdBox, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
         const save = e.target.closest('[data-save]');
         save.disabled = true;
         const was = save.innerHTML;

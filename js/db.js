@@ -84,6 +84,7 @@ function toClaim(r) {
     for (const e of RX_EYES) for (const c of RX_COLS) row[e.key][c.key] = p[`${e.key}_${c.key}`] ?? '';
   }
   rx.add = { od: r.add_od ?? '', os: r.add_os ?? '' };
+  rx.ipd = r.ipd ?? '';   // schema-59
   // ipd, sh_od and sh_os are still columns on older claims. The grid dropped
   // them, so they are read past rather than carried into the app.
   return {
@@ -168,6 +169,8 @@ export const claimRow = (f, by) => ({
   } : {}),
   customer: f.customer ?? '', payment: ['card', 'both'].includes(f.payment) ? f.payment : 'cash',
   add_od: f.rx?.add?.od ?? '', add_os: f.rx?.add?.os ?? '',
+  // IPD (schema-59) — only where the form has the box, so an edit elsewhere never clears it.
+  ...(f.rx && 'ipd' in f.rx && f.ipdBox ? { ipd: String(f.rx.ipd ?? '').trim() || null } : {}),
   ...(by ? { created_by: by } : {}),
 });
 

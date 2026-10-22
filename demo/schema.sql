@@ -15,6 +15,15 @@ create sequence public."damage_seq" start 1001;
 
 create sequence public."step_log_id_seq" start 1;
 
+create sequence public."account_switches_id_seq" start 1;
+
+create table public."account_switches" (
+  "id" bigint default nextval('account_switches_id_seq'::regclass) not null,
+  "by_code" text not null,
+  "to_code" text not null,
+  "at" timestamp with time zone default now() not null
+);
+
 create table public."app_settings" (
   "id" integer default 1 not null,
   "brand_groups" jsonb default '[]'::jsonb not null,
@@ -92,7 +101,8 @@ create table public."claims" (
   "employee_id" text,
   "employee_name" text,
   "canceled_at" timestamp with time zone,
-  "canceled_by" text
+  "canceled_by" text,
+  "ipd" text
 );
 
 create table public."damaged_lines" (
@@ -322,6 +332,8 @@ create table public."storage_usage_log" (
   "db_bytes" bigint not null,
   "data_bytes" bigint not null
 );
+
+alter table public."account_switches" add constraint "account_switches_pkey" PRIMARY KEY (id);
 
 alter table public."app_settings" add constraint "app_settings_id_check" CHECK ((id = 1));
 
@@ -2285,9 +2297,11 @@ CREATE TRIGGER stock_requests_step_log AFTER INSERT OR UPDATE OF status ON publi
 
 CREATE TRIGGER stock_requests_touch BEFORE UPDATE ON public.stock_requests FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
-alter table public."claim_prescriptions" enable row level security;
+alter table public."account_switches" enable row level security;
 
 alter table public."claims" enable row level security;
+
+alter table public."claim_prescriptions" enable row level security;
 
 alter table public."branches" enable row level security;
 
@@ -2336,6 +2350,8 @@ alter table public."outside_lens_orders" enable row level security;
 alter table public."damaged_lines" enable row level security;
 
 alter table public."step_log" enable row level security;
+
+create policy "account_switches_read" on public."account_switches" as permissive for select to authenticated using (( SELECT has_perm('accounts'::text) AS has_perm));
 
 create policy "app_settings_read" on public."app_settings" as permissive for select to authenticated using (true);
 

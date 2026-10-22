@@ -153,6 +153,7 @@ Applied in order:
 | `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
 | `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
 | `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
+| `supabase/schema-59-claims-ipd.sql` | `claims.ipd`: IPD on Direct Insurance (Admin Demo first) |
 | `supabase/schema-58-open-as.sql` | `account_switches`: the record of every "Open as…" (edge function `supabase/functions/open-as`) |
 | `supabase/schema-57-tabs-given.sql` | `branches.tabs_shown`: a tab given to an account on top of what it sees by itself (`set_tabs`) |
 | `supabase/schema-56-step-log.sql` | `step_log`: when each order / stock request / lens request changed step (triggers), for the Data tab's journey times |
