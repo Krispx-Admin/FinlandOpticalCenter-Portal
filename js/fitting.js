@@ -596,6 +596,21 @@ export function fittingView(me) {
     }).join('');
   }
 
+  // An order as its Fitting Log row, to look at only — no tick box, no buttons
+  // (the "another pair?" question shows the orders already on the bill).
+  function previewRowHTML(o) {
+    const fromStock = !!store.lensRequestForOrder(o.id);
+    return `
+      <div class="row pq-preview">
+        <div class="row-main">
+          <div class="row-title"><b>${esc(o.ref)}</b><span class="row-cust">${esc(o.customer || 'No customer name')}</span></div>
+          <div class="row-sub"><span class="row-when" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}</span></div>
+        </div>
+        <div class="row-journey">${journey(o, false, fromStock ? stockTag() : o.outsideLens ? outsideLensTag() : '')}</div>
+        <div class="row-status">${statusHTML(o, fitStep(o, { viewer: me.code }), false)}</div>
+      </div>`;
+  }
+
   // The one next action shared by every selected order — or null if they
   // need different actions (mixed stages / waiting on someone else).
   // The button an order would get in a bulk move, or null when this location
@@ -1153,7 +1168,7 @@ export function fittingView(me) {
       // the ones there are renumbered only when this one is saved.
       let plan = null;
       if (BILL_ON) {
-        plan = await planOrderBill(ref);
+        plan = await planOrderBill(ref, { preview: id => { const x = store.order(id); return x ? previewRowHTML(x) : ''; } });
         if (!plan) return;
       }
       const finalRef = async () => {

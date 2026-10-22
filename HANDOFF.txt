@@ -1300,6 +1300,12 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  "Another pair?" question shows the orders already on the bill as
+             their Fitting Log rows (bill, customer, route, status), without
+             the tick box or buttons — fitting.js previewRowHTML, passed to
+             bill.js planOrderBill({ preview }). (The Lens Stock request's
+             question has no rows to borrow there; its Confirm step still lists
+             them.)
  2026-10-22  Bill pairs redone (user; ADMIN DEMO ONLY): no Pairs boxes. A bill
              is "SEEB 10020"; saving a new fitting order (or a Lens Stock
              request) on a bill already in the Fitting Log asks "This bill has

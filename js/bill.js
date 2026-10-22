@@ -83,7 +83,7 @@ export async function billProblem(kind, ref, keep = null) {
 // Resolves { base, pair: false } — the bill is free; { base, pair: true } —
 // Confirmed as another pair; null — they stopped. Nothing changes until the
 // order is saved: then takePair() renumbers and gives the new one's bill.
-export async function planOrderBill(ref) {
+export async function planOrderBill(ref, { preview = null } = {}) {
   const p = parseBill(ref);
   if (!p) return { base: ref, pair: false };
   const used = await usedBills('order', p.base);
@@ -98,9 +98,12 @@ export async function planOrderBill(ref) {
       <div class="pq-foot"><button type="button" class="btn btn-primary" data-pq="no">OK</button></div>`).then(() => null);
   }
   const n = rows.length;
+  // The orders already on it, as the Fitting Log shows them (no buttons).
+  const shown = preview ? rows.map(o => preview(o.id)).join('') : '';
   const yes = await dialog(`
     <h3>This bill has already been entered</h3>
     <p><b>${esc(p.base)}</b> is in the Fitting Log${n > 1 ? ` ${n} times` : ''}. Is this ${n === 1 ? 'a second' : n === 2 ? 'a third' : 'another'} pair of glasses on the same bill?</p>
+    ${shown ? `<div class="pq-rows">${shown}</div>` : ''}
     <div class="pq-foot">
       <button type="button" class="btn btn-ghost" data-pq="no">No — change the number</button>
       <button type="button" class="btn btn-primary" data-pq="yes">Yes, another pair</button>
