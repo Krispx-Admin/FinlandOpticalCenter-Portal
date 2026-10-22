@@ -1300,6 +1300,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  "Add a pair" lines keep the customer's name beside the bill: "SEEB
+             10 Ahmed Al Balushi → SEEB 10 (1/2)", "This new order Fatma … →
+             SEEB 10 (2/2)" (the name typed in the form; planOrderBill
+             { customer }).
  2026-10-22  "Add a pair" confirm step: each line is only "SEEB 10 → SEEB 10
              (1/2)" and "This new order → SEEB 10 (2/2)", centred, wider gap
              around the arrow; the customer / route / status line is gone

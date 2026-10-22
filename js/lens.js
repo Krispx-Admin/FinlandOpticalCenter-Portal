@@ -571,7 +571,7 @@ export function lensView(me) {
         // There already? Another pair (bill.js) — renumbered when this is sent.
         let plan = null;
         if (BILL_ON) {
-          plan = await planOrderBill(draft.billNo);
+          plan = await planOrderBill(draft.billNo, { customer: draft.customer });
           if (!plan) return;
         }
 

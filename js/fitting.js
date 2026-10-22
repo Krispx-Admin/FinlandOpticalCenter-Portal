@@ -1168,7 +1168,7 @@ export function fittingView(me) {
       // the ones there are renumbered only when this one is saved.
       let plan = null;
       if (BILL_ON) {
-        plan = await planOrderBill(ref, { preview: id => { const x = store.order(id); return x ? previewRowHTML(x) : ''; } });
+        plan = await planOrderBill(ref, { customer, preview: id => { const x = store.order(id); return x ? previewRowHTML(x) : ''; } });
         if (!plan) return;
       }
       const finalRef = async () => {

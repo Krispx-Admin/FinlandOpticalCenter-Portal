@@ -83,7 +83,7 @@ export async function billProblem(kind, ref, keep = null) {
 // Resolves { base, pair: false } — the bill is free; { base, pair: true } —
 // Confirmed as another pair; null — they stopped. Nothing changes until the
 // order is saved: then takePair() renumbers and gives the new one's bill.
-export async function planOrderBill(ref, { preview = null } = {}) {
+export async function planOrderBill(ref, { preview = null, customer = '' } = {}) {
   const p = parseBill(ref);
   if (!p) return { base: ref, pair: false };
   const used = await usedBills('order', p.base);
@@ -114,9 +114,9 @@ export async function planOrderBill(ref, { preview = null } = {}) {
     <p>Already on this bill — they will be renumbered:</p>
     <div class="pq-list">${rows.map((o, i) => `
       <div class="pq-row">
-        <div class="pq-ref"><b>${esc(o.ref)}</b> ${icons.arrowRight} <b>${esc(`${p.base} (${i + 1}/${n + 1})`)}</b></div>
+        <div class="pq-ref"><span><b>${esc(o.ref)}</b> <span class="pq-cust">${esc(o.customer || 'No name')}</span></span> ${icons.arrowRight} <b>${esc(`${p.base} (${i + 1}/${n + 1})`)}</b></div>
       </div>`).join('')}
-      <div class="pq-row pq-new"><div class="pq-ref">This new order ${icons.arrowRight} <b>${esc(`${p.base} (${n + 1}/${n + 1})`)}</b></div></div>
+      <div class="pq-row pq-new"><div class="pq-ref"><span>This new order${customer ? ` <span class="pq-cust">${esc(customer)}</span>` : ''}</span> ${icons.arrowRight} <b>${esc(`${p.base} (${n + 1}/${n + 1})`)}</b></div></div>
     </div>
     <div class="pq-foot">
       <button type="button" class="btn btn-ghost" data-pq="no">Back</button>
