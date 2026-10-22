@@ -2,7 +2,6 @@
 import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES, PERMS, can, seesTab, tabByDefault } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
-import { BILL_ON } from './bill.js';
 import { esc, icons, relTime, openLayer, toast } from './ui.js';
 
 export function settingsView(me) {
@@ -167,6 +166,7 @@ export function settingsView(me) {
     const L = LOCATIONS.find(l => l.code === r.code);
     const tags = [
       !r.active ? '<span class="acc-tag t-closed">Closed</span>' : '',
+      !isPersonRow(r) ? `<span class="acc-tag" title="The letters in front of its bill numbers">Bill ${esc(L?.billPrefix || r.code)}</span>` : '',
       r.holds_lens_stock ? `<span class="acc-tag t-lens">${icons.lens} Lens stock</span>` : '',
       r.role === 'fitting' && r.active && labMode(r.code) !== 'on' ? `<span class="acc-tag t-lab">Lab ${labMode(r.code) === 'off' ? 'off' : 'in-house only'}</span>` : '',
     ].join('');
@@ -249,7 +249,7 @@ export function settingsView(me) {
             <label>Name<input data-br-name="${esc(code)}" value="${esc(r.name)}" required></label>
             ${person ? '' : `<label>Arabic name <span class="opt">for the WhatsApp message</span><input dir="rtl" lang="ar" data-br-ar="${esc(code)}" value="${esc(L.nameAr ?? '')}" placeholder="الاسم بالعربية"></label>`}
             <label>Kind<select data-br-role="${esc(code)}">${accountOptions(r.role)}</select></label>
-            ${BILL_ON && !person ? `<label>Bill letters <span class="opt">in front of its bill numbers</span><input data-br-billpx="${esc(code)}" value="${esc(L.billPrefix || code)}" maxlength="8" style="text-transform:uppercase" placeholder="${esc(code)}"></label>` : ''}
+            ${!person ? `<label>Bill letters <span class="opt">in front of its bill numbers</span><input data-br-billpx="${esc(code)}" value="${esc(L.billPrefix || code)}" maxlength="8" style="text-transform:uppercase" placeholder="${esc(code)}"></label>` : ''}
           </div>`)}
         ${sec('lock', 'Sign-in code', `
           <form class="ba-set acc-code" data-set="${esc(code)}" autocomplete="off">

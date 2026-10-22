@@ -1300,6 +1300,13 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  Bill letters set (user): SCC SB · AV AV · QCC Q · SAL S · SUR SU ·
+             MOUJ MJ · MOO O · MGM MGM (not listed — its code) · QURFEC ·
+             SALFEC · SOHFEC · NIZFEC (live branches.bill_prefix; null where
+             it equals the code). Settings → Accounts → a branch → "Bill
+             letters" is now in the LIVE portal too (letters A–Z, 1–8, saved
+             upper case), and each branch's line in the list shows "Bill SB".
+             The bill box itself is still Admin Demo only. Admin Demo VERSION 17.
  2026-10-22  New fitting order form: Bill number and Customer name side by side
              again (the bill box had been made full width for the Pairs boxes,
              which are gone).
