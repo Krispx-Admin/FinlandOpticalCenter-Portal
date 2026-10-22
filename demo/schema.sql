@@ -728,6 +728,18 @@ AS $function$
                      from public.branches b where b.code = p_code), false)
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bill_orders(p_base text)
+ RETURNS TABLE(id uuid, ref text, customer text, status text, origin_code text, fitter_code text, outside_cutter text, created_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  select o.id, o.ref, o.customer, o.status, o.origin_code, o.fitter_code, o.outside_cutter, o.created_at
+    from public.orders o
+   where o.ref = p_base or o.ref like p_base || ' (%'
+   order by o.created_at;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.bills_used(p_kind text, p_base text)
  RETURNS SETOF text
  LANGUAGE sql
@@ -1529,6 +1541,66 @@ begin
   values (x.order_id, me, format('The outside lenses arrived at %s', h));
   update public.orders set updated_at = now() where id = x.order_id;
   return x;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.pair_fix(p_base text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me text := public.jwt_branch();
+  n  int;
+  r  record;
+  i  int := 0;
+  nu text;
+begin
+  perform 1 from public.orders where ref = p_base or ref like p_base || ' (%' for update;
+  select count(*) into n from public.orders where ref = p_base or ref like p_base || ' (%';
+  if n = 0 then return; end if;
+  if exists (select 1 from public.orders where (ref = p_base or ref like p_base || ' (%')
+               and origin_code <> me) and not public.has_perm('act_all') then
+    raise exception '% was logged by another branch', p_base;
+  end if;
+  for r in select id, ref from public.orders where ref = p_base or ref like p_base || ' (%' order by created_at loop
+    i := i + 1;
+    nu := case when n = 1 then p_base else format('%s (%s/%s)', p_base, i, n) end;
+    if r.ref <> nu then update public.orders set ref = nu, updated_at = now() where id = r.id; end if;
+  end loop;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.pair_ref(p_base text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  me  text := public.jwt_branch();
+  n   int;
+  r   record;
+  i   int := 0;
+  nu  text;
+begin
+  if coalesce(btrim(p_base), '') = '' then raise exception 'No bill number'; end if;
+  perform 1 from public.orders where ref = p_base or ref like p_base || ' (%' for update;
+  select count(*) into n from public.orders where ref = p_base or ref like p_base || ' (%';
+  if n = 0 then return p_base; end if;
+  if exists (select 1 from public.orders where (ref = p_base or ref like p_base || ' (%')
+               and origin_code <> me) and not public.has_perm('act_all') then
+    raise exception '% was logged by another branch', p_base;
+  end if;
+  for r in select id, ref from public.orders where ref = p_base or ref like p_base || ' (%' order by created_at loop
+    i := i + 1;
+    nu := format('%s (%s/%s)', p_base, i, n + 1);
+    if r.ref <> nu then
+      update public.orders set ref = nu, updated_at = now() where id = r.id;
+      insert into public.order_events (order_id, by_code, text)
+      values (r.id, nullif(me, ''), format('Bill now %s — another pair added on the same bill', nu));
+    end if;
+  end loop;
+  return format('%s (%s/%s)', p_base, n + 1, n + 1);
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.publish_schedule_week(p_week date)

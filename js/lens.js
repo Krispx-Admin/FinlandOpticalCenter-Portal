@@ -7,7 +7,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount, olderHTML } from './ui.js';
-import { BILL_ON, billFieldHTML, wireBillFields, billProblem } from './bill.js';
+import { BILL_ON, billFieldHTML, wireBillFields, planOrderBill, takePair, fixPairs } from './bill.js';
 
 const REQ_CHIPS = [
   { key: 'requested', label: 'Lenses to send' },
@@ -505,7 +505,7 @@ export function lensView(me) {
             <tbody>${rows}</tbody>
           </table>
           <div class="grid2">
-            ${BILL_ON ? billFieldHTML({ code: me.code, value: draft.billNo, hidden: { id: 'lens-note' }, pairs: true }) : `<label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>`}
+            ${BILL_ON ? billFieldHTML({ code: me.code, value: draft.billNo, hidden: { id: 'lens-note' } }) : `<label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>`}
             <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
           </div>
           <div class="fulfil">
@@ -568,19 +568,25 @@ export function lensView(me) {
         cust.value = draft.customer = draft.customer.trim();
         bill.value = draft.billNo = draft.billNo.trim();
         if (!cust.reportValidity() || !(BILL_ON ? layer.el.querySelector('[data-bill] .bill-num') : bill).reportValidity()) return;
+        // There already? Another pair (bill.js) — renumbered when this is sent.
+        let plan = null;
         if (BILL_ON) {
-          const why = await billProblem('order', draft.billNo);
-          if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+          plan = await planOrderBill(draft.billNo);
+          if (!plan) return;
         }
 
         const send = e.target.closest('[data-send]');
         send.disabled = true;
         const was = send.innerHTML;
         send.textContent = 'Sending…';
+        let billNo = draft.billNo;
+        if (plan?.pair) {
+          try { billNo = await takePair(plan.base); } catch (err) { toast({ title: 'Could not add the pair', sub: err.message, tone: 'stock' }); send.disabled = false; send.innerHTML = was; return; }
+        }
         const r = await store.createLensRequest({
-          lines, billNo: draft.billNo, customer: draft.customer, fulfilment: draft.fulfilment, holder,
+          lines, billNo, customer: draft.customer, fulfilment: draft.fulfilment, holder,
         }, me.code);
-        if (!r) { send.disabled = false; send.innerHTML = was; return; }
+        if (!r) { if (plan?.pair) await fixPairs(plan.base); send.disabled = false; send.innerHTML = was; return; }
         cart.clear();
         layer.close();
         ui.tab = 'mine';

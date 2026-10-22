@@ -79,7 +79,7 @@ js/demo.js          Admin Demo (?AdminDemo=SCC): the database inside the browser
 js/phone.js         phone number with a country picker; js/countries.js the codes
 js/notify.js        the notification bell on each tab (All / My Action / Off) and what rings
 js/insights.js      the Data tab: numbers, a chart, breakdowns and every record, per tab
-js/bill.js          bill numbers: the branch's letters + digits only, pairs (1/3), no repeats (Admin Demo first)
+js/bill.js          bill numbers: the branch's letters + digits only; "another pair?" renumbers (1/2)…; no repeats (Admin Demo first)
 js/sound.js         its two sounds — Web Audio, no file
 demo/               practice copy's layout + starting data, and build.py that makes them
 ```
@@ -154,6 +154,7 @@ Applied in order:
 | `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
 | `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
 | `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
+| `supabase/schema-61-bill-pairs.sql` | another pair on a bill: `bill_orders`, `pair_ref` (renumbers (i/n+1)), `pair_fix` |
 | `supabase/schema-60-bill-prefix.sql` | bill numbers: `branches.bill_prefix`, `set_bill_prefix`, `bills_used` (Admin Demo first) |
 | `supabase/schema-59-claims-ipd.sql` | `claims.ipd`: IPD on Direct Insurance (Admin Demo first) |
 | `supabase/schema-58-open-as.sql` | `account_switches`: the record of every "Open as…" (edge function `supabase/functions/open-as`) |

@@ -13,7 +13,7 @@ import {
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
 import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
-import { BILL_ON, billFieldHTML, wireBillFields, billProblem, parseBill } from './bill.js';
+import { BILL_ON, billFieldHTML, wireBillFields, billProblem, parseBill, planOrderBill, takePair, fixPairs } from './bill.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -353,7 +353,7 @@ export function fittingView(me) {
       </div>
       <form class="form" id="eo">
         <div class="grid2">
-          ${BILL_ON && (parseBill(o.ref) || !o.ref) ? billFieldHTML({ code: o.origin, value: o.ref, hidden: { name: 'ref' }, pairs: true }) : `<label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>`}
+          ${BILL_ON && (parseBill(o.ref) || !o.ref) ? billFieldHTML({ code: o.origin, value: o.ref, hidden: { name: 'ref' } }) : `<label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>`}
           <label>Customer name <input name="customer" required value="${esc(o.customer ?? '')}"></label>
         </div>
         <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message</span></span>${phoneFieldHTML(saved)}</div>
@@ -981,7 +981,7 @@ export function fittingView(me) {
       </div>
       <form class="form" id="nf">
         <div class="grid2">
-          ${BILL_ON ? billFieldHTML({ code: me.code, hidden: { name: 'ref' }, pairs: true }) : '<label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>'}
+          ${BILL_ON ? billFieldHTML({ code: me.code, hidden: { name: 'ref' } }) : '<label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>'}
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message when it is ready</span></span>${phoneFieldHTML()}</div>
@@ -1139,7 +1139,7 @@ export function fittingView(me) {
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
-      const ref = f.get('ref').trim();
+      let ref = f.get('ref').trim();
       const customer = f.get('customer').trim();
       const collect = String(f.get('collect') || me.code);
       const phone = phoneValue(e.target.querySelector('[data-ph]'));
@@ -1149,11 +1149,17 @@ export function fittingView(me) {
       e.target.elements.ref.value = ref;
       e.target.elements.customer.value = customer;
       if (!e.target.reportValidity()) return;
-      // The bill: used once in the Fitting Log (pairs "(1/3)"…) — bill.js.
+      // The bill: there already? Asked whether this is another pair (bill.js);
+      // the ones there are renumbered only when this one is saved.
+      let plan = null;
       if (BILL_ON) {
-        const why = await billProblem('order', ref);
-        if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+        plan = await planOrderBill(ref);
+        if (!plan) return;
       }
+      const finalRef = async () => {
+        if (!plan?.pair) return ref;
+        try { ref = await takePair(plan.base); return ref; } catch (err) { toast({ title: 'Could not add the pair', sub: err.message, tone: 'stock' }); return null; }
+      };
       // The order is written to the database, which can refuse it (a bill
       // number already used here), so the form stays open until it lands.
       const go = e.target.querySelector('[type=submit]');
@@ -1173,9 +1179,11 @@ export function fittingView(me) {
         if (!lines.length) { toast({ title: 'Choose the lenses', sub: `Pick at least one lens from ${locName(ls.holder)}'s shelf.`, tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         if (ls.lines.some(l => (l.text ?? '').trim() && !l.itemId)) { toast({ title: 'Pick a lens from the list', sub: 'A line has text that is not a lens on the shelf.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         const how = String(f.get('lsHow') || (isBenchClosed(ls.holder) ? 'receive_lens' : 'send_frames'));
+        const useRef = await finalRef();
+        if (!useRef) { go.disabled = false; go.innerHTML = was; return; }
         const r = own()
-          ? await store.useOwnStock({ lines, billNo: ref, customer }, me.code)
-          : await store.createLensRequest({ lines, billNo: ref, customer, fulfilment: how, holder: ls.holder }, me.code);
+          ? await store.useOwnStock({ lines, billNo: useRef, customer }, me.code)
+          : await store.createLensRequest({ lines, billNo: useRef, customer, fulfilment: how, holder: ls.holder }, me.code);
         o = r?.orderId ? store.order(r.orderId) : null;
         if (o && collect !== me.code) await store.setCollect(o.id, collect, me.code);
         if (r && !o) { layer.close(); return; }
@@ -1186,12 +1194,19 @@ export function fittingView(me) {
         if (!rx.r.sph && !rx.l.sph) { toast({ title: 'Enter the prescription', sub: 'At least the SPH for one eye.', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         if (!lensType) { toast({ title: 'Type the lens type', sub: 'e.g. 1.5 progressive blue UV', tone: 'stock' }); go.disabled = false; go.innerHTML = was; return; }
         const how = val('olHow') || 'receive_lens';
-        o = await store.createOutsideOrder({ ref, customer, rx, lensType, fulfilment: how, dest: how === 'send_frames' ? val('olDest') : null }, me.code);
+        const useRef = await finalRef();
+        if (!useRef) { go.disabled = false; go.innerHTML = was; return; }
+        o = await store.createOutsideOrder({ ref: useRef, customer, rx, lensType, fulfilment: how, dest: how === 'send_frames' ? val('olDest') : null }, me.code);
         if (o && collect !== me.code) await store.setCollect(o.id, collect, me.code);
       } else {
-        o = await store.createOrder({ ref, origin: me.code, customer, collect }, me.code);
+        const useRef = await finalRef();
+        if (!useRef) { go.disabled = false; go.innerHTML = was; return; }
+        o = await store.createOrder({ ref: useRef, origin: me.code, customer, collect }, me.code);
       }
-      if (!o) { go.disabled = false; go.innerHTML = was; return; }
+      if (!o) {
+        if (plan?.pair) await fixPairs(plan.base);     // not saved: number the others back
+        go.disabled = false; go.innerHTML = was; return;
+      }
       if (phone) await store.setOrderPhone(o.id, phone, me.code);
       layer.close();
       toast({

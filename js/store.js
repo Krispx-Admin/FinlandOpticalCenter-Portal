@@ -721,6 +721,19 @@ export const store = {
       return true;
     }, { module: 'settings', title: `${code}: tabs saved` });
   },
+  // Another pair on a bill (schema-61): the orders there renumbered (i/n+1),
+  // the new one's bill back; the orders reload so the new names show.
+  pairRef(base) {
+    return run(['orders'], async () => {
+      const data = ok(await supabase.rpc('pair_ref', { p_base: base }));
+      return typeof data === 'string' ? data : Object.values(data ?? {})[0];
+    }, null);
+  },
+  // A new pair could not be saved: number the ones there again.
+  pairFix(base) {
+    return run(['orders'], async () => { ok(await supabase.rpc('pair_fix', { p_base: base })); return true; }, null);
+  },
+
   // The letters in front of a branch's bills (schema-60); empty = its code.
   setBillPrefix(code, prefix) {
     return run(['branches'], async () => {

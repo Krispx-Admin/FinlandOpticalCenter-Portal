@@ -825,6 +825,12 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-61-bill-pairs.sql   bill_orders(base) (invoker — row rules);
+                             pair_ref(base): locks the bill's orders,
+                             renumbers them (i/n+1) by created_at, notes "Bill
+                             now …" on each, returns 'base (n+1/n+1)'; only the
+                             branch that logged them or act_all. pair_fix(base):
+                             (i/n), one left = plain base. Applied 2026-10-22.
   schema-60-bill-prefix.sql  branches.bill_prefix (empty = the code; SCC =
                              SEEB); set_bill_prefix() for 'accounts';
                              bills_used(kind, base) — the bills already there
@@ -1294,6 +1300,21 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  Bill pairs redone (user; ADMIN DEMO ONLY): no Pairs boxes. A bill
+             is "SEEB 10020"; saving a new fitting order (or a Lens Stock
+             request) on a bill already in the Fitting Log asks "This bill has
+             already been entered — is this a second pair?" (No / Yes), then
+             shows each order on it (bill → its new number, customer, origin →
+             fitter, status, date) and the new one's number (Back / Confirm).
+             Nothing changes until the order is saved: then store.pairRef →
+             pair_ref renumbers the ones there (1/2)… and returns the new
+             one's "(n/n)"; if the save fails, pair_fix numbers them back.
+             The question sits over the form (bill.js dialog, not openLayer,
+             which would close the form). Editing an order to a bill already
+             used is refused (no pairing from edit). Direct Insurance /
+             Reimbursement Invoice: a repeat is refused, as before. Tested in
+             the demo: 2nd → (1/2)+(2/2), 3rd → (1/3)(2/3)(3/3), No and Back
+             change nothing, each renumbered order's history says so.
  2026-10-22  Admin Demo link takes any spelling (user typed ?demoadmin, which
              opened the LIVE portal — the param was exactly "AdminDemo"):
              auth.js reads the first param matching admin-demo / demo-admin in
