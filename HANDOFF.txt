@@ -825,6 +825,12 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-60-bill-prefix.sql  branches.bill_prefix (empty = the code; SCC =
+                             SEEB); set_bill_prefix() for 'accounts';
+                             bills_used(kind, base) — the bills already there
+                             (orders: ref = base or 'base (k/n)'; claims of
+                             that kind: bill_no = base), across every branch.
+                             Applied 2026-10-22.
   schema-59-claims-ipd.sql   claims.ipd text (the old ipd column had been
                              dropped). Applied 2026-10-22.
   schema-58-open-as.sql      account_switches (by_code, to_code, at): read by
@@ -1288,6 +1294,28 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  BILL NUMBERS — ADMIN DEMO ONLY for now (bill.js BILL_ON =
+             isPractice). The branch's letters in front by themselves
+             (bill_prefix, default the code; Seeb = SEEB; editable "Bill
+             letters" in the account panel), the box takes digits only (letters
+             are dropped as typed), saved "SEEB 10020". Fitting orders (new,
+             edit, Lens Stock request) ask "Pairs 1–3" and "This is k of n":
+             "SEEB 10021 (2/3)". Once in the Fitting Log, once in Direct
+             Insurance, once in Reimbursement Invoice (user) — checked with
+             bills_used before saving, with a message saying what clashes.
+             Old free-text bills still edit as before. The invoice form follows
+             the branch picked. Tested in the demo: letters dropped; repeat
+             refused; pairs (1/3) (2/3) saved, a repeat pair, a lone bill and a
+             different pair count refused; Direct Insurance takes SEEB 10020
+             once though the Fitting Log has it. Real bills seen: SB, MJ, SL,
+             SU, O, NZ, AV, QCC, "… MGM" — set the letters per branch before
+             going live.
+             Fixed (live too): the new fitting order form scrolled sideways —
+             the hidden radio buttons (Lenses chips, the "how" options) took
+             .form input's width: 100% of the window.
+             IPD: the user did not see it — it is in the Admin Demo only, and
+             a tab opened before the update needs F5; checked on
+             foc-portal.org/?AdminDemo=SCC, the box is there.
  2026-10-22  IPD on Direct Insurance — ADMIN DEMO ONLY for now (user: "put
              this in demo to check"; claims.js ipdBox = direct && isPractice —
              to go live, drop "&& isPractice"). One IPD box in the middle of the

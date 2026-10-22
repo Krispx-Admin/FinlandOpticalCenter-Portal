@@ -91,6 +91,7 @@ export function setLocations(rows) {
     // to it on top of what it sees by itself (schema-57).
     tabsHidden: Array.isArray(r.tabs_hidden) ? r.tabs_hidden : [],
     tabsShown: Array.isArray(r.tabs_shown) ? r.tabs_shown : [],
+    billPrefix: r.bill_prefix ?? '',   // schema-60; empty = the code
   }));
   LOCATIONS.splice(0, LOCATIONS.length, ...next);
   FITTERS.splice(0, FITTERS.length, ...next.filter(l => isOpen(l) && l.role === 'fitting'));

@@ -52,7 +52,8 @@ create table public."branches" (
   "name_ar" text,
   "perms" text[] default '{}'::text[] not null,
   "tabs_hidden" text[] default '{}'::text[] not null,
-  "tabs_shown" text[] default '{}'::text[] not null
+  "tabs_shown" text[] default '{}'::text[] not null,
+  "bill_prefix" text
 );
 
 create table public."claim_items" (
@@ -725,6 +726,19 @@ AS $function$
   select coalesce((select b.bench_closed and (b.bench_closed_until is null
                           or b.bench_closed_until >= (now() at time zone 'Asia/Muscat')::date)
                      from public.branches b where b.code = p_code), false)
+$function$;
+
+CREATE OR REPLACE FUNCTION public.bills_used(p_kind text, p_base text)
+ RETURNS SETOF text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select ref from public.orders
+   where p_kind = 'order' and (ref = p_base or ref like p_base || ' (%')
+  union all
+  select bill_no from public.claims
+   where p_kind in ('direct', 'claim') and coalesce(kind, 'claim') = p_kind and bill_no = p_base
 $function$;
 
 CREATE OR REPLACE FUNCTION public.branch_access()
@@ -1802,6 +1816,20 @@ begin
   update public.branches
      set bench_closed = p_closed, bench_closed_until = case when p_closed then p_until else null end, bench_own_only = false
    where code = p_code;
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.set_bill_prefix(p_code text, p_prefix text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare px text := upper(btrim(coalesce(p_prefix, '')));
+begin
+  if not public.has_perm('accounts') then raise exception 'Only the office can set the bill letters'; end if;
+  if px <> '' and px !~ '^[A-Z]{1,8}$' then raise exception 'The bill letters are 1 to 8 letters, A to Z'; end if;
+  update public.branches set bill_prefix = nullif(px, '') where code = p_code;
+  if not found then raise exception 'No such account'; end if;
 end $function$;
 
 CREATE OR REPLACE FUNCTION public.set_branch_code(p_branch text, p_code text)

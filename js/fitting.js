@@ -13,6 +13,7 @@ import {
 import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
 import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
+import { BILL_ON, billFieldHTML, wireBillFields, billProblem, parseBill } from './bill.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
 // How far back to look (user, 2026-10-13): by the day an order was logged —
@@ -352,7 +353,7 @@ export function fittingView(me) {
       </div>
       <form class="form" id="eo">
         <div class="grid2">
-          <label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>
+          ${BILL_ON && (parseBill(o.ref) || !o.ref) ? billFieldHTML({ code: o.origin, value: o.ref, hidden: { name: 'ref' }, pairs: true }) : `<label>Bill number <input name="ref" required value="${esc(o.ref)}"></label>`}
           <label>Customer name <input name="customer" required value="${esc(o.customer ?? '')}"></label>
         </div>
         <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message</span></span>${phoneFieldHTML(saved)}</div>
@@ -373,6 +374,7 @@ export function fittingView(me) {
       </form>`);
     layer.el.addEventListener('click', e => { if (e.target.closest('[data-close]')) layer.close(); });
     wirePhoneFields(layer.el);
+    wireBillFields(layer.el);
     layer.el.querySelector('#eo').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -392,6 +394,10 @@ export function fittingView(me) {
       const typed = field.querySelector('input[inputmode=tel]').value.trim();
       const phone = typed ? phoneValue(field) : null;
       if (typed && !phone) return toast({ title: 'That phone number does not look right', sub: 'Type the number — the country is picked on its left.', tone: 'stock' });
+      if (BILL_ON && ref !== o.ref && parseBill(ref)) {
+        const why = await billProblem('order', ref, o.ref);
+        if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+      }
       const go = e.target.querySelector('[type=submit]');
       go.disabled = true;
       let ok = true;
@@ -975,7 +981,7 @@ export function fittingView(me) {
       </div>
       <form class="form" id="nf">
         <div class="grid2">
-          <label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>
+          ${BILL_ON ? billFieldHTML({ code: me.code, hidden: { name: 'ref' }, pairs: true }) : '<label>Bill number <input name="ref" required placeholder="e.g. B-58214" autofocus></label>'}
           <label>Customer name <input name="customer" required placeholder="e.g. Ahmed Al Balushi"></label>
         </div>
         <div class="ph-label"><span>Customer phone <span class="opt">for the WhatsApp message when it is ready</span></span>${phoneFieldHTML()}</div>
@@ -1129,6 +1135,7 @@ export function fittingView(me) {
     });
     wireWay(layer.el);
     wirePhoneFields(layer.el);
+    wireBillFields(layer.el);
     layer.el.querySelector('#nf').addEventListener('submit', async e => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -1142,6 +1149,11 @@ export function fittingView(me) {
       e.target.elements.ref.value = ref;
       e.target.elements.customer.value = customer;
       if (!e.target.reportValidity()) return;
+      // The bill: used once in the Fitting Log (pairs "(1/3)"…) — bill.js.
+      if (BILL_ON) {
+        const why = await billProblem('order', ref);
+        if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+      }
       // The order is written to the database, which can refuse it (a bill
       // number already used here), so the form stays open until it lands.
       const go = e.target.querySelector('[type=submit]');

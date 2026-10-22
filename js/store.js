@@ -721,6 +721,14 @@ export const store = {
       return true;
     }, { module: 'settings', title: `${code}: tabs saved` });
   },
+  // The letters in front of a branch's bills (schema-60); empty = its code.
+  setBillPrefix(code, prefix) {
+    return run(['branches'], async () => {
+      ok(await supabase.rpc('set_bill_prefix', { p_code: code, p_prefix: prefix }));
+      return true;
+    }, { module: 'settings', title: `${code}: bill letters ${prefix ? `now ${prefix.toUpperCase()}` : 'back to the code'}` });
+  },
+
   // Hidden, and given on top of what it sees by itself (schema-57).
   setTabs(code, hidden, shown) {
     return run(['branches'], async () => {

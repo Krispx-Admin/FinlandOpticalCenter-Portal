@@ -2,7 +2,8 @@
 import { UNITS, TABS, tabOff, ROLES, BRANCHES, BRANCH_KINDS, LOCATIONS, labMode, LAB_MODES, PERMS, can, seesTab, tabByDefault } from './data.js';
 import { store } from './store.js';
 import { branchAccess, setBranchCode } from './auth.js';
-import { esc, icons, relTime, openLayer } from './ui.js';
+import { BILL_ON } from './bill.js';
+import { esc, icons, relTime, openLayer, toast } from './ui.js';
 
 export function settingsView(me) {
   let root;
@@ -198,6 +199,11 @@ export function settingsView(me) {
       if (d.brOpen) return saveOpen(e.target);
       if (d.brLens) return saveLens(e.target);
       if (d.brLab) return store.setLab(d.brLab, e.target.value);
+      if (d.brBillpx != null) {
+        const v = e.target.value.trim().toUpperCase();
+        if (v && !/^[A-Z]{1,8}$/.test(v)) { toast({ title: 'Letters only, A to Z', tone: 'stock' }); e.target.value = LOCATIONS.find(l => l.code === code)?.billPrefix || code; return; }
+        return store.setBillPrefix(code, v === code ? '' : v);
+      }
       if (d.accTab) {
         // Unticked: hidden. Ticked where it would not show by itself: given.
         const L = LOCATIONS.find(l => l.code === code);
@@ -243,6 +249,7 @@ export function settingsView(me) {
             <label>Name<input data-br-name="${esc(code)}" value="${esc(r.name)}" required></label>
             ${person ? '' : `<label>Arabic name <span class="opt">for the WhatsApp message</span><input dir="rtl" lang="ar" data-br-ar="${esc(code)}" value="${esc(L.nameAr ?? '')}" placeholder="الاسم بالعربية"></label>`}
             <label>Kind<select data-br-role="${esc(code)}">${accountOptions(r.role)}</select></label>
+            ${BILL_ON && !person ? `<label>Bill letters <span class="opt">in front of its bill numbers</span><input data-br-billpx="${esc(code)}" value="${esc(L.billPrefix || code)}" maxlength="8" style="text-transform:uppercase" placeholder="${esc(code)}"></label>` : ''}
           </div>`)}
         ${sec('lock', 'Sign-in code', `
           <form class="ba-set acc-code" data-set="${esc(code)}" autocomplete="off">

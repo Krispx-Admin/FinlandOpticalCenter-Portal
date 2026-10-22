@@ -5,6 +5,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { supabase, isPractice } from './auth.js';
+import { BILL_ON, billFieldHTML, wireBillFields, setBillBranch, billProblem, parseBill } from './bill.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
 
 // Absolute, because the print window is an about:blank document with no base
@@ -975,7 +976,7 @@ export function claimsView(me, kind = 'claim') {
         </div>
         ${directHTML()}
         <div class="grid2">
-          <label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>
+          ${BILL_ON && (parseBill(draft.billNo) || !draft.billNo) ? billFieldHTML({ code: draft.branch, value: draft.billNo, hidden: { id: 'f-bill' } }) : `<label>Bill number<input id="f-bill" placeholder="e.g. B-58214" value="${esc(draft.billNo)}"></label>`}
           <label>Member ID<input id="f-member" placeholder="As on the insurance card" value="${esc(draft.memberId)}"></label>
         </div>
         <label>Full name<input id="f-cust" placeholder="Full name" value="${esc(draft.customer)}">
@@ -1044,6 +1045,8 @@ export function claimsView(me, kind = 'claim') {
       </div>`, { onClose: () => { layer = null; } });
 
     const el = layer.el;
+    wireBillFields(el);
+    el.addEventListener('change', e => { if (e.target.id === 'f-branch') setBillBranch(el, e.target.value); });
     // The IPD column needs the room: a wider window, so no power box shrinks.
     if (ipdBox) el.classList.add('rx-wide');
     const sync = () => {
@@ -1109,6 +1112,11 @@ export function claimsView(me, kind = 'claim') {
         if (!draft.memberId.trim()) return toast({ title: 'Member ID is required', sub: 'It is on the insurance card.', tone: 'stock' });
         if (!draft.customer.trim()) return toast({ title: 'Full name is required', sub: 'Exactly as on the insurance card.', tone: 'stock' });
         if (!items.length) return toast({ title: 'Add at least one product', tone: 'stock' });
+        // The bill: once in Direct Insurance, once in Reimbursement Invoice (bill.js).
+        if (BILL_ON && draft.billNo && parseBill(draft.billNo) && draft.billNo !== existing?.billNo) {
+          const why = await billProblem(kind, draft.billNo, existing?.billNo ?? null);
+          if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+        }
         const fields = { ...draft, kind, ipdBox, customer: draft.customer.trim(), memberId: draft.memberId.trim(), items: items.map(i => ({ ...i, name: (i.name || '').trim() })) };
         const save = e.target.closest('[data-save]');
         save.disabled = true;

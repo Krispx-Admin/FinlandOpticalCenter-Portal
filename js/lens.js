@@ -7,6 +7,7 @@ import {
 } from './data.js';
 import { store } from './store.js';
 import { esc, relTime, fmtDT, icons, pill, locChip, openLayer, closeLayer, chipCount, olderHTML } from './ui.js';
+import { BILL_ON, billFieldHTML, wireBillFields, billProblem } from './bill.js';
 
 const REQ_CHIPS = [
   { key: 'requested', label: 'Lenses to send' },
@@ -504,7 +505,7 @@ export function lensView(me) {
             <tbody>${rows}</tbody>
           </table>
           <div class="grid2">
-            <label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>
+            ${BILL_ON ? billFieldHTML({ code: me.code, value: draft.billNo, hidden: { id: 'lens-note' }, pairs: true }) : `<label>Bill number<input id="lens-note" required value="${esc(draft.billNo)}" placeholder="e.g. B-58214"></label>`}
             <label>Customer name<input id="lens-cust" required value="${esc(draft.customer)}" placeholder="e.g. Ahmed Al Balushi"></label>
           </div>
           <div class="fulfil">
@@ -535,6 +536,7 @@ export function lensView(me) {
     layer.el.addEventListener('change', e => {
       if (e.target.name === 'fulfil') { sync(); layer.update(); }
     });
+    wireBillFields(layer.el);
 
     layer.el.addEventListener('click', async e => {
       if (e.target.closest('[data-close]')) return layer.close();
@@ -565,7 +567,11 @@ export function lensView(me) {
         const bill = layer.el.querySelector('#lens-note');
         cust.value = draft.customer = draft.customer.trim();
         bill.value = draft.billNo = draft.billNo.trim();
-        if (!cust.reportValidity() || !bill.reportValidity()) return;
+        if (!cust.reportValidity() || !(BILL_ON ? layer.el.querySelector('[data-bill] .bill-num') : bill).reportValidity()) return;
+        if (BILL_ON) {
+          const why = await billProblem('order', draft.billNo);
+          if (why) return toast({ title: 'That bill number is taken', sub: why, tone: 'stock' });
+        }
 
         const send = e.target.closest('[data-send]');
         send.disabled = true;
