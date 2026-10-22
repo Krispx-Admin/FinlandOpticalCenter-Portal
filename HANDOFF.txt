@@ -1300,6 +1300,10 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  "Add a pair" confirm step: each line is only "SEEB 10 → SEEB 10
+             (1/2)" and "This new order → SEEB 10 (2/2)", centred, wider gap
+             around the arrow; the customer / route / status line is gone
+             (the first question shows the rows).
  2026-10-22  "Another pair?" question shows the orders already on the bill as
              their Fitting Log rows (bill, customer, route, status), without
              the tick box or buttons — fitting.js previewRowHTML, passed to

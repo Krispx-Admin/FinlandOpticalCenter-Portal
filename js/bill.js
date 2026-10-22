@@ -8,7 +8,7 @@
 // (3/3) for a third, and so on (schema-61 renumbers them when it is saved).
 // The field keeps a hidden input with the whole bill ("SEEB 10020") under the
 // form's own name/id, so the forms read it as they always did.
-import { LOCATIONS, FIT_STATUS, locName } from './data.js';
+import { LOCATIONS } from './data.js';
 import { isPractice, supabase } from './auth.js';
 import { store } from './store.js';
 import { esc, icons } from './ui.js';
@@ -109,17 +109,12 @@ export async function planOrderBill(ref, { preview = null } = {}) {
       <button type="button" class="btn btn-primary" data-pq="yes">Yes, another pair</button>
     </div>`);
   if (!yes) return null;
-  const route = o => {
-    const to = o.fitter_code ? locName(o.fitter_code) : o.outside_cutter ? `${o.outside_cutter} (outside cutter)` : 'not sent to fitting yet';
-    return `${esc(locName(o.origin_code))} → ${esc(to)}`;
-  };
   const ok = await dialog(`
     <h3>Add a pair to ${esc(p.base)}</h3>
     <p>Already on this bill — they will be renumbered:</p>
     <div class="pq-list">${rows.map((o, i) => `
       <div class="pq-row">
         <div class="pq-ref"><b>${esc(o.ref)}</b> ${icons.arrowRight} <b>${esc(`${p.base} (${i + 1}/${n + 1})`)}</b></div>
-        <div class="pq-sub">${esc(o.customer || 'No name')} · ${route(o)} · <span class="pq-st">${esc(FIT_STATUS[o.status]?.label ?? o.status)}</span> · logged ${esc(new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</div>
       </div>`).join('')}
       <div class="pq-row pq-new"><div class="pq-ref">This new order ${icons.arrowRight} <b>${esc(`${p.base} (${n + 1}/${n + 1})`)}</b></div></div>
     </div>
