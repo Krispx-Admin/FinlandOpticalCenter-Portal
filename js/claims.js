@@ -1016,7 +1016,7 @@ export function claimsView(me, kind = 'claim') {
                   <tr>
                     <th title="${esc(r.title)}">${esc(r.label)}</th>
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].od[c.key] ?? '')}" data-rx="${r.key}.od.${c.key}"></td>`).join('')}
-                    ${ipdBox && i === 0 ? `<td class="rx-ipd" rowspan="${RX_ROWS.length + 1}"><input value="${esc(draft.rx.ipd ?? '')}" data-rx="ipd" placeholder="mm" aria-label="IPD"></td>` : ''}
+                    ${ipdBox && i === 0 ? `<td class="rx-ipd" rowspan="${RX_ROWS.length + 1}"><input value="${esc(draft.rx.ipd ?? '')}" data-rx="ipd" aria-label="IPD in millimetres"></td>` : ''}
                     ${RX_COLS.map(c => `<td><input value="${esc(draft.rx[r.key].os[c.key] ?? '')}" data-rx="${r.key}.os.${c.key}"></td>`).join('')}
                   </tr>`).join('')}
                 <tr class="rx-sum">
