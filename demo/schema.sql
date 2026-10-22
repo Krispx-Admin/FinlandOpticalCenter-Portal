@@ -344,7 +344,7 @@ alter table public."app_settings" add constraint "app_settings_id_check" CHECK (
 
 alter table public."app_settings" add constraint "app_settings_pkey" PRIMARY KEY (id);
 
-alter table public."branches" add constraint "branches_perms_check" CHECK ((perms <@ ARRAY['see_all'::text, 'act_all'::text, 'office_queue'::text, 'accounts'::text, 'lists'::text, 'insurance_dash'::text, 'export_insurance'::text, 'schedule_edit'::text, 'view_only'::text, 'demo'::text]));
+alter table public."branches" add constraint "branches_perms_check" CHECK ((perms <@ ARRAY['see_all'::text, 'act_all'::text, 'office_queue'::text, 'accounts'::text, 'lists'::text, 'insurance_dash'::text, 'export_insurance'::text, 'schedule_edit'::text, 'view_only'::text, 'demo'::text, 'tablet'::text]));
 
 alter table public."branches" add constraint "branches_role_check" CHECK ((role = ANY (ARRAY['retail'::text, 'fitting'::text, 'clinic'::text, 'person'::text, 'admin'::text, 'scheduler'::text, 'manager'::text])));
 
@@ -2151,7 +2151,7 @@ begin
   select * into b from public.branches where code = p_code for update;
   if not found then raise exception 'No account %', p_code; end if;
   nxt := array(select distinct unnest(coalesce(p_perms, '{}')) order by 1);
-  if not (nxt <@ array['see_all', 'act_all', 'office_queue', 'accounts', 'lists', 'insurance_dash', 'export_insurance', 'schedule_edit', 'view_only', 'demo']::text[]) then
+  if not (nxt <@ array['see_all', 'act_all', 'office_queue', 'accounts', 'lists', 'insurance_dash', 'export_insurance', 'schedule_edit', 'view_only', 'demo', 'tablet']::text[]) then
     raise exception 'Unknown permission in %', p_perms;
   end if;
   if public.manages_accounts(b) and not ('accounts' = any(nxt) and not 'view_only' = any(nxt))

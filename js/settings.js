@@ -204,6 +204,11 @@ export function settingsView(me) {
         if (v && !/^[A-Z]{1,8}$/.test(v)) { toast({ title: 'Letters only, A to Z', tone: 'stock' }); e.target.value = LOCATIONS.find(l => l.code === code)?.billPrefix || code; return; }
         return store.setBillPrefix(code, v === code ? '' : v);
       }
+      if (e.target.matches('[data-acc-tablet]')) {
+        const ps = new Set(LOCATIONS.find(l => l.code === code)?.perms ?? []);
+        if (e.target.checked) ps.add('tablet'); else ps.delete('tablet');
+        return store.setPermissions(code, [...ps]);
+      }
       if (d.accTab) {
         // Unticked: hidden. Ticked where it would not show by itself: given.
         const L = LOCATIONS.find(l => l.code === code);
@@ -266,6 +271,11 @@ export function settingsView(me) {
             <label class="acc-tab"><span class="cbx"><input type="checkbox" data-acc-tab="${tb.key}" ${seesTab(tb.key, L) ? 'checked' : ''}><i></i></span>${icons[tb.icon] ?? ''}<span>${esc(tb.label)}${given ? ' <em class="acc-given">given</em>' : ''}</span></label>`;
           }).join('')}</div>`,
           'Ticked = in its sidebar now. Lens Stock shows by itself to a lens-stock holder and Outside Lens Orders to the outside-lens handler (both to anyone who sees every branch); tick them to give them to anyone else.')}
+        ${sec('tablet', 'Tablet mode', `
+          <label class="acc-switch">
+            <span class="sw"><input type="checkbox" data-acc-tablet ${(L.perms ?? []).includes('tablet') ? 'checked' : ''}><i></i></span>
+            <span><b>${(L.perms ?? []).includes('tablet') ? 'Allowed' : 'Not allowed'}</b><span>Shows “Tablet mode” in its sidebar, to switch a tablet to big buttons and order cards. Each tablet is switched on by itself.</span></span>
+          </label>`)}
         ${sec('lens', 'Lens stock and lab', `
           <label class="acc-switch ${r.active ? '' : 'is-off'}">
             <span class="sw"><input type="checkbox" data-br-lens="${esc(code)}" ${r.holds_lens_stock ? 'checked' : ''} ${off(r.active, 'Open the account first')}><i></i></span>
@@ -287,7 +297,7 @@ export function settingsView(me) {
   // ── Access permissions (schema-50): tick boxes per account ──
   const permsOf = code => LOCATIONS.find(l => l.code === code)?.perms ?? [];
   function permSummary(code) {
-    const ps = permsOf(code), all = PERMS.filter(([k]) => k !== 'view_only').map(([k]) => k);
+    const ps = permsOf(code), all = PERMS.filter(([k]) => !['view_only', 'tablet'].includes(k)).map(([k]) => k);
     const n = all.filter(k => ps.includes(k)).length;
     const view = ps.includes('view_only') ? ' · view only' : '';
     return n === all.length ? `Full access${view}` : n ? `${n} of ${all.length}${view}` : `Own branch only${view}`;
@@ -305,7 +315,7 @@ export function settingsView(me) {
       <form class="form perm-form" id="perm-form">
         <p class="muted sm">${BRANCH_KINDS.includes(b.role) ? 'A branch always has its own work. Tick what it may do beyond that.' : 'Tick what this person may do in the portal.'}</p>
         <div class="perm-list">
-          ${PERMS.filter(([k]) => k !== 'view_only').map(([k, label, help]) => `
+          ${PERMS.filter(([k]) => !['view_only', 'tablet'].includes(k)).map(([k, label, help]) => `
           <label class="perm-row"><span class="cbx"><input type="checkbox" name="p" value="${k}" ${had.has(k) ? 'checked' : ''}><i></i></span>
             <span class="perm-txt"><b>${esc(label)}</b><span>${esc(help)}</span></span></label>`).join('')}
         </div>
@@ -320,6 +330,7 @@ export function settingsView(me) {
     layer.el.addEventListener('submit', async e => {
       e.preventDefault();
       const perms = new FormData(e.target).getAll('p').map(String);
+      if (had.has('tablet')) perms.push('tablet');   // set by its own switch in the account panel
       if (code === me.code && had.has('accounts') && !perms.includes('accounts')
           && !confirm('Take "Settings: accounts & codes" off your own account?\n\nYou will no longer be able to manage accounts.')) return;
       if (await store.setPermissions(code, perms)) { layer.close(); loadBranches(); }

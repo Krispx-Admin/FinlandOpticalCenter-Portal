@@ -111,6 +111,7 @@ export const PERMS = [
   ['insurance_dash', 'Direct Insurance dashboard', 'What the insurers paid — by insurer, branch and salesperson'],
   ['export_insurance', 'Excel exports', 'The Excel export in Direct Insurance and in Reimbursement Invoice'],
   ['schedule_edit', 'Schedule: edit', 'Build and publish the staff schedule'],
+  ['tablet', 'Tablet mode', 'May switch a tablet to Tablet Mode — big buttons, the orders as cards (set in the account panel)'],
   ['demo', 'Admin Demo', 'The “Switch to demo” button beside Live · synced — try changes on a copy in this browser, never the real data'],
   ['view_only', 'View only', 'Sees what the ticks above allow, but changes nothing'],
 ];

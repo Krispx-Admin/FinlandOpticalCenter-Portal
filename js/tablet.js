@@ -14,8 +14,14 @@
 //  · A step pressed by mistake is undone from the pop-up (Undo), instead of an
 //    "are you sure?" before every step.
 const KEY = 'focp.tablet';
+// Only for an account the office allows (schema-64, the 'tablet' tick — MGM
+// to start); the shell says which on signing in. Off before then.
+let allowed = false;
+export function allowTablet(on) { allowed = !!on; apply(); }
+export const tabletAllowed = () => allowed;
 
 export function isTablet() {
+  if (!allowed) return false;
   try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
 }
 export function setTablet(on) {

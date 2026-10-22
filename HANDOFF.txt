@@ -825,6 +825,8 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-64-tablet-permission.sql  'tablet' added to branches_perms_check and
+                             set_permissions' list; given to MGM. Applied 2026-10-22.
   schema-63-demo-permission.sql  'demo' added to branches_perms_check and to
                              set_permissions' list; given to OFC and OMAR.
                              Applied 2026-10-22.
@@ -1308,6 +1310,15 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  Tablet Mode only for accounts allowed it (user: MGM for now).
+             The 'tablet' tick (schema-64) — Settings → Accounts → an account
+             → "Tablet mode: Allowed / Not allowed" (a switch in the panel; left
+             out of the Access Permissions window and its count, and kept when
+             that window saves). tablet.js allowTablet(): the shell sets it on
+             signing in (can(me, 'tablet')), sign-out clears it; isTablet() is
+             false unless allowed — no sidebar button, no offer, and a device
+             switched on before stays off. Tested: SCC (not allowed) none even
+             with ?tablet=1; MGM has it; the panel switch saves.
  2026-10-22  LIVE (user): bill numbers (bill.js BILL_ON = true) and IPD on
              Direct Insurance (claims.js ipdBox = direct). Bills already saved
              with letters stay as they are — editing one keeps the free-text

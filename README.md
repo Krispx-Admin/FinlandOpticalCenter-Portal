@@ -155,6 +155,7 @@ Applied in order:
 | `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
 | `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
 | `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
+| `supabase/schema-64-tablet-permission.sql` | the 'tablet' tick: Tablet Mode only for accounts allowed it (MGM to start) |
 | `supabase/schema-63-demo-permission.sql` | the 'demo' permission: "Switch to demo" beside Live · synced (OFC, OMAR to start) |
 | `supabase/schema-62-outside-via-hub.sql` | outside cutting through a hub (MGM): `orders.outside_hub/_out_at/_back_at`, `app_settings.outside_cut_hub`, route gate fix |
 | `supabase/schema-61-bill-pairs.sql` | another pair on a bill: `bill_orders`, `pair_ref` (renumbers (i/n+1)), `pair_fix` |

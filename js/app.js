@@ -9,7 +9,7 @@ import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer, openLayer } from './ui.js';
 import { armSound } from './sound.js';
-import { isTablet, setTablet, tabletChosen, looksLikeTablet } from './tablet.js';
+import { isTablet, setTablet, tabletChosen, looksLikeTablet, allowTablet } from './tablet.js';
 import { notifier, actionIds, relevantNotice } from './notify.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
@@ -357,6 +357,7 @@ const rememberSide = on => { try { localStorage.setItem(SIDE_KEY, on ? '1' : '0'
 function renderShell() {
   teardownShell();
   const me = store.session;
+  allowTablet(can(me, 'tablet'));   // Tablet Mode: only an account allowed it (schema-64)
   const mod = currentModule();
   app.innerHTML = `
     <div class="shell ${sideCollapsed() || isTablet() ? 'collapsed' : ''}">
@@ -383,7 +384,7 @@ function renderShell() {
           <div class="side-actions">
             ${auth.openedFrom() ? `<button class="side-link side-back" id="open-back">${icons.history}<span>Back to ${esc(loc(auth.openedFrom().code)?.name ?? auth.openedFrom().code)}</span></button>` : ''}
             ${can(me, 'accounts') ? `<button class="side-link" id="open-as">${icons.users}<span>Open as…</span></button>` : ''}
-            <button class="side-link" id="tablet-toggle" title="Big buttons and cards for a tablet — on this device only">${icons.tablet}<span>Tablet mode: ${isTablet() ? 'on' : 'off'}</span></button>
+            ${can(me, 'tablet') ? `<button class="side-link" id="tablet-toggle" title="Big buttons and cards for a tablet — on this device only">${icons.tablet}<span>Tablet mode: ${isTablet() ? 'on' : 'off'}</span></button>` : ''}
             <button class="side-link" id="signout">${icons.logout}<span>Sign out</span></button>
           </div>
         </div>
@@ -401,7 +402,7 @@ function renderShell() {
   app.querySelector('#open-as')?.addEventListener('click', openAsModal);
   app.querySelector('#tablet-toggle')?.addEventListener('click', () => { setTablet(!isTablet()); renderShell(); });
   // A tablet that has never chosen: offer it once.
-  if (!tabletChosen() && looksLikeTablet()) {
+  if (can(me, 'tablet') && !tabletChosen() && looksLikeTablet()) {
     setTimeout(() => toast({ title: 'This looks like a tablet', sub: 'Tablet mode has big buttons and shows every order in full.', ms: 12000,
       action: { label: 'Turn on', run: () => { setTablet(true); renderShell(); } } }), 1500);
     try { localStorage.setItem('focp.tablet', '0'); } catch { /* fine */ }
@@ -412,7 +413,7 @@ function renderShell() {
     await reenter(r.branch);
   });
   app.querySelector('#signout').addEventListener('click', () => {
-    auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
+    auth.signOut(); store.stop(); store.session = null; allowTablet(false); closeLayer(); renderLogin();
   });
   // The notification bells (notify.js): set up before the first tab mounts.
   bells = notifier(me);
@@ -424,7 +425,7 @@ function renderShell() {
     // rebuild the portal for its new kind.
     const now = store.session;
     if (now && now.active === false) {
-      auth.signOut(); store.stop(); store.session = null; closeLayer(); renderLogin();
+      auth.signOut(); store.stop(); store.session = null; allowTablet(false); closeLayer(); renderLogin();
       toast({ title: 'This branch has been closed', sub: 'Ask the office if that is a mistake.', tone: 'stock' });
       return;
     }
