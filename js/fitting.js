@@ -32,6 +32,7 @@ const CHIP_LABELS = {
   at_fitter: 'In Fitting', ready: 'Ready', returning: 'In Transit to Branch', delivered: 'Ready for Collection',
 };
 // Outside cutting through the hub (schema-62) — tried in the Admin Demo first.
+// Still the Admin Demo only (user 2026-10-22: not live yet).
 const OUT_HUB_ON = isPractice;
 const CHIP_DEFS = [{ key: 'active', label: 'All active' }];
 for (const s of FIT_FLOW.filter(s => s !== 'collected')) CHIP_DEFS.push({ key: s, label: CHIP_LABELS[s], statuses: [s] });

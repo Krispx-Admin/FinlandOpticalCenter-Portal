@@ -1308,6 +1308,14 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  LIVE (user): bill numbers (bill.js BILL_ON = true) and IPD on
+             Direct Insurance (claims.js ipdBox = direct). Bills already saved
+             with letters stay as they are — editing one keeps the free-text
+             box (parseBill fails → old input); only new bills are the
+             branch's letters + digits, with "another pair?" and no repeats.
+             Outside cutting through MGM stays Admin Demo only (fitting.js
+             OUT_HUB_ON = isPractice), so the live Send to Fitting still lists
+             the outside cutters directly.
  2026-10-22  TABLET MODE + DEMO SWITCH + 4-STOP ROUTE.
              · Tablet Mode (js/tablet.js; LIVE, opt-in per device —
                localStorage focp.tablet, ?tablet=1/0; sidebar "Tablet mode:

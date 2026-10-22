@@ -9,11 +9,13 @@
 // The field keeps a hidden input with the whole bill ("SEEB 10020") under the
 // form's own name/id, so the forms read it as they always did.
 import { LOCATIONS } from './data.js';
-import { isPractice, supabase } from './auth.js';
+import { supabase } from './auth.js';
 import { store } from './store.js';
 import { esc, icons } from './ui.js';
 
-export const BILL_ON = isPractice;
+// Live since 2026-10-22 (user). A bill already saved with letters in it stays
+// as it is — editing one keeps the free-text box; only new bills are digits.
+export const BILL_ON = true;
 export const billPrefix = code => {
   const l = LOCATIONS.find(x => x.code === code);
   return (l?.billPrefix || code || '').toUpperCase();

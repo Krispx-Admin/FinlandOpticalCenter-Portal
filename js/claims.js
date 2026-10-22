@@ -4,7 +4,7 @@ import {
   RX_ROWS, RX_EYES, RX_COLS, blankRx, normaliseRx, claimTotal, seesAll, readOnly, ITEM_KINDS, itemQty, itemAmount, itemCounts, canExportInsurance, can,
 } from './data.js';
 import { store } from './store.js';
-import { supabase, isPractice } from './auth.js';
+import { supabase } from './auth.js';
 import { BILL_ON, billFieldHTML, wireBillFields, setBillBranch, billProblem, parseBill } from './bill.js';
 import { esc, relTime, fmtDT, icons, locChip, openLayer, closeLayer, toast } from './ui.js';
 
@@ -625,8 +625,8 @@ export function claimsView(me, kind = 'claim') {
   const viewOnly = readOnly(me);
   const direct = kind === 'direct';
   const T = KINDS[kind];
-  // IPD box on Direct Insurance (user 2026-10-22) — in the Admin Demo first.
-  const ipdBox = direct && isPractice;
+  // IPD box on Direct Insurance (user 2026-10-22; live after the Admin Demo).
+  const ipdBox = direct;
   const ui = { q: '', branch: 'all', insurer: 'all', period: '30d' };
   let root, layer = null;
 
