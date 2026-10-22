@@ -825,6 +825,9 @@ Migrations are applied by hand, in order. Each file has a header with
   schema-49-branch-name-ar.sql branches.name_ar (12 filled: e.g. SCC سيتي سنتر
                              السيب, FEC clinics عيادة <city>); office-only
                              set_branch_name_ar(). Applied 2026-10-18.
+  schema-63-demo-permission.sql  'demo' added to branches_perms_check and to
+                             set_permissions' list; given to OFC and OMAR.
+                             Applied 2026-10-22.
   schema-62-outside-via-hub.sql  app_settings.outside_cut_hub ('MGM');
                              orders.outside_hub, outside_out_at, outside_back_at;
                              orders_route_gate: "ready" puts the frame at the
@@ -1305,6 +1308,30 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  TABLET MODE + DEMO SWITCH + 4-STOP ROUTE.
+             · Tablet Mode (js/tablet.js; LIVE, opt-in per device —
+               localStorage focp.tablet, ?tablet=1/0; sidebar "Tablet mode:
+               on/off"; offered once on a touch screen of tablet size).
+               html.tablet: controls ≥ 48 px (Apple 44 pt / NN/g 1 cm), boxes
+               16 px (Safari zooms smaller), chips one scrolling row, menu as
+               the icon rail. Fitting Log becomes cards (fitting.js cardHTML;
+               #f-list.t-list grid minmax 400 px: 2 across landscape, 1
+               portrait): bill 22 px, customer, the whole route with stops
+               named (journey big), status + tags, the next step as a 56 px
+               full-width button (nextActionHTML — shared with the rows). Tap a
+               card → its panel. A step pressed shows "<bill> — <status>" with
+               Undo (store.undoOrderStep) instead of an "are you sure?". Why:
+               below 1180 px (iPad width) the desktop rows hide the route and
+               the tags — the user had to zoom out, shrinking the buttons.
+               Tested at 1180×820 and 820×1180 with touch: 2 / 1 columns, 56 px
+               buttons, no sideways scroll, Undo works.
+             · Pop-ups: index.html has #toasts already, so the click handler
+               (×, Clear all) was never attached — fixed (wired on first use).
+             · "Switch to demo" beside Live · synced for accounts with the new
+               'demo' tick (schema-63; Access Permissions "Admin Demo"; OFC and
+               OMAR to start) → /?demoadmin; the demo shows "Back to live".
+             · Through-MGM outside orders draw four stops: sold at — MGM — OUT
+               — collect at (fitting.js frameJourney, .journey-4).
  2026-10-22  OUTSIDE CUTTING THROUGH MGM — ADMIN DEMO ONLY (fitting.js
              OUT_HUB_ON = isPractice). User's route: branch → MGM → outside
              cutter → back to MGM → branch. "Send to Fitting" offers one card,

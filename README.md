@@ -79,6 +79,7 @@ js/demo.js          Admin Demo (?AdminDemo=SCC): the database inside the browser
 js/phone.js         phone number with a country picker; js/countries.js the codes
 js/notify.js        the notification bell on each tab (All / My Action / Off) and what rings
 js/insights.js      the Data tab: numbers, a chart, breakdowns and every record, per tab
+js/tablet.js        Tablet Mode: per device, big touch targets, the Fitting Log as cards
 js/bill.js          bill numbers: the branch's letters + digits only; "another pair?" renumbers (1/2)…; no repeats (Admin Demo first)
 js/sound.js         its two sounds — Web Audio, no file
 demo/               practice copy's layout + starting data, and build.py that makes them
@@ -154,6 +155,7 @@ Applied in order:
 | `supabase/schema-53-tabs-per-account.sql` | `branches.tabs_hidden`: which sidebar tabs each account sees (`set_tabs_hidden`); Data hidden for branches |
 | `supabase/schema-54-lens-stock-any-account.sql` | any open account may hold lens stock; frames go only to a fitting centre's shelf |
 | `supabase/schema-55-mend-dashes.sql` | four functions' messages: garbled dashes put right |
+| `supabase/schema-63-demo-permission.sql` | the 'demo' permission: "Switch to demo" beside Live · synced (OFC, OMAR to start) |
 | `supabase/schema-62-outside-via-hub.sql` | outside cutting through a hub (MGM): `orders.outside_hub/_out_at/_back_at`, `app_settings.outside_cut_hub`, route gate fix |
 | `supabase/schema-61-bill-pairs.sql` | another pair on a bill: `bill_orders`, `pair_ref` (renumbers (i/n+1)), `pair_fix` |
 | `supabase/schema-60-bill-prefix.sql` | bill numbers: `branches.bill_prefix`, `set_bill_prefix`, `bills_used` (Admin Demo first) |

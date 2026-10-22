@@ -9,6 +9,7 @@ import { store } from './store.js';
 import * as auth from './auth.js';
 import { esc, icons, toast, closeLayer, openLayer } from './ui.js';
 import { armSound } from './sound.js';
+import { isTablet, setTablet, tabletChosen, looksLikeTablet } from './tablet.js';
 import { notifier, actionIds, relevantNotice } from './notify.js';
 import { fittingView } from './fitting.js';
 import { stockView } from './stock.js';
@@ -358,7 +359,7 @@ function renderShell() {
   const me = store.session;
   const mod = currentModule();
   app.innerHTML = `
-    <div class="shell ${sideCollapsed() ? 'collapsed' : ''}">
+    <div class="shell ${sideCollapsed() || isTablet() ? 'collapsed' : ''}">
       <nav class="side">
         <div class="side-logo">
           <button class="side-toggle" id="side-toggle" title="Fold the menu" aria-label="Fold the menu">${icons.menu}</button>
@@ -367,7 +368,11 @@ function renderShell() {
         </div>
         <div class="side-nav" id="nav"></div>
         <div class="side-foot">
-          <div class="live-ind${auth.isPractice ? ' is-practice' : ''}"><i></i>${auth.isPractice ? 'Admin Demo' : 'Live · synced'}</div>
+          <div class="live-row">
+            <div class="live-ind${auth.isPractice ? ' is-practice' : ''}"><i></i>${auth.isPractice ? 'Admin Demo' : 'Live · synced'}</div>
+            ${auth.isPractice ? '<a class="demo-switch" href="/" title="Back to the real portal">Back to live</a>'
+              : can(me, 'demo') ? '<a class="demo-switch" href="/?demoadmin" title="A copy in this browser — nothing you do there touches the real data">Switch to demo</a>' : ''}
+          </div>
           <div class="me-card">
             <span class="me-code role-${me.role}">${me.code}</span>
             <div class="me-meta">
@@ -378,6 +383,7 @@ function renderShell() {
           <div class="side-actions">
             ${auth.openedFrom() ? `<button class="side-link side-back" id="open-back">${icons.history}<span>Back to ${esc(loc(auth.openedFrom().code)?.name ?? auth.openedFrom().code)}</span></button>` : ''}
             ${can(me, 'accounts') ? `<button class="side-link" id="open-as">${icons.users}<span>Open as…</span></button>` : ''}
+            <button class="side-link" id="tablet-toggle" title="Big buttons and cards for a tablet — on this device only">${icons.tablet}<span>Tablet mode: ${isTablet() ? 'on' : 'off'}</span></button>
             <button class="side-link" id="signout">${icons.logout}<span>Sign out</span></button>
           </div>
         </div>
@@ -393,6 +399,13 @@ function renderShell() {
     rememberSide(on);
   });
   app.querySelector('#open-as')?.addEventListener('click', openAsModal);
+  app.querySelector('#tablet-toggle')?.addEventListener('click', () => { setTablet(!isTablet()); renderShell(); });
+  // A tablet that has never chosen: offer it once.
+  if (!tabletChosen() && looksLikeTablet()) {
+    setTimeout(() => toast({ title: 'This looks like a tablet', sub: 'Tablet mode has big buttons and shows every order in full.', ms: 12000,
+      action: { label: 'Turn on', run: () => { setTablet(true); renderShell(); } } }), 1500);
+    try { localStorage.setItem('focp.tablet', '0'); } catch { /* fine */ }
+  }
   app.querySelector('#open-back')?.addEventListener('click', async () => {
     const r = await auth.backFromOpened();
     if (!r.branch) { toast({ title: 'Could not go back', sub: r.error ?? '', tone: 'stock' }); store.stop(); store.session = null; teardownShell(); return renderLogin(); }

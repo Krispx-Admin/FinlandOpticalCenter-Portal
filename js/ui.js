@@ -48,6 +48,7 @@ export const icons = {
   history: I('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'),
   inbox: I('<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
   chat: I('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
+  tablet: I('<rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/>'),
   lock: I('<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
   power: I('<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>'),
   chart: I('<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'),
@@ -111,11 +112,16 @@ const TOAST_MAX = 2;
 let toastMore = { n: 0, last: '', timer: null };
 function toastHost() {
   let host = document.getElementById('toasts');
-  if (!host) {
-    host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host);
+  if (!host) { host = document.createElement('div'); host.id = 'toasts'; document.body.appendChild(host); }
+  // index.html already has the host, so wire it on first use, not on creation
+  // (the ×, Clear all and Undo did nothing before this).
+  if (!host.dataset.wired) {
+    host.dataset.wired = '1';
     host.addEventListener('click', e => {
       const x = e.target.closest('[data-t-x]');
       if (x) return dropToast(x.closest('.toast'));
+      const act = e.target.closest('[data-t-act]');
+      if (act) { const el = act.closest('.toast'); el?._act?.(); return dropToast(el); }
       if (e.target.closest('[data-t-clear]')) { host.querySelectorAll('.toast').forEach(dropToast); clearMore(); }
     });
   }
@@ -143,16 +149,17 @@ function drawMore(host) {
   clearTimeout(toastMore.timer);
   toastMore.timer = setTimeout(clearMore, 9000);
 }
-export function toast({ title, sub = '', tone = 'info', ms = 5200 }) {
+export function toast({ title, sub = '', tone = 'info', ms = 5200, action = null }) {
   const host = toastHost();
   const live = [...host.querySelectorAll('.toast:not([data-gone])')];
-  if (live.length >= TOAST_MAX) {
+  if (live.length >= TOAST_MAX && !action) {
     toastMore.n += 1; toastMore.last = title;
     return drawMore(host);
   }
   const el = document.createElement('div');
   el.className = `toast tone-${tone}`;
-  el.innerHTML = `<i class="t-dot"></i><div class="t-body"><div class="t-title">${esc(title)}</div>${sub ? `<div class="t-sub">${esc(sub)}</div>` : ''}</div><button type="button" class="t-x" data-t-x aria-label="Close">×</button>`;
+  el.innerHTML = `<i class="t-dot"></i><div class="t-body"><div class="t-title">${esc(title)}</div>${sub ? `<div class="t-sub">${esc(sub)}</div>` : ''}</div>${action ? `<button type="button" class="t-act" data-t-act>${esc(action.label)}</button>` : ''}<button type="button" class="t-x" data-t-x aria-label="Close">×</button>`;
+  if (action) el._act = action.run;
   host.appendChild(el);
   requestAnimationFrame(() => el.classList.add('in'));
   const start = () => { el._timer = setTimeout(() => dropToast(el), ms); };

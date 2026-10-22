@@ -15,6 +15,7 @@ import { store } from './store.js';
 import { openShelfBrowser } from './lens.js';
 import { phoneFieldHTML, wirePhoneFields, phoneValue, splitPhone } from './phone.js';
 import { isPractice } from './auth.js';
+import { isTablet } from './tablet.js';
 import { BILL_ON, billFieldHTML, wireBillFields, billProblem, parseBill, planOrderBill, takePair, fixPairs } from './bill.js';
 import { esc, relTime, fmtDT, icons, pill, stepPill, locChip, openLayer, closeLayer, toast, chipCount, olderHTML } from './ui.js';
 
@@ -490,6 +491,24 @@ export function fittingView(me) {
         <span class="j-inhouse">${isBack(o) ? 'Fitted in-house' : 'In-house — no transit'}</span>
       </div>`;
     const C = collectOf(o);
+    // Outside cutting through the hub (schema-62): four stops — where it was
+    // sold, the hub, the outside cutter, where the customer collects.
+    if (isViaHub(o)) {
+      const sent = !!o.outsideOutAt, back = !!o.outsideBackAt;
+      const segA = stage >= at('at_fitter') ? 'done' : stage === at('to_fitter') ? 'moving' : '';
+      const segB = sent ? 'done' : '';
+      const segC = stage >= at('delivered') ? 'done' : back ? 'moving' : '';
+      return `
+      <div class="journey journey-4 ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(locName(o.fitter))} → ${esc(o.outside || 'outside cutter')} → ${esc(locName(C))}">
+        ${node(o.origin, 'done', locName(o.origin))}
+        <i class="j-seg ${segA}"></i>
+        ${node(o.fitter, `${stage >= at('to_fitter') ? 'done' : ''}`, locName(o.fitter))}
+        <i class="j-seg ${segB}"></i>
+        ${node('OUT', `${back ? 'ready' : sent ? 'done' : ''} j-mid`, o.outside ? `${o.outside} (outside)` : 'Outside cutter', tail)}
+        <i class="j-seg ${segC}"></i>
+        ${node(C, stage >= at('delivered') ? 'done' : '', C === o.origin ? 'Back at branch' : `Collect at ${locName(C)}`)}
+      </div>`;
+    }
     // A plain round trip draws as it always has.
     if (C === o.origin && !(o.stops ?? []).length && !isSelfFit(o)) return `
       <div class="journey ${big ? 'journey-big' : ''}" title="${esc(locName(o.origin))} → ${esc(fitterName)} → back">
@@ -550,9 +569,61 @@ export function fittingView(me) {
   // taken off the Fitting Log, user 2026-10-18: the tabs carry the counts.)
 
   // ── list ──
+  // The next step for an order, as buttons (or who it waits on) — the list's
+  // rows and Tablet Mode's cards share it.
+  function nextActionHTML(o, st, can, needsFitter) {
+    // Primary action: pick a fitter, advance, or show who we're waiting on.
+    let action;
+    // The handler's first job on any outside order: order the lens — the button opens the list.
+    if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && !isBack(o) && !viewOnly)
+      action = `<a class="btn btn-primary btn-sm" href="#/outside">Order Lens ${icons.arrowRight}</a>`;
+    else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send Lenses</button>`;
+    else if (canArriveOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-arrive-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
+    else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send Lenses to ${esc(o.outsideLens.dest)}</button>`;
+    else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
+    else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} not taking frames</span>`;
+    else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
+    else if (st.hubOut && can && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-hub-out="${o.id}">${icons.send} Send to Outside Cutter</button>`;
+    else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
+    else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
+    else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
+    // The fitter marks the outside lenses received — alongside the frame's own step.
+    if (canReceiveOutside(o, me.code) && !viewOnly) {
+      const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
+      action = action.startsWith('<span') ? lens : `${lens}${action}`;
+    }
+    if (waOn(o)) action = `${waBtn(o)}${action}`;
+    return action;
+  }
+
+  // ── Tablet Mode (tablet.js): each order a card with everything on it ──
+  // Bill and customer big, the whole route with its stops named, the status,
+  // and the next step as one big button. Tap the card for the details.
+  function cardHTML(o) {
+    const can = canAdvanceOrder(o, me.code);
+    const st = fitStep(o, { viewer: me.code });
+    const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
+    const action = nextActionHTML(o, st, can, needsFitter);
+    const fromStock = !!store.lensRequestForOrder(o.id);
+    const selected = ui.selected.has(o.id);
+    const isNew = !ui.seen.has(o.id);
+    return `
+      <article class="t-card ${o.urgent ? 't-urgent' : ''} ${selected ? 'row-selected' : ''} ${isNew ? 'row-enter' : ''}" data-card="${o.id}">
+        <header class="t-head">
+          <label class="cbx t-cbx" data-stop><input type="checkbox" data-sel="${o.id}" ${selected ? 'checked' : ''} ${!canSelect(o) || viewOnly ? 'disabled' : ''}><i></i></label>
+          <div class="t-id"><b class="t-ref">${esc(o.ref)}</b><span class="t-cust">${esc(o.customer || 'No customer name')}</span></div>
+          <div class="t-age" title="Logged ${fmtDT(o.createdAt)}">${relTime(o.createdAt)}${o.urgent ? '<span class="t-flag">Urgent</span>' : ''}</div>
+        </header>
+        <div class="t-route">${journey(o, true, '')}</div>
+        <div class="t-status">${statusHTML(o, st, false)}${fromStock ? stockTag() : o.outsideLens ? outsideLensTag() : ''}</div>
+        <div class="t-do" data-stop>${action}</div>
+      </article>`;
+  }
+
   function rowsHTML() {
     const list = visible();
     if (!list.length) return `<div class="empty">${icons.glasses}<p>No orders match this view.</p></div>`;
+    if (isTablet()) return list.map(cardHTML).join('');
     return list.map(o => {
       const isNew = !ui.seen.has(o.id);
       const changed = ui.prevStatus.get(o.id) !== o.status;
@@ -560,27 +631,7 @@ export function fittingView(me) {
       const st = fitStep(o, { viewer: me.code });
       const selected = ui.selected.has(o.id);
       const needsFitter = o.status === 'lenses_in' && !o.fitter && !isOutside(o);
-      // Primary action: pick a fitter, advance, or show who we're waiting on.
-      let action;
-      // The handler's first job on any outside order: order the lens — the button opens the list.
-      if (o.outsideLens && o.outsideLens.status !== 'ordered' && me.code === outsideHandler() && !isBack(o) && !viewOnly)
-        action = `<a class="btn btn-primary btn-sm" href="#/outside">Order Lens ${icons.arrowRight}</a>`;
-      else if (canSendLenses(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-lenses="${o.lensRequest.id}">${icons.send} Send Lenses</button>`;
-      else if (canArriveOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-arrive-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
-      else if (canSendOutside(o, me.code) && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-send-outside="${o.outsideLens.id}">${icons.send} Send Lenses to ${esc(o.outsideLens.dest)}</button>`;
-      else if (outsideBlocked(o) && fitActor(o) === me.code && !canReceiveOutside(o, me.code)) action = `<span class="row-actor">waiting for the lenses</span>`;
-      else if (o.status === 'lenses_in' && o.fitter && o.fitter !== o.origin && isBenchClosed(o.fitter)) action = `<span class="row-actor" title="${esc(benchNote(o.fitter))}">${esc(o.fitter)} not taking frames</span>`;
-      else if (needsFitter && can) action = `<button class="btn btn-primary btn-sm" data-send-fitter="${o.id}">${icons.send} Send to Fitting</button>`;
-      else if (st.hubOut && can && !viewOnly) action = `<button class="btn btn-primary btn-sm" data-hub-out="${o.id}">${icons.send} Send to Outside Cutter</button>`;
-      else if (can && st.action) action = `<button class="btn btn-primary btn-sm" data-advance="${o.id}">${esc(st.action)} ${icons.arrowRight}</button>`;
-      else if (outsideInTransit(o, me.code)) action = `<span class="row-actor">waiting on ${esc(o.outsideLens.dest)}</span>`;
-      else action = `<span class="row-actor">${o.status === 'collected' ? icons.check : `waiting on ${esc(fitActor(o) ?? '')}`}</span>`;
-      // The fitter marks the outside lenses received — alongside the frame's own step.
-      if (canReceiveOutside(o, me.code) && !viewOnly) {
-        const lens = `<button class="btn btn-primary btn-sm" data-recv-outside="${o.outsideLens.id}">Lens Received ${icons.arrowRight}</button>`;
-        action = action.startsWith('<span') ? lens : `${lens}${action}`;
-      }
-      if (waOn(o)) action = `${waBtn(o)}${action}`;
+      const action = nextActionHTML(o, st, can, needsFitter);
       const title = o.customer || 'No customer name';
       const fromStock = !!store.lensRequestForOrder(o.id);
       return `
@@ -1315,7 +1366,7 @@ export function fittingView(me) {
       <section class="chips status-chips" id="f-chips">${chipsHTML()}</section>
       <div id="f-bulk">${bulkHTML()}</div>
       <div id="f-selall">${selectAllHTML()}</div>
-      <section class="list" id="f-list">${rowsHTML()}</section>
+      <section class="list ${isTablet() ? 't-list' : ''}" id="f-list">${rowsHTML()}</section>
       <div id="f-older">${ui.chip === 'collected' ? olderHTML(store.historyDays, store.olderLoaded('orders')) : ''}</div>`;
     wire();
     markSeen();
@@ -1469,12 +1520,23 @@ export function fittingView(me) {
       const sf = e.target.closest('[data-send-fitter]');
       if (sf) { e.stopPropagation(); fitterPicker(sf.dataset.sendFitter); return; }
       const adv = e.target.closest('[data-advance]');
-      if (adv) { e.stopPropagation(); store.advanceOrders([adv.dataset.advance], me.code); return; }
+      if (adv) {
+        e.stopPropagation();
+        const id = adv.dataset.advance;
+        store.advanceOrders([id], me.code).then(done => {
+          const o = done?.[0];
+          if (o && isTablet()) toast({ title: `${o.ref} — ${fitStep(o, { viewer: me.code }).label}`, sub: o.customer || '', ms: 7000,
+            action: canUndoOrder(o, me.code) ? { label: 'Undo', run: () => store.undoOrderStep(o.id, me.code) } : null });
+        });
+        return;
+      }
       const wa = e.target.closest('[data-wa]');
       if (wa) { e.stopPropagation(); messageCustomer(wa.dataset.wa); return; }
       const sel = e.target.closest('[data-sel]');
       if (sel) { toggleSelect(sel.dataset.sel); return; }
       if (e.target.closest('[data-stop]')) return;
+      const card = e.target.closest('[data-card]');
+      if (card) { openDrawer(card.dataset.card); return; }
       // Clicking the row selects it.
       const row = e.target.closest('[data-select]');
       if (row) toggleSelect(row.dataset.select);
