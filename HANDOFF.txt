@@ -1294,6 +1294,11 @@ vh (Chrome shrinks vh under zoom; --vh = 1vh/.9 undoes it).
 ================================================================================
  CHANGE LOG (newest first)
 ================================================================================
+ 2026-10-22  Admin Demo link takes any spelling (user typed ?demoadmin, which
+             opened the LIVE portal — the param was exactly "AdminDemo"):
+             auth.js reads the first param matching admin-demo / demo-admin in
+             any case — ?AdminDemo, ?admindemo, ?demoadmin(=SCC). The yellow
+             "Admin Demo" bar is how to tell you are in it.
  2026-10-22  BILL NUMBERS — ADMIN DEMO ONLY for now (bill.js BILL_ON =
              isPractice). The branch's letters in front by themselves
              (bill_prefix, default the code; Seeb = SEEB; editable "Bill

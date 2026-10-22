@@ -12,7 +12,10 @@ import { loc } from './data.js';
 // launch, unlisted anywhere. The portal on a database inside
 // this browser. The live connection is never even created then, so nothing
 // done in practice can reach the real data.
-export const PRACTICE = new URLSearchParams(location.search).get('AdminDemo');
+// Any spelling of the link opens it: ?AdminDemo, ?admindemo, ?demoadmin (the
+// user typed the last one, 2026-10-22, and landed on the live portal instead).
+const demoParam = [...new URLSearchParams(location.search)].find(([k]) => /^(admin-?demo|demo-?admin)$/i.test(k));
+export const PRACTICE = demoParam ? demoParam[1] : null;
 export const isPractice = PRACTICE !== null;
 export const supabase = isPractice
   ? await (await import('./demo.js')).practiceClient()
